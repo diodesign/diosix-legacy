@@ -1,0 +1,146 @@
+
+init:     file format elf32-i386
+
+
+Disassembly of section .text:
+
+08048054 <main>:
+ 8048054:	8d 4c 24 04          	lea    0x4(%esp),%ecx
+ 8048058:	83 e4 f0             	and    $0xfffffff0,%esp
+ 804805b:	ff 71 fc             	pushl  -0x4(%ecx)
+ 804805e:	55                   	push   %ebp
+ 804805f:	89 e5                	mov    %esp,%ebp
+ 8048061:	51                   	push   %ecx
+ 8048062:	83 ec 04             	sub    $0x4,%esp
+ 8048065:	e8 7e 00 00 00       	call   80480e8 <diosix_fork>
+ 804806a:	66 90                	xchg   %ax,%ax
+ 804806c:	f3 90                	pause  
+ 804806e:	eb fc                	jmp    804806c <main+0x18>
+
+08048070 <do_listen>:
+ 8048070:	55                   	push   %ebp
+ 8048071:	89 e5                	mov    %esp,%ebp
+ 8048073:	56                   	push   %esi
+ 8048074:	53                   	push   %ebx
+ 8048075:	83 ec 30             	sub    $0x30,%esp
+ 8048078:	8d 75 f4             	lea    -0xc(%ebp),%esi
+ 804807b:	8d 5d d4             	lea    -0x2c(%ebp),%ebx
+ 804807e:	66 90                	xchg   %ax,%ax
+ 8048080:	c7 45 d8 00 00 00 00 	movl   $0x0,-0x28(%ebp)
+ 8048087:	c7 45 d4 00 00 00 00 	movl   $0x0,-0x2c(%ebp)
+ 804808e:	c7 45 dc ff 0f 00 00 	movl   $0xfff,-0x24(%ebp)
+ 8048095:	89 75 f0             	mov    %esi,-0x10(%ebp)
+ 8048098:	c7 45 e8 04 00 00 00 	movl   $0x4,-0x18(%ebp)
+ 804809f:	83 ec 0c             	sub    $0xc,%esp
+ 80480a2:	53                   	push   %ebx
+ 80480a3:	e8 a4 00 00 00       	call   804814c <diosix_msg_receive>
+ 80480a8:	83 c4 10             	add    $0x10,%esp
+ 80480ab:	85 c0                	test   %eax,%eax
+ 80480ad:	75 d1                	jne    8048080 <do_listen+0x10>
+ 80480af:	ff 45 f4             	incl   -0xc(%ebp)
+ 80480b2:	c7 45 dc 01 00 00 00 	movl   $0x1,-0x24(%ebp)
+ 80480b9:	89 75 e4             	mov    %esi,-0x1c(%ebp)
+ 80480bc:	c7 45 e0 04 00 00 00 	movl   $0x4,-0x20(%ebp)
+ 80480c3:	83 ec 0c             	sub    $0xc,%esp
+ 80480c6:	53                   	push   %ebx
+ 80480c7:	e8 90 00 00 00       	call   804815c <diosix_msg_reply>
+ 80480cc:	83 c4 10             	add    $0x10,%esp
+ 80480cf:	85 c0                	test   %eax,%eax
+ 80480d1:	75 df                	jne    80480b2 <do_listen+0x42>
+ 80480d3:	eb ab                	jmp    8048080 <do_listen+0x10>
+ 80480d5:	90                   	nop
+ 80480d6:	90                   	nop
+ 80480d7:	90                   	nop
+
+080480d8 <diosix_exit>:
+ 80480d8:	55                   	push   %ebp
+ 80480d9:	89 e5                	mov    %esp,%ebp
+ 80480db:	31 d2                	xor    %edx,%edx
+ 80480dd:	cd 90                	int    $0x90
+ 80480df:	b2 03                	mov    $0x3,%dl
+ 80480e1:	8d 76 00             	lea    0x0(%esi),%esi
+ 80480e4:	cd 90                	int    $0x90
+ 80480e6:	eb fc                	jmp    80480e4 <diosix_exit+0xc>
+
+080480e8 <diosix_fork>:
+ 80480e8:	55                   	push   %ebp
+ 80480e9:	89 e5                	mov    %esp,%ebp
+ 80480eb:	ba 01 00 00 00       	mov    $0x1,%edx
+ 80480f0:	cd 90                	int    $0x90
+ 80480f2:	c9                   	leave  
+ 80480f3:	c3                   	ret    
+
+080480f4 <diosix_kill>:
+ 80480f4:	55                   	push   %ebp
+ 80480f5:	89 e5                	mov    %esp,%ebp
+ 80480f7:	ba 02 00 00 00       	mov    $0x2,%edx
+ 80480fc:	8b 45 08             	mov    0x8(%ebp),%eax
+ 80480ff:	cd 90                	int    $0x90
+ 8048101:	c9                   	leave  
+ 8048102:	c3                   	ret    
+ 8048103:	90                   	nop
+
+08048104 <diosix_yield>:
+ 8048104:	55                   	push   %ebp
+ 8048105:	89 e5                	mov    %esp,%ebp
+ 8048107:	ba 03 00 00 00       	mov    $0x3,%edx
+ 804810c:	cd 90                	int    $0x90
+ 804810e:	c9                   	leave  
+ 804810f:	c3                   	ret    
+
+08048110 <diosix_thread_exit>:
+ 8048110:	55                   	push   %ebp
+ 8048111:	89 e5                	mov    %esp,%ebp
+ 8048113:	ba 04 00 00 00       	mov    $0x4,%edx
+ 8048118:	cd 90                	int    $0x90
+ 804811a:	b2 03                	mov    $0x3,%dl
+ 804811c:	cd 90                	int    $0x90
+ 804811e:	eb fc                	jmp    804811c <diosix_thread_exit+0xc>
+
+08048120 <diosix_thread_fork>:
+ 8048120:	55                   	push   %ebp
+ 8048121:	89 e5                	mov    %esp,%ebp
+ 8048123:	ba 05 00 00 00       	mov    $0x5,%edx
+ 8048128:	cd 90                	int    $0x90
+ 804812a:	c9                   	leave  
+ 804812b:	c3                   	ret    
+
+0804812c <diosix_thread_kill>:
+ 804812c:	55                   	push   %ebp
+ 804812d:	89 e5                	mov    %esp,%ebp
+ 804812f:	ba 06 00 00 00       	mov    $0x6,%edx
+ 8048134:	8b 45 08             	mov    0x8(%ebp),%eax
+ 8048137:	cd 90                	int    $0x90
+ 8048139:	c9                   	leave  
+ 804813a:	c3                   	ret    
+ 804813b:	90                   	nop
+
+0804813c <diosix_msg_send>:
+ 804813c:	55                   	push   %ebp
+ 804813d:	89 e5                	mov    %esp,%ebp
+ 804813f:	ba 07 00 00 00       	mov    $0x7,%edx
+ 8048144:	8b 45 08             	mov    0x8(%ebp),%eax
+ 8048147:	cd 90                	int    $0x90
+ 8048149:	c9                   	leave  
+ 804814a:	c3                   	ret    
+ 804814b:	90                   	nop
+
+0804814c <diosix_msg_receive>:
+ 804814c:	55                   	push   %ebp
+ 804814d:	89 e5                	mov    %esp,%ebp
+ 804814f:	ba 08 00 00 00       	mov    $0x8,%edx
+ 8048154:	8b 45 08             	mov    0x8(%ebp),%eax
+ 8048157:	cd 90                	int    $0x90
+ 8048159:	c9                   	leave  
+ 804815a:	c3                   	ret    
+ 804815b:	90                   	nop
+
+0804815c <diosix_msg_reply>:
+ 804815c:	55                   	push   %ebp
+ 804815d:	89 e5                	mov    %esp,%ebp
+ 804815f:	8b 45 08             	mov    0x8(%ebp),%eax
+ 8048162:	81 48 08 00 00 00 80 	orl    $0x80000000,0x8(%eax)
+ 8048169:	ba 07 00 00 00       	mov    $0x7,%edx
+ 804816e:	cd 90                	int    $0x90
+ 8048170:	c9                   	leave  
+ 8048171:	c3                   	ret    
