@@ -18,7 +18,8 @@ READELFbin = $(PREFIX)readelf
 # defines
 PORTDIR  = kernel/ports/i386
 COREDIR  = ../../core
-LIBDIOSIXDIR	= ../../../user/lib/i386/libdiosix
+LIBDIOSIXDIR = ../../../user/lib/i386/libdiosix
+SVNDEF := -D'SVN_REV="$(shell svnversion -n .)"'
 
 MAKEFILE	= makefile
 MAKEDEP		= $(MAKEFILE) include/portdefs.h include/processes.h include/boot.h include/cpu.h include/debug.h include/elf.h include/interrupts.h include/ipc.h include/locks.h include/lowlevel.h include/memory.h include/multiboot.h include/sched.h include/sglib.h include/syscalls.h
@@ -30,7 +31,7 @@ NASM		= nasm -f elf -i$(INCDIR)/
 FLAGS		= -g -std=c99 -Wall -nostdlib -nostartfiles \
 			-nostdinc -fno-builtin -nodefaultlibs \
 			-fomit-frame-pointer
-CC		= $(CCbin) $(FLAGS) -I$(INCDIR) -I$(COREDIR) -I$(LIBDIOSIXDIR)/include -DDEBUG
+CC		= $(CCbin) $(SVNDEF) $(FLAGS) -I$(INCDIR) -I$(COREDIR) -I$(LIBDIOSIXDIR)/include -DDEBUG
 LD		= $(CCbin) $(FLAGS) -Xlinker --script=$(LDSCRIPT) -Xlinker
 
 

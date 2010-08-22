@@ -34,7 +34,7 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 void _main(multiboot_info_t *mbd, unsigned int magic)
 {
    if(DEBUG) debug_initialise();
-   dprintf("[core] diosix-hyatt " __TIME__ " " __DATE__ " (built with GCC " __VERSION__ ")\n");
+   dprintf("[core] diosix-hyatt rev %s" " " __TIME__ " " __DATE__ " (built with GCC " __VERSION__ ")\n", SVN_REV);
 	
 	if(magic != MULTIBOOT_MAGIC) /* as defined in the multiboot spec */
 		dprintf("*** warning: bootloader magic was %x (expecting %x).\n", magic, MULTIBOOT_MAGIC);
