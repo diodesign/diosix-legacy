@@ -251,8 +251,9 @@ struct process
 	   them or their own children. The layer list:
 	   0 = reserved for the kernel (which has no processes/threads)
 	   1 = reserved for init (which becomes the sytem executive)
-	   2 = managers and drivers (trusted)
-	   3 = user processes (untrusted) */
+	   2 = reserved for hardware-specific drivers (trusted)
+		3 = reserved for hardware-independent managers (trusted)
+	   4 = user processes (untrusted) */
 	unsigned int rights; /* bitmap of allowed restricted syscalls */
 	unsigned char layer; /* this process's layer */
 	
@@ -262,9 +263,6 @@ struct process
 };
 
 #define LAYER_EXECUTIVE	 (1)
-#define LAYER_TRUSTED	 (2)
-#define LAYER_UNTRUSTED	 (3)
-
 #define RIGHTS_EXECUTIVE (0)
 
 /* processes, threads and scheduling */

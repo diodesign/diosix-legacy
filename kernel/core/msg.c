@@ -53,6 +53,10 @@ kresult msg_test_receiver(thread *sender, thread *target, diosix_msg_info *msg)
 	/* protect us from changes to the target's metadata */
 	lock_gate(&(target->lock), LOCK_READ);
 	
+	/* threads can only recieve messages if they are in a layer below the sender */
+	if(target->proc->layer >= sender->proc->layer)
+		goto msg_test_receiver_failure;
+	
 	/* is this message waiting on a reply from this thread? */
 	if((target->state == waitingforreply) &&
 		(msg->flags & DIOSIX_MSG_REPLY) &&
@@ -203,7 +207,7 @@ kresult msg_copy(thread *receiver, void *data, unsigned int size, unsigned int *
    Send a basic diosix IPC message to a thread within another process.
    the kernel doesn't care about the contents of the message. threads
    can only send messages to listening threads (those blocked on msg_recv())
-   that are in a trusted layer. this call will unschedule the calling thread
+   in layers below them. this call will unschedule the calling thread
    so that it will block until a reply via msg_send() is sent from the receiver
    => sender = thread trying to send the message
       msg = message block
