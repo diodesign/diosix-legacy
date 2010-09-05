@@ -66,6 +66,7 @@ typedef enum
 /* message passing - control flags bits high */
 #define DIOSIX_MSG_REPLY		 (1 << 31)
 #define DIOSIX_MSG_MULTIPART	 (1 << 30)
+#define DIOSIX_MSG_RECVONREPLY (1 << 29)
 /* simple type bits low (bits 0-11) */
 #define DIOSIX_MSG_GENERIC		 (1)
 #define DIOSIX_MSG_SIGNAL		 (2)

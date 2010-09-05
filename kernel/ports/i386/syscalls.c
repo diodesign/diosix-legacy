@@ -206,6 +206,7 @@ void syscall_do_msg_send(int_registers_block *regs)
 {
 	thread *current = cpu_table[CPU_ID].current;
 	diosix_msg_info *msg = (diosix_msg_info *)regs->eax;
+	unsigned int send_result;
 	
 	SYSCALL_DEBUG("[sys:%i] SYSCALL_MSG_SEND(%x) called by process %i (%p) (thread %i)\n",
 			  CPU_ID, regs->eax, cpu_table[CPU_ID].current->proc->pid, cpu_table[CPU_ID].current->proc,
@@ -215,10 +216,25 @@ void syscall_do_msg_send(int_registers_block *regs)
 	if(!msg || ((unsigned int)msg >= KERNEL_SPACE_BASE)) SYSCALL_RETURN(e_bad_address);
 	
 	/* do the actual sending */
-	regs->eax = msg_send(current, msg);
+	send_result = msg_send(current, msg);
+	
+	/* should we wait for a follow-up message if this was a reply? */
+	if(!send_result && (msg->flags & DIOSIX_MSG_REPLY) && (msg->flags & DIOSIX_MSG_RECVONREPLY))
+	{
+		/* clear message flags to perform a recv */
+		msg->flags &= DIOSIX_MSG_TYPEMASK;
+		
+		/* zero the send info and preserve everything else */
+		msg->send_size = 0;
+		msg->send = NULL;
+		
+		syscall_do_msg_recv(regs); /* will update eax when it returns */		
+	}
+	else
+		regs->eax = send_result;
 }
 
-/* syscall:msg_send - receive a message or block until a message is received
+/* syscall:msg_recv - receive a message or block until a message is received
    => eax = pointer to message description block
    <= eax = 0 for success or a diosix-specific error code
 */

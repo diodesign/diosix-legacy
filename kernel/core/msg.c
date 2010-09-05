@@ -53,8 +53,9 @@ kresult msg_test_receiver(thread *sender, thread *target, diosix_msg_info *msg)
 	/* protect us from changes to the target's metadata */
 	lock_gate(&(target->lock), LOCK_READ);
 	
-	/* threads can only recieve messages if they are in a layer below the sender */
-	if(target->proc->layer >= sender->proc->layer)
+	/* threads can only recieve messages if they are in a layer below the sender - unless it's a 
+		reply. we check below whether this is a legit reply */
+	if((target->proc->layer >= sender->proc->layer) && !(msg->flags & DIOSIX_MSG_REPLY))
 		goto msg_test_receiver_failure;
 	
 	/* is this message waiting on a reply from this thread? */
