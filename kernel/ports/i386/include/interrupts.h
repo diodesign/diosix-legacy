@@ -107,6 +107,7 @@ void lapic_ipi_send_startup(unsigned int destination, unsigned char vector);
 void lapic_ipi_send_init(unsigned int destination);
 unsigned int ioapic_read(unsigned char id, unsigned char reg);
 void ioapic_write(unsigned char id, unsigned char reg, unsigned int value);
+kresult ioapic_register_chip(unsigned int id, unsigned int physaddr);
 kresult irq_register_driver(unsigned int irq_num, unsigned int flags, unsigned int pid, kresult (*func)(unsigned char intnum, int_registers_block *regs));
 kresult irq_deregister_driver(unsigned int irq_num, unsigned int type, unsigned int pid, kresult (*func)(unsigned char intnum, int_registers_block *regs));
 

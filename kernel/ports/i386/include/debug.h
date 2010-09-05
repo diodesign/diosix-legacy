@@ -33,6 +33,13 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #define KOOPS_DEBUG	dprintf  /* potentially serious kernel failures */
 
 /* these are conditional - define *_DEBUG to activate them */
+#ifdef BUS_DEBUG
+# undef BUS_DEBUG
+# define BUS_DEBUG		dprintf
+#else
+# define BUS_DEBUG if(0) dprintf
+#endif
+
 #ifdef MSG_DEBUG
 # undef MSG_DEBUG
 # define MSG_DEBUG		dprintf

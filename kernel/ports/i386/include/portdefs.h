@@ -31,6 +31,7 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 /* the order of these should not be important */
 #include <boot.h>
 #include <chips.h>
+#include <buses.h>
 #include <memory.h>
 #include <interrupts.h>
 #include <cpu.h>

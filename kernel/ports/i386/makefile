@@ -22,7 +22,7 @@ LIBDIOSIXDIR = ../../../user/lib/i386/libdiosix
 SVNDEF := -D'SVN_REV="$(shell svnversion -n .)"'
 
 MAKEFILE	= makefile
-MAKEDEP		= $(MAKEFILE) include/portdefs.h include/processes.h include/boot.h include/cpu.h include/debug.h include/elf.h include/interrupts.h include/ipc.h include/locks.h include/lowlevel.h include/memory.h include/multiboot.h include/sched.h include/sglib.h include/syscalls.h
+MAKEDEP		= $(MAKEFILE) include/portdefs.h include/processes.h include/boot.h include/cpu.h include/buses.h include/debug.h include/elf.h include/interrupts.h include/ipc.h include/locks.h include/lowlevel.h include/memory.h include/multiboot.h include/sched.h include/sglib.h include/syscalls.h
 
 INCDIR		= include
 LDSCRIPT	= diosix.ld
@@ -39,7 +39,7 @@ LD		= $(CCbin) $(FLAGS) -Xlinker --script=$(LDSCRIPT) -Xlinker
 # try to keep often-used functions together for cache performance
 OBJS	 = objs/locore.o \
 	   objs/lowlevel.o objs/exceptions.o objs/irqs.o objs/syscalls.o objs/msg.o objs/sched.o \
-	   objs/vmm.o objs/page.o objs/thread.o objs/proc.o objs/ioapic.o objs/pic.o objs/lapic.o \
+	   objs/vmm.o objs/page.o objs/thread.o objs/proc.o objs/ioapic.o objs/pic.o objs/lapic.o objs/buses.o \
 	   objs/intcontrol.o objs/mp.o objs/boot.o objs/payload.o \
 	   objs/serial.o objs/debug.o
 
@@ -93,6 +93,9 @@ objs/lowlevel.o:	hw/lowlevel.c		$(MAKEDEP)
 
 objs/locore.o:		hw/locore.s		$(MAKEDEP)
 			$(COMPILE.s)
+
+objs/buses.o:		buses.c			$(MAKEDEP)
+			$(COMPILE.c)
 
 objs/page.o:		cpu/page.c		$(MAKEDEP)
 			$(COMPILE.c)

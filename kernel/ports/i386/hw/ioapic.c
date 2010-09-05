@@ -96,6 +96,19 @@ void ioapic_route_set(unsigned char id, unsigned char entry, unsigned char cpu, 
 	ioapic_write(id, IOAPIC_REDIR_BASE + (entry * 2) + 1, cpu << 24);
 }
 
+/* ioapic_register_chip
+   Register an IOAPIC chip with the system
+	=> id = system ID for the chip
+      physaddr = physical base address of the chip's memory-mapped registers
+   <= 0 for success or a failure code
+*/
+kresult ioapic_register_chip(unsigned int id, unsigned int physaddr)
+{
+	/* TODO: not implemented */
+	
+	return e_failure;
+}
+
 /* int_initialise_ioapic
 	Set up an IOAPIC on the system
    => id = ID of IOAPIC to initialise
