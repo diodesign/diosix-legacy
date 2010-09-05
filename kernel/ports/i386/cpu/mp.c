@@ -22,6 +22,9 @@ unsigned char mp_cpus = 0;
 unsigned char mp_ioapics = 0;
 unsigned char mp_boot_cpu = 0;
 unsigned char mp_domains = 0;
+
+/* pointer to table of cpu descriptors */
+mp_core *cpu_table;
  
 /* set to 1 by an AP to indicate it's reached startup, reset to 0 before attempting to bake an AP */
 volatile unsigned char mp_ap_ready = 0;
@@ -152,12 +155,12 @@ kresult mp_init_ap(unsigned int id)
    Initialise the table of present cpus and prepare the slave cpu launch trampoline */
 void mp_init_cpu_table(void)
 {
-	if(vmm_malloc((void **)&cpu_table, sizeof(proc_cpu) * mp_cpus))
+	if(vmm_malloc((void **)&cpu_table, sizeof(mp_core) * mp_cpus))
 	{
 		MP_DEBUG("[mp:%i] can't allocate cpu table! halting...\n");
 		while(1);
 	}
-	vmm_memset((void *)cpu_table, 0, sizeof(proc_cpu) * mp_cpus);
+	vmm_memset((void *)cpu_table, 0, sizeof(mp_core) * mp_cpus);
 	
 	MP_DEBUG("[mp:%i] initialised run-time cpu table %p (%i cpus)\n", CPU_ID, cpu_table, mp_cpus);
 }

@@ -29,8 +29,8 @@ typedef enum
 /* chip states */
 typedef enum
 {
-	enabled = 0, /* chip can be used */	
-	disabled		 /* chip has been disabled */
+	enabled = 0,  /* chip can be used */	
+	disabled		 /* chip has been disabled at boot */
 } chip_state;
 
 /* describe a cpu core */
@@ -67,11 +67,11 @@ typedef struct
 	unsigned int apic_id;
 	
 	/* pointer to data with info specific to this chip */
-	union data
+	union
 	{
 		chip_ioapic *ioapic;
 		chip_core *core;
-	};
+	} data;
 } chip_entry;
 
 extern chip_entry *chip_table;

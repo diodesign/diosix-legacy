@@ -141,10 +141,30 @@ typedef struct
 	mp_rsdt_block *rsdt;
 } __attribute__((packed)) mp_rsdp_header;
 
+/* describe an mp core */
+typedef struct
+{
+	chip_state state;
+	thread *current;			 /* must point to the thread being run */
+	rw_gate lock;				 /* lock for the cpu metadata */
+	
+	/* prioritised run queues */
+	thread *queue_head, *queue_tail;
+	thread *queue_marker[SCHED_PRIORITY_LEVELS]; /* priority levels */
+	unsigned int queued; /* how much workload this processor has */
+	
+	/* pointers to this CPU's gdt table and into its TSS selector */
+	gdtptr_descr gdtptr;
+	gdt_entry *tssentry;
+	
+} mp_core;
+
 /* multiprocessing support */
 #define MP_AP_START_STACK_SIZE	(1024)
 #define MP_AP_START_VECTOR			(0x80)
 #define MP_AP_START_VECTOR_SHIFT (12)
+
+extern mp_core *cpu_table;
 
 kresult mp_initialise(void); /* if this fails then the machine is probably toast */
 void mp_post_initialise(void);

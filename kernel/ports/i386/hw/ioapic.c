@@ -20,7 +20,7 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #include <portdefs.h>
 
 /* a messy fixed table of IOAPIC info */
-iaopic ioapics[MAX_IOAPICS];
+chip_ioapic ioapics[MAX_IOAPICS];
 
 /* hardware interrupts for the system's IOAPICs */
 extern void irq23(); extern void irq24(); extern void irq25(); extern void irq26();

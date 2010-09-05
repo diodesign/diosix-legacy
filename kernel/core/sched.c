@@ -265,7 +265,7 @@ void sched_caretaker(void)
 */
 void sched_tick(int_registers_block *regs)
 {
-	proc_cpu *cpu = &cpu_table[CPU_ID];
+	mp_core *cpu = &cpu_table[CPU_ID];
 
 	/* give up if no thread running */
 	if(!(cpu->current)) return;
@@ -321,7 +321,7 @@ void sched_pick(int_registers_block *regs)
 {
 	thread *now, *next;
 
-	proc_cpu *cpu = &cpu_table[CPU_ID];
+	mp_core *cpu = &cpu_table[CPU_ID];
 	
 #ifdef SCHED_DEBUG
 	{

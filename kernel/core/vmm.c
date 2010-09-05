@@ -189,7 +189,7 @@ unsigned int vmm_malloc_read_size(void *addr)
 
 /* vmm_malloc_write_size
    Update the allocated size of a given block in bytes */
-unsigned int vmm_malloc_write_size(void *addr, unsigned int size)
+void vmm_malloc_write_size(void *addr, unsigned int size)
 {
 	kheap_block *block = (kheap_block *)((unsigned int)addr - sizeof(kheap_block));
 	block->size = size;
@@ -353,7 +353,7 @@ void *vmm_realloc(void *addr, signed int change)
 			return NULL; /* failed */			
 		}
 		
-		if(malloc(&new, change) == success)
+		if(vmm_malloc(&new, change) == success)
 			return new; /* we succeeded, send back the pointer */
 		else
 			return NULL; /* failed to allocate */
@@ -375,7 +375,7 @@ void *vmm_realloc(void *addr, signed int change)
 	}
 
 	/* sanity checks passed, try to grow/shrink the block within the padding of the block */
-	if(size + change) =< KHEAP_PAD_SAFE(size))
+	if((size + change) <= KHEAP_PAD_SAFE(size))
 	{
 		/* update the size stats and return the same pointer */
 		vmm_malloc_write_size(addr, size + change);
