@@ -16,10 +16,10 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 */
 
 #ifndef _SCHED_H
-#define	_SCHED_H
+#define   _SCHED_H
 
 /* rate at which thread timeslices are reduced by 1 (in Hz) */
-#define SCHED_FREQUENCY	(100)
+#define SCHED_FREQUENCY   (100)
 
 /* scheduling */
 void sched_initialise(void);

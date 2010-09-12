@@ -16,7 +16,7 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 */
 
 #ifndef _PORTDEFS_H
-#define	_PORTDEFS_H
+#define   _PORTDEFS_H
 
 /* declare stuff shared with the userspace libraries */
 #include <diosix.h>

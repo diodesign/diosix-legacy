@@ -31,7 +31,10 @@ NASM		= nasm -f elf -i$(INCDIR)/
 FLAGS		= -g -std=c99 -Wall -nostdlib -nostartfiles \
 			-nostdinc -fno-builtin -nodefaultlibs \
 			-fomit-frame-pointer
-CC		= $(CCbin) $(SVNDEF) $(FLAGS) -I$(INCDIR) -I$(COREDIR) -I$(LIBDIOSIXDIR)/include -DDEBUG
+
+DEBUG		= -DDEBUG -DMSG_DEBUG -DBUS_DEBUG -DPROC_DEBUG -DSCHED_DEBUG -DTHREAD_DEBUG -DVMM_DEBUG -DXPT_DEBUG -DINT_DEBUG -DIRQ_DEBUG -DMP_DEBUG -DPAGE_DEBUG -DKSYM_DEBUG -DIOAPIC_DEBUG -DLAPIC_DEBUG -DLOCK_DEBUG -DLOLVL_DEBUG -DPIC_DEBUG -DSYSCALL_DEBUG -DPERFORMANCE_DEBUG
+
+CC		= $(CCbin) $(SVNDEF) $(FLAGS) -I$(INCDIR) -I$(COREDIR) -I$(LIBDIOSIXDIR)/include $(DEBUG)
 LD		= $(CCbin) $(FLAGS) -Xlinker --script=$(LDSCRIPT) -Xlinker
 
 

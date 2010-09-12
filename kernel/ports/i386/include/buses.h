@@ -16,7 +16,7 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 */
 
 #ifndef _BUSES_H
-#define	_BUSES_H
+#define _BUSES_H
 
 /* prototypes */
 kresult bus_register_name(unsigned int id, char *name);

@@ -35,34 +35,34 @@ void _main(multiboot_info_t *mbd, unsigned int magic)
 {
    if(DEBUG) debug_initialise();
    dprintf("[core] diosix-hyatt rev %s" " " __TIME__ " " __DATE__ " (built with GCC " __VERSION__ ")\n", SVN_REV);
-	
-	if(magic != MULTIBOOT_MAGIC) /* as defined in the multiboot spec */
-		dprintf("*** warning: bootloader magic was %x (expecting %x).\n", magic, MULTIBOOT_MAGIC);
-	
-	/* ---- multiboot + SMP data must be preserved during these calls ------- */
-	/* initialise interrupt handling and discover processor(s) */
+   
+   if(magic != MULTIBOOT_MAGIC) /* as defined in the multiboot spec */
+      dprintf("*** warning: bootloader magic was %x (expecting %x).\n", magic, MULTIBOOT_MAGIC);
+   
+   /* ---- multiboot + SMP data must be preserved during these calls ------- */
+   /* initialise interrupt handling and discover processor(s) */
    if(mp_initialise()) goto goforhalt;
-	
-	/* parse modules payloaded by the boot loader, best halt if there are none? */
+   
+   /* parse modules payloaded by the boot loader, best halt if there are none? */
    if(payload_preinit(mbd)) goto goforhalt;
 
    /* initialise the memory manager or halt if it fails */
    if(vmm_initialise(mbd)) goto goforhalt;
 
    /* initialise process and thread management, prepare first processes */
-	sched_pre_initalise();
-	
-	/* bring up the processor(s) */
-	mp_post_initialise();
-	
+   sched_pre_initalise();
+   
+   /* bring up the processor(s) */
+   mp_post_initialise();
+   
    if(proc_initialise()) goto goforhalt;
    /* ---- multiboot + SMP data is no longer required by this point ------- */
 
-	/* hocus pocus, mumbo jumbo, black magic */
-	sched_initialise(); /* enable interrupts and start the execution of
-								  userspace processes */
-	/* shouldn't fall through... but halt if so */
-	
+   /* hocus pocus, mumbo jumbo, black magic */
+   sched_initialise(); /* enable interrupts and start the execution of
+                          userspace processes */
+   /* shouldn't fall through... but halt if so */
+   
 goforhalt:
    /* halt here - there is nothing to return to */
    debug_panic("unexpected end-of-boot");

@@ -16,62 +16,62 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 */
 
 #ifndef _CHIPS_H
-#define	_CHIPS_H
+#define   _CHIPS_H
 
 /* chip types */
 typedef enum 
 {
-	notpresent = 0,
-	cpu_core,
-	ioapic
+   notpresent = 0,
+   cpu_core,
+   ioapic
 } chip_type;
 
 /* chip states */
 typedef enum
 {
-	enabled = 0,  /* chip can be used */	
-	disabled		 /* chip has been disabled at boot */
+   enabled = 0,  /* chip can be used */   
+   disabled       /* chip has been disabled at boot */
 } chip_state;
 
 /* describe a cpu core */
 typedef struct
 {
-	thread *current;			 /* must point to the thread being run */
-	rw_gate lock;				 /* lock for the cpu metadata */
-	
-	/* prioritised run queues */
-	thread *queue_head, *queue_tail;
-	thread *queue_marker[SCHED_PRIORITY_LEVELS]; /* priority levels */
-	unsigned int queued; /* how much workload this processor has */
-	
-	/* pointers to this CPU's gdt table and into its TSS selector */
-	gdtptr_descr gdtptr;
-	gdt_entry *tssentry;
+   thread *current;          /* must point to the thread being run */
+   rw_gate lock;             /* lock for the cpu metadata */
+   
+   /* prioritised run queues */
+   thread *queue_head, *queue_tail;
+   thread *queue_marker[SCHED_PRIORITY_LEVELS]; /* priority levels */
+   unsigned int queued; /* how much workload this processor has */
+   
+   /* pointers to this CPU's gdt table and into its TSS selector */
+   gdtptr_descr gdtptr;
+   gdt_entry *tssentry;
 } chip_core;
 
 /* define an ioapic chip */
 typedef struct
 {
-	unsigned int baseaddr;
+   unsigned int baseaddr;
 } chip_ioapic;
 
 
 /* define per-chip table entry */
 typedef struct
 {
-	/* describe this chip in a generic sense */
-	chip_type type;
-	chip_state state;
-	
-	/* BIOS-assigned system ID for this chip */
-	unsigned int apic_id;
-	
-	/* pointer to data with info specific to this chip */
-	union
-	{
-		chip_ioapic *ioapic;
-		chip_core *core;
-	} data;
+   /* describe this chip in a generic sense */
+   chip_type type;
+   chip_state state;
+   
+   /* BIOS-assigned system ID for this chip */
+   unsigned int apic_id;
+   
+   /* pointer to data with info specific to this chip */
+   union
+   {
+      chip_ioapic *ioapic;
+      chip_core *core;
+   } data;
 } chip_entry;
 
 extern chip_entry *chip_table;

@@ -18,39 +18,39 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #include <portdefs.h>
 
 /* thread_find_thread
-	<= return a pointer to a thread that matches the given tid owned by the
+   <= return a pointer to a thread that matches the given tid owned by the
       given process, or NULL for failure */
 thread *thread_find_thread(process *proc, unsigned int tid)
 {
-	thread *search, **table;
-	unsigned int hash = tid % THREAD_HASH_BUCKETS;
+   thread *search, **table;
+   unsigned int hash = tid % THREAD_HASH_BUCKETS;
 
-	if(!tid || !proc)
-	{
-		KOOPS_DEBUG("[thread:%i] OMGWTF thread_find_thread failed on sanity check.\n"
-				      "            process %p tid %i\n", CPU_ID, proc, tid);
-		return NULL;
-	}
+   if(!tid || !proc)
+   {
+      KOOPS_DEBUG("[thread:%i] OMGWTF thread_find_thread failed on sanity check.\n"
+                  "            process %p tid %i\n", CPU_ID, proc, tid);
+      return NULL;
+   }
 
-	if(lock_gate(&(proc->lock), LOCK_READ))
-		return NULL;
-	
-	table = proc->threads;
-	
-	search = table[hash];
-	while(search)
-	{
-		if(search->tid == tid)
-		{
-			unlock_gate(&(proc->lock), LOCK_READ);
-			return search; /* foundya */
-		}
-		
-		search = search->hash_next;
-	}
-	
-	unlock_gate(&(proc->lock), LOCK_READ);
-	return NULL; /* not found! */
+   if(lock_gate(&(proc->lock), LOCK_READ))
+      return NULL;
+   
+   table = proc->threads;
+   
+   search = table[hash];
+   while(search)
+   {
+      if(search->tid == tid)
+      {
+         unlock_gate(&(proc->lock), LOCK_READ);
+         return search; /* foundya */
+      }
+      
+      search = search->hash_next;
+   }
+   
+   unlock_gate(&(proc->lock), LOCK_READ);
+   return NULL; /* not found! */
 }
 
 /* thread_duplicate
@@ -62,323 +62,323 @@ thread *thread_find_thread(process *proc, unsigned int tid)
 */
 thread *thread_duplicate(process *proc, thread *source)
 {
-	unsigned int kstack, hash;
-	thread *new, **threads;
-	
-	if(lock_gate(&(proc->lock), LOCK_WRITE))
-		return NULL;
-	if(lock_gate(&(source->lock), LOCK_READ))
-	{
-		unlock_gate(&(proc->lock), LOCK_WRITE);
-		return NULL;
-	}
-	
-	/* grab memory and zero it now to store details of new thread */
-	kresult err = vmm_malloc((void **)&new, sizeof(thread));
-	if(err)
-	{
-		unlock_gate(&(source->lock), LOCK_READ);
-		unlock_gate(&(proc->lock), LOCK_WRITE);
-		return NULL; /* fail if we can't alloc a new thread */
-	}
-	vmm_memset(new, 0, sizeof(thread));
-	
-	/* initialise thread hash table if required */
-	if(!(proc->threads))
-	{
-		thread_new_hash(proc);
-		if(!(proc->threads))
-		{
-			vmm_free(new);
-			unlock_gate(&(source->lock), LOCK_READ);
-			unlock_gate(&(proc->lock), LOCK_WRITE);
-			return NULL;
-		}
-	}
-	threads = proc->threads;
-	
-	new->proc          = proc;
-	new->tid           = source->tid;
-	new->flags         = source->flags;
-	new->timeslice     = source->timeslice;
-	new->priority      = source->priority;
-	new->prev_priority = source->prev_priority;
-	new->stackbase		 = source->stackbase;
+   unsigned int kstack, hash;
+   thread *new, **threads;
+   
+   if(lock_gate(&(proc->lock), LOCK_WRITE))
+      return NULL;
+   if(lock_gate(&(source->lock), LOCK_READ))
+   {
+      unlock_gate(&(proc->lock), LOCK_WRITE);
+      return NULL;
+   }
+   
+   /* grab memory and zero it now to store details of new thread */
+   kresult err = vmm_malloc((void **)&new, sizeof(thread));
+   if(err)
+   {
+      unlock_gate(&(source->lock), LOCK_READ);
+      unlock_gate(&(proc->lock), LOCK_WRITE);
+      return NULL; /* fail if we can't alloc a new thread */
+   }
+   vmm_memset(new, 0, sizeof(thread));
+   
+   /* initialise thread hash table if required */
+   if(!(proc->threads))
+   {
+      thread_new_hash(proc);
+      if(!(proc->threads))
+      {
+         vmm_free(new);
+         unlock_gate(&(source->lock), LOCK_READ);
+         unlock_gate(&(proc->lock), LOCK_WRITE);
+         return NULL;
+      }
+   }
+   threads = proc->threads;
+   
+   new->proc          = proc;
+   new->tid           = source->tid;
+   new->flags         = source->flags;
+   new->timeslice     = source->timeslice;
+   new->priority      = source->priority;
+   new->prev_priority = source->prev_priority;
+   new->stackbase       = source->stackbase;
 
-	/* the new thread is asleep and due to be scheduled */
-	new->state = sleeping;
-	
-	/* clone the source thread's tss FIXME not very portable? :( */
-	vmm_memcpy(&(new->tss), &(source->tss), sizeof(tss_descr));
-	
-	/* clone the source thread's kernel stack for this new thread */
-	err = vmm_malloc((void **)&kstack, MEM_PGSIZE);
-	if(err)
-	{
-		unlock_gate(&(source->lock), LOCK_READ);
-		unlock_gate(&(proc->lock), LOCK_WRITE);
-		vmm_free(new);
-		return NULL; /* something went wrong */
-	}
-	
-	/* stacks grow down, hence pushing base up */
-	new->kstackblk = kstack;
-	new->kstackbase = kstack + MEM_PGSIZE;
-	
-	/* copy thread state FIXME not very portable :( */
-	vmm_memcpy(&(new->regs), &(source->regs), sizeof(int_registers_block));
-	
-	hash = new->tid % THREAD_HASH_BUCKETS;
-	if(threads[hash])
-	{ 
-		threads[hash]->hash_prev = new;
-		new->hash_next = threads[hash];
-	}
-	else
-	{
-		new->hash_next = NULL;
-	}
-	threads[hash] = new;
-	new->hash_prev = NULL;	
-	
-	unlock_gate(&(source->lock), LOCK_READ);
-	unlock_gate(&(proc->lock), LOCK_WRITE);
-	
-	THREAD_DEBUG("[thread:%i] cloned thread %i of process %i for process %i (%p) (kstack %p)\n",
-			  CPU_ID, source->tid, source->proc->pid, proc->pid, new, new->kstackbase);
-	
-	return new;
+   /* the new thread is asleep and due to be scheduled */
+   new->state = sleeping;
+   
+   /* clone the source thread's tss FIXME not very portable? :( */
+   vmm_memcpy(&(new->tss), &(source->tss), sizeof(tss_descr));
+   
+   /* clone the source thread's kernel stack for this new thread */
+   err = vmm_malloc((void **)&kstack, MEM_PGSIZE);
+   if(err)
+   {
+      unlock_gate(&(source->lock), LOCK_READ);
+      unlock_gate(&(proc->lock), LOCK_WRITE);
+      vmm_free(new);
+      return NULL; /* something went wrong */
+   }
+   
+   /* stacks grow down, hence pushing base up */
+   new->kstackblk = kstack;
+   new->kstackbase = kstack + MEM_PGSIZE;
+   
+   /* copy thread state FIXME not very portable :( */
+   vmm_memcpy(&(new->regs), &(source->regs), sizeof(int_registers_block));
+   
+   hash = new->tid % THREAD_HASH_BUCKETS;
+   if(threads[hash])
+   { 
+      threads[hash]->hash_prev = new;
+      new->hash_next = threads[hash];
+   }
+   else
+   {
+      new->hash_next = NULL;
+   }
+   threads[hash] = new;
+   new->hash_prev = NULL;   
+   
+   unlock_gate(&(source->lock), LOCK_READ);
+   unlock_gate(&(proc->lock), LOCK_WRITE);
+   
+   THREAD_DEBUG("[thread:%i] cloned thread %i of process %i for process %i (%p) (kstack %p)\n",
+           CPU_ID, source->tid, source->proc->pid, proc->pid, new, new->kstackbase);
+   
+   return new;
 }
 
 /* thread_new_hash
-	Create a new hash table for threads in the given process
+   Create a new hash table for threads in the given process
    <= returns 0 for success, anything else is failure
 */
 kresult thread_new_hash(process *proc)
 {
-	kresult err;
-	thread **threads;
-	
-	if(lock_gate(&(proc->lock), LOCK_WRITE))
-		return e_failure;
-	
-	if(proc->threads)
-	{
-		unlock_gate(&(proc->lock), LOCK_WRITE);
-		return e_failure;
-	}
-	
-	err = vmm_malloc((void **)&threads, sizeof(thread *) * THREAD_HASH_BUCKETS);
-	if(err)
-	{
-		unlock_gate(&(proc->lock), LOCK_WRITE);
-		return err;
-	}
-	
-	vmm_memset(threads, 0, sizeof(thread *) * THREAD_HASH_BUCKETS);
-	proc->threads = threads;
-	
-	unlock_gate(&(proc->lock), LOCK_WRITE);
-	
-	THREAD_DEBUG("[thread:%i] created thread hash table %p for process %i\n",
-			  CPU_ID, threads, proc->pid);
+   kresult err;
+   thread **threads;
+   
+   if(lock_gate(&(proc->lock), LOCK_WRITE))
+      return e_failure;
+   
+   if(proc->threads)
+   {
+      unlock_gate(&(proc->lock), LOCK_WRITE);
+      return e_failure;
+   }
+   
+   err = vmm_malloc((void **)&threads, sizeof(thread *) * THREAD_HASH_BUCKETS);
+   if(err)
+   {
+      unlock_gate(&(proc->lock), LOCK_WRITE);
+      return err;
+   }
+   
+   vmm_memset(threads, 0, sizeof(thread *) * THREAD_HASH_BUCKETS);
+   proc->threads = threads;
+   
+   unlock_gate(&(proc->lock), LOCK_WRITE);
+   
+   THREAD_DEBUG("[thread:%i] created thread hash table %p for process %i\n",
+           CPU_ID, threads, proc->pid);
 
-	return success;
+   return success;
 }
 
 /* thread_new
-	Create a new thread inside a process
+   Create a new thread inside a process
    => proc = pointer to process owning the thread
  <= pointer to new thread structure, or NULL for failure
 */
 thread *thread_new(process *proc)
 {
-	kresult err;
-	unsigned int tid_free = 0, hash, stackbase;
-	thread *new;
-	unsigned int kstack;
-	
-	if(!proc) return NULL; /* give up now if we get a bad pointer */
-	
-	lock_gate(&(proc->lock), LOCK_WRITE);
-	
-	/* give up now if we have too many threads */
-	if(proc->thread_count > THREAD_MAX_NR)
-	{
-		unlock_gate(&(proc->lock), LOCK_WRITE);
-		return NULL;
-	}
+   kresult err;
+   unsigned int tid_free = 0, hash, stackbase;
+   thread *new;
+   unsigned int kstack;
+   
+   if(!proc) return NULL; /* give up now if we get a bad pointer */
+   
+   lock_gate(&(proc->lock), LOCK_WRITE);
+   
+   /* give up now if we have too many threads */
+   if(proc->thread_count > THREAD_MAX_NR)
+   {
+      unlock_gate(&(proc->lock), LOCK_WRITE);
+      return NULL;
+   }
 
-	/* grab memory now to store details of new thread */
-	err = vmm_malloc((void **)&new, sizeof(thread));
-	if(err)
-	{
-		unlock_gate(&(proc->lock), LOCK_WRITE);
-		return NULL; /* fail if we can't alloc a new thread */
-	}
-	vmm_memset(new, 0, sizeof(thread));
-	
-	/* kernel stack initialisation - just 4K per thread for now */
-	err = vmm_malloc((void **)&kstack, MEM_PGSIZE);
-	if(err)
-	{
-		vmm_free(new);
-		unlock_gate(&(proc->lock), LOCK_WRITE);
-		return NULL; /* FIXME should really do some clean up if this fails */
-	}
-	vmm_memset((void *)kstack, 0, MEM_PGSIZE);
-	
-	/* initialise thread hash table if required */
-	if(!(proc->threads))
-	{
-		thread_new_hash(proc);
-		if(!(proc->threads))
-		{
-			vmm_free((void *)kstack);
-			vmm_free(new);
-			unlock_gate(&(proc->lock), LOCK_WRITE);
-			return NULL;
-		}
-	}
+   /* grab memory now to store details of new thread */
+   err = vmm_malloc((void **)&new, sizeof(thread));
+   if(err)
+   {
+      unlock_gate(&(proc->lock), LOCK_WRITE);
+      return NULL; /* fail if we can't alloc a new thread */
+   }
+   vmm_memset(new, 0, sizeof(thread));
+   
+   /* kernel stack initialisation - just 4K per thread for now */
+   err = vmm_malloc((void **)&kstack, MEM_PGSIZE);
+   if(err)
+   {
+      vmm_free(new);
+      unlock_gate(&(proc->lock), LOCK_WRITE);
+      return NULL; /* FIXME should really do some clean up if this fails */
+   }
+   vmm_memset((void *)kstack, 0, MEM_PGSIZE);
+   
+   /* initialise thread hash table if required */
+   if(!(proc->threads))
+   {
+      thread_new_hash(proc);
+      if(!(proc->threads))
+      {
+         vmm_free((void *)kstack);
+         vmm_free(new);
+         unlock_gate(&(proc->lock), LOCK_WRITE);
+         return NULL;
+      }
+   }
 
-	/* search for an available thread id */
-	while(!tid_free)
-	{
-		if(thread_find_thread(proc, proc->next_tid) == NULL)
-			tid_free = 1;
-		else
-		{
-			proc->next_tid++;
-			if(proc->next_tid >= THREAD_MAX_NR)
-				proc->next_tid = FIRST_TID;
-		}
-	}
+   /* search for an available thread id */
+   while(!tid_free)
+   {
+      if(thread_find_thread(proc, proc->next_tid) == NULL)
+         tid_free = 1;
+      else
+      {
+         proc->next_tid++;
+         if(proc->next_tid >= THREAD_MAX_NR)
+            proc->next_tid = FIRST_TID;
+      }
+   }
 
-	/* assign our new TID */
-	new->tid = proc->next_tid;
-	proc->next_tid++;
-	if(proc->next_tid >= THREAD_MAX_NR)
-		proc->next_tid = FIRST_TID;
+   /* assign our new TID */
+   new->tid = proc->next_tid;
+   proc->next_tid++;
+   if(proc->next_tid >= THREAD_MAX_NR)
+      proc->next_tid = FIRST_TID;
 
-	/* add it to the tid hash table of threads for this process */
-	hash = new->tid % THREAD_HASH_BUCKETS;
-	if(proc->threads[hash])
-	{
-		proc->threads[hash]->hash_prev = new;
-		new->hash_next = proc->threads[hash];
-	}
-	else
-	{
-		new->hash_next = NULL;
-	}
-	proc->threads[hash] = new;
-	new->hash_prev = NULL;
+   /* add it to the tid hash table of threads for this process */
+   hash = new->tid % THREAD_HASH_BUCKETS;
+   if(proc->threads[hash])
+   {
+      proc->threads[hash]->hash_prev = new;
+      new->hash_next = proc->threads[hash];
+   }
+   else
+   {
+      new->hash_next = NULL;
+   }
+   proc->threads[hash] = new;
+   new->hash_prev = NULL;
 
-	/* fill in more details */
-	new->proc = proc;
-	proc->thread_count++;
+   /* fill in more details */
+   new->proc = proc;
+   proc->thread_count++;
 
-	/* create a vma for the thread's user stack - don't forget stacks grow down */
-	stackbase = KERNEL_SPACE_BASE - (THREAD_MAX_STACK * MEM_PGSIZE * new->tid);
-	vmm_add_vma(proc, stackbase - (THREAD_MAX_STACK * MEM_PGSIZE), (THREAD_MAX_STACK * MEM_PGSIZE),
-					VMA_READABLE | VMA_WRITEABLE | VMA_MEMSOURCE, 0);
-	new->stackbase = stackbase;
+   /* create a vma for the thread's user stack - don't forget stacks grow down */
+   stackbase = KERNEL_SPACE_BASE - (THREAD_MAX_STACK * MEM_PGSIZE * new->tid);
+   vmm_add_vma(proc, stackbase - (THREAD_MAX_STACK * MEM_PGSIZE), (THREAD_MAX_STACK * MEM_PGSIZE),
+               VMA_READABLE | VMA_WRITEABLE | VMA_MEMSOURCE, 0);
+   new->stackbase = stackbase;
 
-	/* stacks grow down... */
-	new->kstackblk = kstack;
-	new->kstackbase = (kstack + MEM_PGSIZE);
+   /* stacks grow down... */
+   new->kstackblk = kstack;
+   new->kstackbase = (kstack + MEM_PGSIZE);
 
-	unlock_gate(&(proc->lock), LOCK_WRITE);
+   unlock_gate(&(proc->lock), LOCK_WRITE);
 
-	THREAD_DEBUG("[thread:%i] created thread %p tid %i (ustack %p kstack %p) for process %i\n",
-			  CPU_ID, new, new->tid, new->stackbase, new->kstackbase, proc->pid);
+   THREAD_DEBUG("[thread:%i] created thread %p tid %i (ustack %p kstack %p) for process %i\n",
+           CPU_ID, new, new->tid, new->stackbase, new->kstackbase, proc->pid);
 
-	return new;
+   return new;
 }
 
 /* thread_kill
-	Destroy a thread, freeing its kernel-held resources
+   Destroy a thread, freeing its kernel-held resources
    => owner = process holding the thread
       victim = thread to kill or NULL for all threads - ONLY call on process shutdown
    <= success or e_failure if something went wrong
 */
 kresult thread_kill(process *owner, thread *victim)
 {
-	unsigned int physaddr;
-	
-	if(!owner) return e_failure;
-		
-	if(victim)
-	{
-		if(victim->proc != owner) return e_failure;
-		
-		/* stop this thread from running and lock it */
-		if(lock_gate(&(victim->lock), LOCK_WRITE | LOCK_SELFDESTRUCT))
-			return e_failure;
-		
-		/* if we can't lock then assume it's this thread that's dying */
-		if(sched_lock_thread(victim)) sched_remove(victim, dead);
-		
-		/* free the thread's user stack' physical pages and unset the table entries */
-		if(pg_user2phys(&physaddr, owner->pgdir, victim->stackbase - MEM_PGSIZE) == success)
-		{
-			if(vmm_return_phys_pg((unsigned int *)physaddr) == success)
-			{
-				pg_add_4K_mapping(owner->pgdir, victim->stackbase - MEM_PGSIZE, NULL, 0);
-			}
-			else
-			{
-				KOOPS_DEBUG("[thread:%i] OMGWTF returning physical page from dying thread's stack failed\n"
-						       "            thread %i (%p) process %i (%p) usr %x phys %x\n",
-						       CPU_ID, victim->tid, victim, owner->pid, owner, victim->stackbase, physaddr);
-				debug_stacktrace();
-			}
-		}
+   unsigned int physaddr;
+   
+   if(!owner) return e_failure;
+      
+   if(victim)
+   {
+      if(victim->proc != owner) return e_failure;
+      
+      /* stop this thread from running and lock it */
+      if(lock_gate(&(victim->lock), LOCK_WRITE | LOCK_SELFDESTRUCT))
+         return e_failure;
+      
+      /* if we can't lock then assume it's this thread that's dying */
+      if(sched_lock_thread(victim)) sched_remove(victim, dead);
+      
+      /* free the thread's user stack' physical pages and unset the table entries */
+      if(pg_user2phys(&physaddr, owner->pgdir, victim->stackbase - MEM_PGSIZE) == success)
+      {
+         if(vmm_return_phys_pg((unsigned int *)physaddr) == success)
+         {
+            pg_add_4K_mapping(owner->pgdir, victim->stackbase - MEM_PGSIZE, NULL, 0);
+         }
+         else
+         {
+            KOOPS_DEBUG("[thread:%i] OMGWTF returning physical page from dying thread's stack failed\n"
+                         "            thread %i (%p) process %i (%p) usr %x phys %x\n",
+                         CPU_ID, victim->tid, victim, owner->pid, owner, victim->stackbase, physaddr);
+            debug_stacktrace();
+         }
+      }
 
-		/* unlink thread from the process's thread hash table */
-	  lock_gate(&(owner->lock), LOCK_WRITE);
-					  
-	  if(victim->hash_next)
-			victim->hash_next->hash_prev = victim->hash_prev;
-	  if(victim->hash_prev)
-			victim->hash_prev->hash_next = victim->hash_next;
-	  else
-	  /* we were the hash table entry head, so fixup table */
-			owner->threads[victim->tid % THREAD_HASH_BUCKETS] = victim->hash_next;
+      /* unlink thread from the process's thread hash table */
+     lock_gate(&(owner->lock), LOCK_WRITE);
+                 
+     if(victim->hash_next)
+         victim->hash_next->hash_prev = victim->hash_prev;
+     if(victim->hash_prev)
+         victim->hash_prev->hash_next = victim->hash_next;
+     else
+     /* we were the hash table entry head, so fixup table */
+         owner->threads[victim->tid % THREAD_HASH_BUCKETS] = victim->hash_next;
 
-		owner->thread_count--;
-		unlock_gate(&(owner->lock), LOCK_WRITE);
-		
-		/* free up resources */
-		vmm_free((void *)(victim->kstackblk));
-		vmm_free(victim);
-		
-		THREAD_DEBUG("[thread:%i] killed thread %i (%p) of process %i (%p)\n",
-				  CPU_ID, victim->tid, victim, owner->pid, owner);
-	}
-	else
-	{
-		/* destroy all threads one-by-one */
-		unsigned int loop;
-		
-		lock_gate(&(owner->lock), LOCK_WRITE);
-		
-		for(loop = 0; loop < THREAD_HASH_BUCKETS; loop++)
-		{
-			victim = owner->threads[loop];
-			
-			while(victim)
-			{
-				thread_kill(owner, victim);
-				victim = victim->hash_next;
-			}
-		}
-		
-		/* release the thread hash table */
-		vmm_free(owner->threads);
-		
-		unlock_gate(&(owner->lock), LOCK_WRITE);
-	}
-	
-	return success;
+      owner->thread_count--;
+      unlock_gate(&(owner->lock), LOCK_WRITE);
+      
+      /* free up resources */
+      vmm_free((void *)(victim->kstackblk));
+      vmm_free(victim);
+      
+      THREAD_DEBUG("[thread:%i] killed thread %i (%p) of process %i (%p)\n",
+              CPU_ID, victim->tid, victim, owner->pid, owner);
+   }
+   else
+   {
+      /* destroy all threads one-by-one */
+      unsigned int loop;
+      
+      lock_gate(&(owner->lock), LOCK_WRITE);
+      
+      for(loop = 0; loop < THREAD_HASH_BUCKETS; loop++)
+      {
+         victim = owner->threads[loop];
+         
+         while(victim)
+         {
+            thread_kill(owner, victim);
+            victim = victim->hash_next;
+         }
+      }
+      
+      /* release the thread hash table */
+      vmm_free(owner->threads);
+      
+      unlock_gate(&(owner->lock), LOCK_WRITE);
+   }
+   
+   return success;
 }

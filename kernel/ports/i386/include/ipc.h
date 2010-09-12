@@ -16,7 +16,7 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 */
 
 #ifndef _IPC_H
-#define	_IPC_H
+#define   _IPC_H
 
 /* message passing */
 kresult msg_send_signal(process *target, unsigned int signum, unsigned int sigcode);

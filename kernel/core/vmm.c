@@ -80,15 +80,15 @@ kresult vmm_malloc(void **addr, unsigned int size)
 {
    unsigned int safe_size, *addr_word = (unsigned int *)addr;
    kheap_block *block, *extra;
-	
-	lock_gate(&(vmm_lock), LOCK_WRITE);
-	
+   
+   lock_gate(&(vmm_lock), LOCK_WRITE);
+   
    /* adjust size to include our block header plus enough memory to tack
       a header onto any left over memory - we round up to a set size
-	   (default 64 bytes) to reduce fragmentation and aid quick realloc'ing */
+      (default 64 bytes) to reduce fragmentation and aid quick realloc'ing */
    size += sizeof(kheap_block);
    safe_size = size + sizeof(kheap_block);
-	safe_size = KHEAP_PAD(safe_size);
+   safe_size = KHEAP_PAD(safe_size);
    
    /* scan through free list to find the first block that will fit the
       requested size */
@@ -126,30 +126,30 @@ kresult vmm_malloc(void **addr, unsigned int size)
          type = MEM_LOW_PG;
          result = vmm_ensure_pgs(safe_size, type);
          if(result)
-			{
-				VMM_DEBUG("[vmm:%i] failed to grab physical pages for kernel heap (req size %i bytes)\n",
-						  CPU_ID, safe_size);
-				unlock_gate(&(vmm_lock), LOCK_WRITE);
-				return result; /* give up otherwise */
-			}
+         {
+            VMM_DEBUG("[vmm:%i] failed to grab physical pages for kernel heap (req size %i bytes)\n",
+                    CPU_ID, safe_size);
+            unlock_gate(&(vmm_lock), LOCK_WRITE);
+            return result; /* give up otherwise */
+         }
       }
-		
+      
       /* by now, we've verified that we have a run of pages so grab them */
       for(pg_count = 0; pg_count < ((safe_size / MEM_PGSIZE) + 1); pg_count++)
       {
          result = vmm_req_phys_pg((void **)&block, type); /* get pages in reverse order */
          if(result)
-			{
-				VMM_DEBUG("[vmm:%i] failed to grab physical page for kernel heap\n", CPU_ID);
-				unlock_gate(&(vmm_lock), LOCK_WRITE);
-				return result; /* XXX shouldn't happen - memory leak */
-			}
+         {
+            VMM_DEBUG("[vmm:%i] failed to grab physical page for kernel heap\n", CPU_ID);
+            unlock_gate(&(vmm_lock), LOCK_WRITE);
+            return result; /* XXX shouldn't happen - memory leak */
+         }
       }
 
 #ifdef VMM_DEBUG
-		VMM_DEBUG("[vmm:%i] asked for a block of pages for %i bytes: %p\n", CPU_ID, safe_size, block);
+      VMM_DEBUG("[vmm:%i] asked for a block of pages for %i bytes: %p\n", CPU_ID, safe_size, block);
 #endif
-		
+      
       /* don't forget to convert from physical to kernel's logical */
       block = KERNEL_PHYS2LOG(block);
       block->size = (unsigned int)MEM_PGALIGN(safe_size) + MEM_PGSIZE;
@@ -175,24 +175,24 @@ kresult vmm_malloc(void **addr, unsigned int size)
    block->previous = NULL;
    kheap_allocated = block;
 
-	unlock_gate(&(vmm_lock), LOCK_WRITE);
+   unlock_gate(&(vmm_lock), LOCK_WRITE);
    return success;
 }
 
 /* vmm_malloc_read_size
-	Return the allocated size of a given block in bytes or 0 for bad block */
+   Return the allocated size of a given block in bytes or 0 for bad block */
 unsigned int vmm_malloc_read_size(void *addr)
 {
-	kheap_block *block = (kheap_block *)((unsigned int)addr - sizeof(kheap_block));
-	return block->size;
+   kheap_block *block = (kheap_block *)((unsigned int)addr - sizeof(kheap_block));
+   return block->size;
 }
 
 /* vmm_malloc_write_size
    Update the allocated size of a given block in bytes */
 void vmm_malloc_write_size(void *addr, unsigned int size)
 {
-	kheap_block *block = (kheap_block *)((unsigned int)addr - sizeof(kheap_block));
-	block->size = size;
+   kheap_block *block = (kheap_block *)((unsigned int)addr - sizeof(kheap_block));
+   block->size = size;
 }
 
 /* vmm_heap_add_to_free
@@ -203,8 +203,8 @@ void vmm_malloc_write_size(void *addr, unsigned int size)
 */
 void vmm_heap_add_to_free(kheap_block *block)
 {
-	lock_gate(&(vmm_lock), LOCK_WRITE);
-	
+   lock_gate(&(vmm_lock), LOCK_WRITE);
+   
    kheap_block *block_loop = kheap_free;
 
    while(block_loop)
@@ -261,8 +261,8 @@ void vmm_heap_add_to_free(kheap_block *block)
       }
       block_loop = block_loop->next;
    }
-	
-	unlock_gate(&(vmm_lock), LOCK_WRITE);
+   
+   unlock_gate(&(vmm_lock), LOCK_WRITE);
 }
 
 /* vmm_free
@@ -279,7 +279,7 @@ kresult vmm_free(void *addr)
    if((unsigned int)addr < KERNEL_VIRTUAL_BASE) /* XXX assumes high knl */
    {
       KOOPS_DEBUG("[vmm:%i] OMGWTF! vmm_free: given nonsense address %x\n", CPU_ID, addr);
-		debug_stacktrace();
+      debug_stacktrace();
       return e_bad_address;
    }
 
@@ -290,12 +290,12 @@ kresult vmm_free(void *addr)
    {
       KOOPS_DEBUG("[vmm:%i] OMGWTF! vmm_free: block %x has wrong magic %x\n",
               CPU_ID, block, block->magic);
-		debug_stacktrace();
+      debug_stacktrace();
       return e_bad_magic;
    }
 
-	lock_gate(&(vmm_lock), LOCK_WRITE);
-	
+   lock_gate(&(vmm_lock), LOCK_WRITE);
+   
    /* update magic */
    block->magic = KHEAP_FREE;
 
@@ -312,8 +312,8 @@ kresult vmm_free(void *addr)
    /* add to head of free list */
    vmm_heap_add_to_free(block);
 
-	unlock_gate(&(vmm_lock), LOCK_WRITE);
-	
+   unlock_gate(&(vmm_lock), LOCK_WRITE);
+   
    return success;
 }
 
@@ -322,81 +322,81 @@ kresult vmm_free(void *addr)
    moving the block.
    => addr = pointer to allocated block, if NULL then treat as a malloc()
       change = number of bytes to grow block by (if positive) or shrink
-					the block by (if negative)
+               the block by (if negative)
    <= pointer to new block pointer if it had to be moved, or the original
       block pointer if no move was required, or NULL for failure. The original
       block will remain in-tact if the reallocation fails for whatever reason.
 */
 void *vmm_realloc(void *addr, signed int change)
 {
-	void *new;
-	unsigned int size;
-	
-	if(!addr)
-	{
-		KOOPS_DEBUG("[vmm:%i] OMGWTF tried to alter size of a dereferenced block by %i bytes\n",
-				      CPU_ID, change);
-		return NULL; /* failed */
-	}
-	
-	/* read the size of the block in bytes - if the size is zero (because the block
-		was not found), then treat as a malloc */
-	size = vmm_malloc_read_size(addr);
-	
-	if(!size)
-	{
-		/* we can't decrease or unchange a block that didn't exist... */
-		if(change < 1)
-		{
-			KOOPS_DEBUG("[vmm:%i] OMGWTF tried to shrink a non-existent block by %i bytes\n",
-							CPU_ID, 0 - change);
-			return NULL; /* failed */			
-		}
-		
-		if(vmm_malloc(&new, change) == success)
-			return new; /* we succeeded, send back the pointer */
-		else
-			return NULL; /* failed to allocate */
-	}
-	
-	/* a change of zero bytes will always be successful once we've ascertained that the
-	   block pointer is valid */
-	if(change == 0) return addr;
-	
-	/* we can't shrink a block to and beyond zero */
-	if(change < 1)
-	{
-		if((0 - change) >= size)
-		{
-			KOOPS_DEBUG("[vmm:%i] OMGWTF tried to shrink a block of size %i by %i bytes\n",
-							CPU_ID, size, 0 - change);
-			return NULL; /* failed */
-		}
-	}
+   void *new;
+   unsigned int size;
+   
+   if(!addr)
+   {
+      KOOPS_DEBUG("[vmm:%i] OMGWTF tried to alter size of a dereferenced block by %i bytes\n",
+                  CPU_ID, change);
+      return NULL; /* failed */
+   }
+   
+   /* read the size of the block in bytes - if the size is zero (because the block
+      was not found), then treat as a malloc */
+   size = vmm_malloc_read_size(addr);
+   
+   if(!size)
+   {
+      /* we can't decrease or unchange a block that didn't exist... */
+      if(change < 1)
+      {
+         KOOPS_DEBUG("[vmm:%i] OMGWTF tried to shrink a non-existent block by %i bytes\n",
+                     CPU_ID, 0 - change);
+         return NULL; /* failed */         
+      }
+      
+      if(vmm_malloc(&new, change) == success)
+         return new; /* we succeeded, send back the pointer */
+      else
+         return NULL; /* failed to allocate */
+   }
+   
+   /* a change of zero bytes will always be successful once we've ascertained that the
+      block pointer is valid */
+   if(change == 0) return addr;
+   
+   /* we can't shrink a block to and beyond zero */
+   if(change < 1)
+   {
+      if((0 - change) >= size)
+      {
+         KOOPS_DEBUG("[vmm:%i] OMGWTF tried to shrink a block of size %i by %i bytes\n",
+                     CPU_ID, size, 0 - change);
+         return NULL; /* failed */
+      }
+   }
 
-	/* sanity checks passed, try to grow/shrink the block within the padding of the block */
-	if((size + change) <= KHEAP_PAD_SAFE(size))
-	{
-		/* update the size stats and return the same pointer */
-		vmm_malloc_write_size(addr, size + change);
-		return addr;
-	}
-	
-	/* we can't extend within our block padding so it's time to malloc-copy-free */
-	if(vmm_malloc((void **)&new, size + change) == success)
-	{
-		/* so far so good, copy the contents of the old block to the new one,
-		   free the old block and return the new pointer */
-		if(change > 0)
-			vmm_memcpy(new, addr, size);
-		else
-			vmm_memcpy(new, addr, size + change);
-		vmm_free(addr);
-		return new;
-	}
-	
-	/* fall through to a malloc failure */
-	return NULL;
+   /* sanity checks passed, try to grow/shrink the block within the padding of the block */
+   if((size + change) <= KHEAP_PAD_SAFE(size))
+   {
+      /* update the size stats and return the same pointer */
+      vmm_malloc_write_size(addr, size + change);
+      return addr;
+   }
+   
+   /* we can't extend within our block padding so it's time to malloc-copy-free */
+   if(vmm_malloc((void **)&new, size + change) == success)
+   {
+      /* so far so good, copy the contents of the old block to the new one,
+         free the old block and return the new pointer */
+      if(change > 0)
+         vmm_memcpy(new, addr, size);
+      else
+         vmm_memcpy(new, addr, size + change);
+      vmm_free(addr);
+      return new;
+   }
+   
+   /* fall through to a malloc failure */
+   return NULL;
 }
 
 
@@ -417,18 +417,18 @@ void *vmm_realloc(void *addr, signed int change)
    <= 0 for success or error code
 */
 kresult vmm_req_phys_pg(void **addr, int pref)
-{	
-	lock_gate(&(vmm_lock), LOCK_WRITE);
-	
+{   
+   lock_gate(&(vmm_lock), LOCK_WRITE);
+   
    /* is a DMA-able physical page requested? */
    if(pref == MEM_LOW_PG)
    {
       /* if ptr is above the base, then the stack's empty */
       if(phys_pg_stack_low_ptr > phys_pg_stack_low_base)
-		{
-			unlock_gate(&(vmm_lock), LOCK_WRITE);
+      {
+         unlock_gate(&(vmm_lock), LOCK_WRITE);
          return e_no_phys_pgs;
-		}
+      }
 
       /* otherwise, hand out a page frame */
       goto get_low_page;
@@ -456,13 +456,13 @@ get_low_page:
 
 get_page_success:
    phys_pg_reqed++; /* update accounting totals */
-	/* we don't clean the page at this stage - it has
-	   to be mapped in first */
-	
-	/* would be nice to clean this page */
-	vmm_memset(KERNEL_PHYS2LOG(*addr), 0, MEM_PGSIZE);
-	
-	unlock_gate(&(vmm_lock), LOCK_WRITE);
+   /* we don't clean the page at this stage - it has
+      to be mapped in first */
+   
+   /* would be nice to clean this page */
+   vmm_memset(KERNEL_PHYS2LOG(*addr), 0, MEM_PGSIZE);
+   
+   unlock_gate(&(vmm_lock), LOCK_WRITE);
    return success;
 }
 
@@ -473,18 +473,18 @@ get_page_success:
    <= 0 for success or error code
 */
 kresult vmm_return_phys_pg(void *addr)
-{	
+{   
    /* if the address is not mmu page align then things are up the swanny */
    if(MEM_PGALIGN(addr) != addr)
    {
       KOOPS_DEBUG("[vmm:%i] OMGWTF! vmm_return_phys_pg: physical stack frame "
                   "%x not page aligned!\n", CPU_ID, addr);
-		debug_stacktrace();
+      debug_stacktrace();
       return e_not_pg_aligned;
    }
 
-	lock_gate(&(vmm_lock), LOCK_WRITE);
-	
+   lock_gate(&(vmm_lock), LOCK_WRITE);
+   
    /* decide which stack we're going to return this page frame onto */
    if((unsigned int)addr < MEM_DMA_REGION_MARK)
    {
@@ -493,8 +493,8 @@ kresult vmm_return_phys_pg(void *addr)
       {
          KOOPS_DEBUG("[vmm:%i] OMGWTF! vmm_return_phys_pg: low physical stack frame "
                    "has overflowed!\n", CPU_ID);
-			debug_stacktrace();
-			unlock_gate(&(vmm_lock), LOCK_WRITE);
+         debug_stacktrace();
+         unlock_gate(&(vmm_lock), LOCK_WRITE);
          return e_phys_stk_overflow;
       }
 
@@ -509,8 +509,8 @@ kresult vmm_return_phys_pg(void *addr)
       {
          KOOPS_DEBUG("[vmm:%i] OMGWTF! vmm_return_phys_pg: high physical stack "
                      "has overflowed!\n", CPU_ID);
-			debug_stacktrace();
-			unlock_gate(&(vmm_lock), LOCK_WRITE);
+         debug_stacktrace();
+         unlock_gate(&(vmm_lock), LOCK_WRITE);
          return e_phys_stk_overflow;
       }
 
@@ -520,9 +520,9 @@ kresult vmm_return_phys_pg(void *addr)
    }
 
    phys_pg_reqed--; /* update accounting totals */
-	
-	unlock_gate(&(vmm_lock), LOCK_WRITE);
-	
+   
+   unlock_gate(&(vmm_lock), LOCK_WRITE);
+   
    return success;
 }
 
@@ -536,16 +536,16 @@ kresult vmm_enough_pgs(unsigned int size)
 {
    if(!size) return success; /* there's always room for zero bytes ;) */
 
-	lock_gate(&(vmm_lock), LOCK_READ);
-	
+   lock_gate(&(vmm_lock), LOCK_READ);
+   
    /* convert size into whole number of pages, rounding up */
    if((phys_pg_count - phys_pg_reqed) < ((size / MEM_PGSIZE) + 1))
-	{
-		unlock_gate(&(vmm_lock), LOCK_READ);
+   {
+      unlock_gate(&(vmm_lock), LOCK_READ);
       return e_not_enough_pgs;
-	}
+   }
 
-	unlock_gate(&(vmm_lock), LOCK_READ);
+   unlock_gate(&(vmm_lock), LOCK_READ);
    return success;
 }
 
@@ -558,9 +558,9 @@ kresult vmm_enough_pgs(unsigned int size)
 kresult vmm_ensure_pgs(unsigned int size, int type)
 {
    unsigned int pg_loop;
-	unsigned int *pg_ptr, *pg_base;
-	
-	lock_gate(&(vmm_lock), LOCK_READ);
+   unsigned int *pg_ptr, *pg_base;
+   
+   lock_gate(&(vmm_lock), LOCK_READ);
 
    /* are we checking DMA-able physical memory? */
    if(type == MEM_LOW_PG)
@@ -579,35 +579,35 @@ kresult vmm_ensure_pgs(unsigned int size, int type)
       that there's enough to bother checking before continuing. */
    pg_loop = (size / MEM_PGSIZE); 
    
-	if(pg_ptr > pg_base)
-	{
-		unlock_gate(&(vmm_lock), LOCK_READ);
-		return e_no_phys_pgs;
-	}
-	
+   if(pg_ptr > pg_base)
+   {
+      unlock_gate(&(vmm_lock), LOCK_READ);
+      return e_no_phys_pgs;
+   }
+   
    if((pg_base - pg_ptr) < pg_loop)
-	{
-		unlock_gate(&(vmm_lock), LOCK_READ);
-		return e_no_phys_pgs;
-	}
+   {
+      unlock_gate(&(vmm_lock), LOCK_READ);
+      return e_no_phys_pgs;
+   }
 
    /* we check to see if there is a run of contiguous stack frame pointers
       that descend in value as the loop moves up towards the stack base */
    while(pg_loop)
    {
       unsigned int *pg_next = pg_ptr;
-		pg_next++;
+      pg_next++;
 
       if(*pg_ptr != (*pg_next + MEM_PGSIZE))
-		{
-			unlock_gate(&(vmm_lock), LOCK_READ);
-			return e_not_contiguous;
-		}
+      {
+         unlock_gate(&(vmm_lock), LOCK_READ);
+         return e_not_contiguous;
+      }
       pg_loop--;
       pg_ptr++;
    }
 
-	unlock_gate(&(vmm_lock), LOCK_READ);
+   unlock_gate(&(vmm_lock), LOCK_READ);
    return success; /* managed to find run of pages */
 }
 
@@ -628,14 +628,14 @@ kresult vmm_initialise(multiboot_info_t *mbd)
    void *heap_init;
    unsigned int pg_stack_size, *pg_stack_top;
 
-	/* initialise the smp lock */
-	vmm_memset(&(vmm_lock), 0, sizeof(rw_gate));
-	
+   /* initialise the smp lock */
+   vmm_memset(&(vmm_lock), 0, sizeof(rw_gate));
+   
    BOOT_DEBUG("[vmm:%i] kernel: logical start %x end %x size %i bytes\n",
               CPU_ID, KERNEL_START, KERNEL_END, KERNEL_SIZE);
    BOOT_DEBUG("[vmm:%i] kernel: physical start %x end %x aligned end %x\n",
               CPU_ID, KERNEL_PHYSICAL_BASE, KERNEL_PHYSICAL_END,
-				  KERNEL_PHYSICAL_END_ALIGNED);
+              KERNEL_PHYSICAL_END_ALIGNED);
 
    /* check bit six to see if we can access mmap info */
    if(!(mbd->flags & (1<<6)))
@@ -659,8 +659,8 @@ kresult vmm_initialise(multiboot_info_t *mbd)
    region = (mb_memory_map_t *)mbd->mmap_addr;
    while((unsigned int)region < mbd->mmap_addr + mbd->mmap_length)
    {
-		if(region->type == 1) /* if region is present RAM */
-			phys_pg_count += (region->length_low / MEM_PGSIZE);
+      if(region->type == 1) /* if region is present RAM */
+         phys_pg_count += (region->length_low / MEM_PGSIZE);
 
       /* get next region */
       region = (mb_memory_map_t *)((unsigned int)region +
@@ -675,22 +675,22 @@ kresult vmm_initialise(multiboot_info_t *mbd)
    BOOT_DEBUG("[vmm:%i] found %i pages, %iMB total, phys stack size %i bytes\n",
               CPU_ID, phys_pg_count, (phys_pg_count * MEM_PGSIZE) / (1024 * 1024),
               pg_stack_size);
-	
-	/* check to make sure we have enough memory to function */
-	if((phys_pg_count * MEM_PGSIZE) < (KERNEL_CRITICAL_END - KERNEL_CRITICAL_BASE))
-	{
-		BOOT_DEBUG("*** Not enough memory present, must have at least %i bytes available.\n",
-		   		  KERNEL_CRITICAL_END - KERNEL_CRITICAL_BASE);
-		return e_failure;
-	}
-	
+   
+   /* check to make sure we have enough memory to function */
+   if((phys_pg_count * MEM_PGSIZE) < (KERNEL_CRITICAL_END - KERNEL_CRITICAL_BASE))
+   {
+      BOOT_DEBUG("*** Not enough memory present, must have at least %i bytes available.\n",
+                 KERNEL_CRITICAL_END - KERNEL_CRITICAL_BASE);
+      return e_failure;
+   }
+   
    VMM_DEBUG("[vmm:%i] page stack: lo base %p hi base: %p top: %p aligned top: %p\n",
-				 CPU_ID, phys_pg_stack_low_base, phys_pg_stack_high_base,
-			    pg_stack_top, MEM_PGALIGN(pg_stack_top)); 
+             CPU_ID, phys_pg_stack_low_base, phys_pg_stack_high_base,
+             pg_stack_top, MEM_PGALIGN(pg_stack_top)); 
 
    /* the stack may not end on a page boundary, so round down - this is so
-	   that we can make sure the pages holding the stacks don't end up on
-	   the list of available physical page frames */
+      that we can make sure the pages holding the stacks don't end up on
+      the list of available physical page frames */
    pg_stack_top = MEM_PGALIGN(pg_stack_top);
 
    /* run through the memory areas found by the bootloader and build up
@@ -707,68 +707,68 @@ kresult vmm_initialise(multiboot_info_t *mbd)
       VMM_DEBUG("[vmm:%i] mem region: start %x length %i type %x\n",
                CPU_ID, region->base_addr_low, region->length_low, region->type);
 
-		/* is this region present? */
-		if(region->type == 1)
-		{
-			pg_loop = region->base_addr_low;
-			while((pg_loop + MEM_PGSIZE) <= max_addr)
-			{
-				/* skip over kernel in physical mem, otherwise things get messy */
-				if((pg_loop >= (unsigned int)KERNEL_PHYSICAL_BASE) &&
-					(pg_loop < (unsigned int)KERNEL_PHYSICAL_END_ALIGNED))
-				{
-					pg_skip++;
-					pg_loop += MEM_PGSIZE;
-					continue;
-				}
+      /* is this region present? */
+      if(region->type == 1)
+      {
+         pg_loop = region->base_addr_low;
+         while((pg_loop + MEM_PGSIZE) <= max_addr)
+         {
+            /* skip over kernel in physical mem, otherwise things get messy */
+            if((pg_loop >= (unsigned int)KERNEL_PHYSICAL_BASE) &&
+               (pg_loop < (unsigned int)KERNEL_PHYSICAL_END_ALIGNED))
+            {
+               pg_skip++;
+               pg_loop += MEM_PGSIZE;
+               continue;
+            }
 
-				/* skip over pages that will hold these page frame stacks */
-				if((pg_loop < (unsigned int)phys_pg_stack_low_base) &&
-					(pg_loop >= (unsigned int)pg_stack_top))
-				{
-					pg_skip++;
-					pg_loop += MEM_PGSIZE;
-					continue;
-				}
+            /* skip over pages that will hold these page frame stacks */
+            if((pg_loop < (unsigned int)phys_pg_stack_low_base) &&
+               (pg_loop >= (unsigned int)pg_stack_top))
+            {
+               pg_skip++;
+               pg_loop += MEM_PGSIZE;
+               continue;
+            }
 
-				/* skip over pages holding payload binaries XXX inefficient */
-				if(payload_exist_here(pg_loop))
-				{
-					pg_skip++;
-					pg_loop += MEM_PGSIZE;
-					continue;
-				}
+            /* skip over pages holding payload binaries XXX inefficient */
+            if(payload_exist_here(pg_loop))
+            {
+               pg_skip++;
+               pg_loop += MEM_PGSIZE;
+               continue;
+            }
 
-				/* decide which stack to place the page frame in */
-				if(pg_loop < MEM_DMA_REGION_MARK)
-				{
-					*phys_pg_stack_low_ptr = pg_loop;
-					phys_pg_stack_low_ptr--;
-					pg_count_lo++;
-				}
-				else
-				{
-					*phys_pg_stack_high_ptr = pg_loop;
-					phys_pg_stack_high_ptr--;
-					pg_count_hi++;
-				}
-				
-				if(phys_pg_stack_low_ptr < phys_pg_stack_high_base)
-				{
-					KOOPS_DEBUG("*** lomem page stack crashed into himem stack!\n"
-					            "    ptr %p after %i pages (%x) - halting.\n",
-							      phys_pg_stack_low_ptr, pg_count_lo, pg_loop);
-					while(1);
-				}
-				
-				pg_loop += MEM_PGSIZE;
-			}
+            /* decide which stack to place the page frame in */
+            if(pg_loop < MEM_DMA_REGION_MARK)
+            {
+               *phys_pg_stack_low_ptr = pg_loop;
+               phys_pg_stack_low_ptr--;
+               pg_count_lo++;
+            }
+            else
+            {
+               *phys_pg_stack_high_ptr = pg_loop;
+               phys_pg_stack_high_ptr--;
+               pg_count_hi++;
+            }
+            
+            if(phys_pg_stack_low_ptr < phys_pg_stack_high_base)
+            {
+               KOOPS_DEBUG("*** lomem page stack crashed into himem stack!\n"
+                           "    ptr %p after %i pages (%x) - halting.\n",
+                           phys_pg_stack_low_ptr, pg_count_lo, pg_loop);
+               while(1);
+            }
+            
+            pg_loop += MEM_PGSIZE;
+         }
 
-			VMM_DEBUG("[vmm:%i] added phys pages: %i low, %i high (%i reserved)\n",
-					  CPU_ID, pg_count_lo, pg_count_hi, pg_skip);
+         VMM_DEBUG("[vmm:%i] added phys pages: %i low, %i high (%i reserved)\n",
+                 CPU_ID, pg_count_lo, pg_count_hi, pg_skip);
 
-		}
-			
+      }
+         
       /* get to the next memory region */
       region = (mb_memory_map_t *)((unsigned int)region +
                                    region->size +
@@ -780,11 +780,11 @@ kresult vmm_initialise(multiboot_info_t *mbd)
    phys_pg_stack_high_ptr++; /* adjust ptr to top word */
    phys_pg_stack_low_limit = phys_pg_stack_low_ptr;
    phys_pg_stack_high_limit = phys_pg_stack_high_ptr;
-		
+      
    /* now we've got a grip on physical memory, map it all into our virtual
       space using pagination */
    pg_init(); /* non-portable code */
-	
+   
    /* prime the kernel heap while we still have contiguous space */
    vmm_malloc(&heap_init, KHEAP_INITSIZE);
    vmm_free(heap_init);
@@ -793,7 +793,7 @@ kresult vmm_initialise(multiboot_info_t *mbd)
 }
 
 /* vmm_memset
-	Brute-force overwrite a block of memory accessible to the kernel.
+   Brute-force overwrite a block of memory accessible to the kernel.
    *Quite* dangerous, assumes caller knows what it's doing.
    => addr  = base address to start writing to
       value = byte-wide value to write into each byte
@@ -801,11 +801,11 @@ kresult vmm_initialise(multiboot_info_t *mbd)
 */
 void vmm_memset(void *addr, unsigned char value, unsigned int count)
 {
-	unsigned char *ptr = (unsigned char *)addr;
-	unsigned int i;
-	
-	for(i = 0; i < count; i++)
-		ptr[i] = value;
+   unsigned char *ptr = (unsigned char *)addr;
+   unsigned int i;
+   
+   for(i = 0; i < count; i++)
+      ptr[i] = value;
 }
 
 /* vmm_memcpy
@@ -814,15 +814,15 @@ void vmm_memset(void *addr, unsigned char value, unsigned int count)
    *Quite* dangerous, assumes caller knows what it's doing.
    => target  = base address to write to
       source = base address to read from 
-    	count = number of bytes to write
+       count = number of bytes to write
  */
 void vmm_memcpy(void *target, void *source, unsigned int count)
 {
-	unsigned char *ptr1 = (unsigned char *)target;
-	unsigned char *ptr2 = (unsigned char *)source;
-	unsigned int i;
-	for(i = 0; i < count; i++)
-		ptr1[i] = ptr2[i];
+   unsigned char *ptr1 = (unsigned char *)target;
+   unsigned char *ptr2 = (unsigned char *)source;
+   unsigned int i;
+   for(i = 0; i < count; i++)
+      ptr1[i] = ptr2[i];
 }
 
 /* vmm_memcpyuser
@@ -835,53 +835,53 @@ void vmm_memcpy(void *target, void *source, unsigned int count)
    => target = target usermode virtual address
       tproc = target process structure (or NULL for kernel)
       source = source usermode virtual address
-	   sproc = source process structure (or NULL for kernel)
+      sproc = source process structure (or NULL for kernel)
       count = number of bytes to write
 */
 kresult vmm_memcpyuser(void *target, process *tproc,
-						     void *source, process *sproc, unsigned int count)
+                       void *source, process *sproc, unsigned int count)
 {
-	/* the goal is to resolve the addresses into kernel 
+   /* the goal is to resolve the addresses into kernel 
       virtual addresses */
-	kresult err = e_failure;
-	unsigned int ktarget, ksource;
-	
-	if(((unsigned int)target + count) >= KERNEL_SPACE_BASE)
-	{
-		/* copying into kernel, tproc must be NULL */
-		if(tproc) goto vmm_memcpyuser_wtf;
-		ktarget = (unsigned int)target;
-	}
-	else
-	{
-		err = pg_user2kernel(&ktarget, (unsigned int)target, tproc);
-		if(err) goto vmm_memcpyuser_wtf;
-	}
+   kresult err = e_failure;
+   unsigned int ktarget, ksource;
+   
+   if(((unsigned int)target + count) >= KERNEL_SPACE_BASE)
+   {
+      /* copying into kernel, tproc must be NULL */
+      if(tproc) goto vmm_memcpyuser_wtf;
+      ktarget = (unsigned int)target;
+   }
+   else
+   {
+      err = pg_user2kernel(&ktarget, (unsigned int)target, tproc);
+      if(err) goto vmm_memcpyuser_wtf;
+   }
 
-	if(((unsigned int)source + count) >= KERNEL_SPACE_BASE)
-	{
-		/* copying from kernel, sproc must be NULL */
-		if(sproc) goto vmm_memcpyuser_wtf;
-		ksource = (unsigned int)source;
-	}
-	else
-	{
-		err = pg_user2kernel(&ksource, (unsigned int)source, sproc);
-		if(err) goto vmm_memcpyuser_wtf;
-	}
-	
-	/* perform the copy with sane virtual addresses */
-	vmm_memcpy((void *)ktarget, (void *)ksource, count);
-	return success;
-	
+   if(((unsigned int)source + count) >= KERNEL_SPACE_BASE)
+   {
+      /* copying from kernel, sproc must be NULL */
+      if(sproc) goto vmm_memcpyuser_wtf;
+      ksource = (unsigned int)source;
+   }
+   else
+   {
+      err = pg_user2kernel(&ksource, (unsigned int)source, sproc);
+      if(err) goto vmm_memcpyuser_wtf;
+   }
+   
+   /* perform the copy with sane virtual addresses */
+   vmm_memcpy((void *)ktarget, (void *)ksource, count);
+   return success;
+   
 vmm_memcpyuser_wtf:
-	KOOPS_DEBUG("[vmm:%i] OMGWTF: vmm_memcpyuser has bad params!\n"
-			      "                target = %p (proc %p)\n"
-			      "                source = %p (proc %p)\n"
-			      "                copying: %i bytes\n",
-			      CPU_ID, target, tproc, source, sproc, count);
-	debug_stacktrace();
-	return err;
+   KOOPS_DEBUG("[vmm:%i] OMGWTF: vmm_memcpyuser has bad params!\n"
+               "                target = %p (proc %p)\n"
+               "                source = %p (proc %p)\n"
+               "                copying: %i bytes\n",
+               CPU_ID, target, tproc, source, sproc, count);
+   debug_stacktrace();
+   return err;
 }
 
 /* -------------------------------------------------------------------------
@@ -906,84 +906,84 @@ SGLIB_DEFINE_RBTREE_FUNCTIONS(vmm_tree, left, right, colour, vmm_cmp_vma);
 */
 kresult vmm_link_vma(process *proc, vmm_area *vma)
 {
-	kresult err;
-	vmm_tree *new, *existing;
-	unsigned int loop;
-	
-	/* allocate and zero memory for the new tree node */
-	err = vmm_malloc((void **)&new, sizeof(vmm_tree));
-	if(err) return err;
-	vmm_memset(new, 0, sizeof(vmm_tree));
-	
-	/* set the area pointer */
-	new->area = vma;
-	
-	lock_gate(&(proc->lock), LOCK_WRITE);
-	
-	/* and try to add to the tree */
-	if(sglib_vmm_tree_add_if_not_member(&(proc->mem), new, &existing))
-	{
-		lock_gate(&(vma->lock), LOCK_WRITE);
-		
-		/* non-zero return for success, so incremement the refcount */
-		vma->refcount++;
-		err = success;
-		
-		VMM_DEBUG("[vmm:%i] linked vma %p to process %i (%p) via tree node %p\n",
-				  CPU_ID, vma, proc->pid, proc, new);
-		
-		/* add the vma to the list of users */
-		if(vma->refcount > vma->users_max)
-		{
-			process **new_list;
-			
-			/* we need to grow the list size */
-			unsigned int new_size = vma->users_max * 2;
-			
-			if(vmm_malloc((void **)&new_list, new_size * sizeof(process *)))
-			{
-				vmm_free(vma);
-				new->area = NULL; /* FIXME: and unlink from the tree ?? */
-				unlock_gate(&(vma->lock), LOCK_WRITE);
-				unlock_gate(&(proc->lock), LOCK_WRITE);
-				return e_failure; /* bail out if the malloc failed! */
-			}
-			
-			vmm_memset(new_list, 0, new_size); /* clean the new list */
-			
-			/* copy over the previous list */
-			vmm_memcpy(new_list, vma->users, vma->users_max * sizeof(process *));
-			vmm_free(vma->users); /* free the old list */
-			
-			/* update the list's accounting */
-			vma->users = new_list;
-			vma->users_max = new_size;
-		}
-		
-		/* find an empty slot and insert the new user's pointer */
-		for(loop = 0; loop < vma->users_max; loop++)
-			if((vma->users[loop]) == NULL)
-			{
-				/* found a free slot */
-				vma->users[loop] = proc;
-				break;
-			}
-		
-		unlock_gate(&(vma->lock), LOCK_WRITE);
-	}
-	else
-	{
-		/* the vma already exists or collides with an area */
-		err = e_vma_exists;
-		vmm_free(new);
-		
-		VMM_DEBUG("[vmm:%i] couldn't link vma %p to process %i (%p) - collision with vma %p\n", 
-				  CPU_ID, vma, proc->pid, proc, existing->area);
-	}
-	
-	unlock_gate(&(proc->lock), LOCK_WRITE);
-	
-	return err;
+   kresult err;
+   vmm_tree *new, *existing;
+   unsigned int loop;
+   
+   /* allocate and zero memory for the new tree node */
+   err = vmm_malloc((void **)&new, sizeof(vmm_tree));
+   if(err) return err;
+   vmm_memset(new, 0, sizeof(vmm_tree));
+   
+   /* set the area pointer */
+   new->area = vma;
+   
+   lock_gate(&(proc->lock), LOCK_WRITE);
+   
+   /* and try to add to the tree */
+   if(sglib_vmm_tree_add_if_not_member(&(proc->mem), new, &existing))
+   {
+      lock_gate(&(vma->lock), LOCK_WRITE);
+      
+      /* non-zero return for success, so incremement the refcount */
+      vma->refcount++;
+      err = success;
+      
+      VMM_DEBUG("[vmm:%i] linked vma %p to process %i (%p) via tree node %p\n",
+              CPU_ID, vma, proc->pid, proc, new);
+      
+      /* add the vma to the list of users */
+      if(vma->refcount > vma->users_max)
+      {
+         process **new_list;
+         
+         /* we need to grow the list size */
+         unsigned int new_size = vma->users_max * 2;
+         
+         if(vmm_malloc((void **)&new_list, new_size * sizeof(process *)))
+         {
+            vmm_free(vma);
+            new->area = NULL; /* FIXME: and unlink from the tree ?? */
+            unlock_gate(&(vma->lock), LOCK_WRITE);
+            unlock_gate(&(proc->lock), LOCK_WRITE);
+            return e_failure; /* bail out if the malloc failed! */
+         }
+         
+         vmm_memset(new_list, 0, new_size); /* clean the new list */
+         
+         /* copy over the previous list */
+         vmm_memcpy(new_list, vma->users, vma->users_max * sizeof(process *));
+         vmm_free(vma->users); /* free the old list */
+         
+         /* update the list's accounting */
+         vma->users = new_list;
+         vma->users_max = new_size;
+      }
+      
+      /* find an empty slot and insert the new user's pointer */
+      for(loop = 0; loop < vma->users_max; loop++)
+         if((vma->users[loop]) == NULL)
+         {
+            /* found a free slot */
+            vma->users[loop] = proc;
+            break;
+         }
+      
+      unlock_gate(&(vma->lock), LOCK_WRITE);
+   }
+   else
+   {
+      /* the vma already exists or collides with an area */
+      err = e_vma_exists;
+      vmm_free(new);
+      
+      VMM_DEBUG("[vmm:%i] couldn't link vma %p to process %i (%p) - collision with vma %p\n", 
+              CPU_ID, vma, proc->pid, proc, existing->area);
+   }
+   
+   unlock_gate(&(proc->lock), LOCK_WRITE);
+   
+   return err;
 }
 
 /* vmm_unlink_vma
@@ -995,42 +995,42 @@ kresult vmm_link_vma(process *proc, vmm_area *vma)
  */
 kresult vmm_unlink_vma(process *owner, vmm_tree *victim)
 {
-	lock_gate(&(owner->lock), LOCK_WRITE);
-	
-	unsigned int loop;
-	vmm_area *vma = victim->area;
-	
-	lock_gate(&(vma->lock), LOCK_WRITE);
-	
-	/* try to remove from the tree */
-	sglib_vmm_tree_delete(&(owner->mem), victim);
-	unlock_gate(&(owner->lock), LOCK_WRITE);
-	
-	/* delete from the vma's users list */
-	for(loop = 0; loop < vma->refcount; loop++)
-	{
-		if(vma->users[loop] == owner)
-		{
-			vma->users[loop] = NULL;
-			vma->users_ptr = loop; /* next free slot is this one */
-			break;
-		}
-	}
-	
-	/* reduce the refcount and free if zero */
-	vma->refcount--;
-	if(!(vma->refcount))
-	{
-		unlock_gate(&(vma->lock), LOCK_WRITE | LOCK_SELFDESTRUCT);
-		vmm_free(vma);
-	}
-	else
-		unlock_gate(&(vma->lock), LOCK_WRITE);
-		
-	VMM_DEBUG("[vmm:%i] unlinked vma %p from tree node %p in process %i (%p)\n",
-			  CPU_ID, vma, victim, owner->pid, owner);
-	
-	return vmm_free(victim);
+   lock_gate(&(owner->lock), LOCK_WRITE);
+   
+   unsigned int loop;
+   vmm_area *vma = victim->area;
+   
+   lock_gate(&(vma->lock), LOCK_WRITE);
+   
+   /* try to remove from the tree */
+   sglib_vmm_tree_delete(&(owner->mem), victim);
+   unlock_gate(&(owner->lock), LOCK_WRITE);
+   
+   /* delete from the vma's users list */
+   for(loop = 0; loop < vma->refcount; loop++)
+   {
+      if(vma->users[loop] == owner)
+      {
+         vma->users[loop] = NULL;
+         vma->users_ptr = loop; /* next free slot is this one */
+         break;
+      }
+   }
+   
+   /* reduce the refcount and free if zero */
+   vma->refcount--;
+   if(!(vma->refcount))
+   {
+      unlock_gate(&(vma->lock), LOCK_WRITE | LOCK_SELFDESTRUCT);
+      vmm_free(vma);
+   }
+   else
+      unlock_gate(&(vma->lock), LOCK_WRITE);
+      
+   VMM_DEBUG("[vmm:%i] unlinked vma %p from tree node %p in process %i (%p)\n",
+           CPU_ID, vma, victim, owner->pid, owner);
+   
+   return vmm_free(victim);
 }
 
 /* vmm_add_vma
@@ -1043,127 +1043,127 @@ kresult vmm_unlink_vma(process *owner, vmm_tree *victim)
    <= success or a failure code
 */
 kresult vmm_add_vma(process *proc, unsigned int base, unsigned int size,
-						  unsigned char flags, unsigned int cookie)
+                    unsigned char flags, unsigned int cookie)
 {
-	vmm_area *new;
-	kresult err = vmm_malloc((void **)&new, sizeof(vmm_area));
-	if(err) return err;
-	vmm_memset(new, 0, sizeof(vmm_area)); /* zero the area */
-	
-	/* fill in the details - ref_count will be updated by the link_vma() call */
-	new->flags    = flags;
-	new->refcount = 0;
-	new->base     = base;
-	new->size     = size;
-	new->token    = cookie;
-	
-	/* set up an empty amortised list of vma users */
-	new->users_max = 4;
-	err = vmm_malloc((void **)&(new->users), sizeof(process *) * new->users_max);
-	if(err)
-	{
-		vmm_free(new);
-		return err;
-	}
-	vmm_memset(new->users, 0, sizeof(process *) * new->users_max); /* zero the list */
-	
-	VMM_DEBUG("[vmm:%i] created vma %p for proc %i (%p): base %x size %i flags %x cookie %x\n",
-			  CPU_ID, new, proc->pid, proc, base, size, flags, cookie);
-	
-	if(vmm_link_vma(proc, new))
-		return e_failure;
-	else
-		return success;
+   vmm_area *new;
+   kresult err = vmm_malloc((void **)&new, sizeof(vmm_area));
+   if(err) return err;
+   vmm_memset(new, 0, sizeof(vmm_area)); /* zero the area */
+   
+   /* fill in the details - ref_count will be updated by the link_vma() call */
+   new->flags    = flags;
+   new->refcount = 0;
+   new->base     = base;
+   new->size     = size;
+   new->token    = cookie;
+   
+   /* set up an empty amortised list of vma users */
+   new->users_max = 4;
+   err = vmm_malloc((void **)&(new->users), sizeof(process *) * new->users_max);
+   if(err)
+   {
+      vmm_free(new);
+      return err;
+   }
+   vmm_memset(new->users, 0, sizeof(process *) * new->users_max); /* zero the list */
+   
+   VMM_DEBUG("[vmm:%i] created vma %p for proc %i (%p): base %x size %i flags %x cookie %x\n",
+           CPU_ID, new, proc->pid, proc, base, size, flags, cookie);
+   
+   if(vmm_link_vma(proc, new))
+      return e_failure;
+   else
+      return success;
 }
 
 /* vmm_duplicate_vmas
    Duplicate the memory map of a process for a child by
    recreateing a new tree and linking the VMAs in the parent to the
-	child's tree.
+   child's tree.
    => new = child process
       source = parent process to clone from
    <= success or a failure code
 */
 kresult vmm_duplicate_vmas(process *new, process *source)
 {
-	kresult err;
-	struct vmm_tree *node;
-	struct sglib_vmm_tree_iterator state;
-	
-	if(!source) return e_failure;
+   kresult err;
+   struct vmm_tree *node;
+   struct sglib_vmm_tree_iterator state;
+   
+   if(!source) return e_failure;
 
-	VMM_DEBUG("[vmm:%i] duplicating process map for proc %i (%p) from %i (%p)\n",
-			  CPU_ID, new->pid, new, source->pid, source);
-	
-	lock_gate(&(source->lock), LOCK_READ);
-	
-	/* walk the parent's tree and copy it */
-	for(node = sglib_vmm_tree_it_init(&state, source->mem);
-		 node != NULL;
-		 node = sglib_vmm_tree_it_next(&state))
-	{
-		err = vmm_link_vma(new, node->area);
-		if(err != success) break;
-	}
-	
-	unlock_gate(&(source->lock), LOCK_READ);
-	
-	return err;
+   VMM_DEBUG("[vmm:%i] duplicating process map for proc %i (%p) from %i (%p)\n",
+           CPU_ID, new->pid, new, source->pid, source);
+   
+   lock_gate(&(source->lock), LOCK_READ);
+   
+   /* walk the parent's tree and copy it */
+   for(node = sglib_vmm_tree_it_init(&state, source->mem);
+       node != NULL;
+       node = sglib_vmm_tree_it_next(&state))
+   {
+      err = vmm_link_vma(new, node->area);
+      if(err != success) break;
+   }
+   
+   unlock_gate(&(source->lock), LOCK_READ);
+   
+   return err;
 }
 
 /* vmm_destroy_vmas
-	Tear down the given process's memory tree
+   Tear down the given process's memory tree
    <= success or a failure code */
 kresult vmm_destroy_vmas(process *victim)
 {
-	kresult err;
-	struct vmm_tree *node;
-	struct sglib_vmm_tree_iterator state;	
-	
-	lock_gate(&(victim->lock), LOCK_WRITE);
-	
-	/* walk the victim's tree, unlink and free the nodes */
-	for(node = sglib_vmm_tree_it_init(&state, victim->mem);
-		 node != NULL;
-		 node = sglib_vmm_tree_it_next(&state))
-	{
-		err = vmm_unlink_vma(victim, node);
-		if(err != success) break;
-	}
-	
-	victim->mem = NULL;
-	
-	unlock_gate(&(victim->lock), LOCK_WRITE);
-	return err;
+   kresult err;
+   struct vmm_tree *node;
+   struct sglib_vmm_tree_iterator state;   
+   
+   lock_gate(&(victim->lock), LOCK_WRITE);
+   
+   /* walk the victim's tree, unlink and free the nodes */
+   for(node = sglib_vmm_tree_it_init(&state, victim->mem);
+       node != NULL;
+       node = sglib_vmm_tree_it_next(&state))
+   {
+      err = vmm_unlink_vma(victim, node);
+      if(err != success) break;
+   }
+   
+   victim->mem = NULL;
+   
+   unlock_gate(&(victim->lock), LOCK_WRITE);
+   return err;
 }
 
 /* vmm_find_vma
-	Locate a vma tree node using the given address in the given proc
+   Locate a vma tree node using the given address in the given proc
    <= pointer to tree node or NULL for not found
 */
 vmm_tree *vmm_find_vma(process *proc, unsigned int addr)
 {
-	vmm_tree node;
-	vmm_area area;
-	vmm_tree *result;
-	
-	/* give up now if we're given rubbish pointers */
-	if(!proc) return NULL;
+   vmm_tree node;
+   vmm_area area;
+   vmm_tree *result;
+   
+   /* give up now if we're given rubbish pointers */
+   if(!proc) return NULL;
 
-	/* mock up a vma and node to search for */
-	area.base = addr;
-	area.size = 1;
-	node.area = &area;
-	
-	lock_gate(&(proc->lock), LOCK_READ);
-	result = sglib_vmm_tree_find_member(proc->mem, &node);
-	unlock_gate(&(proc->lock), LOCK_READ);
-	
-	return result;
+   /* mock up a vma and node to search for */
+   area.base = addr;
+   area.size = 1;
+   node.area = &area;
+   
+   lock_gate(&(proc->lock), LOCK_READ);
+   result = sglib_vmm_tree_find_member(proc->mem, &node);
+   unlock_gate(&(proc->lock), LOCK_READ);
+   
+   return result;
 }
 
 /* vmm_fault
-	Make a decision on what to do with a faulting user process by using its
+   Make a decision on what to do with a faulting user process by using its
    vma tree and the flags associated with a located vma
    => proc = process at fault
       addr = virtual address where fault occurred
@@ -1172,97 +1172,97 @@ vmm_tree *vmm_find_vma(process *proc, unsigned int addr)
 */
 vmm_decision vmm_fault(process *proc, unsigned int addr, unsigned char flags)
 {
-	lock_gate(&(proc->lock), LOCK_READ);
-	
-	vmm_area *vma;
-	vmm_tree *found = vmm_find_vma(proc, addr);
+   lock_gate(&(proc->lock), LOCK_READ);
+   
+   vmm_area *vma;
+   vmm_tree *found = vmm_find_vma(proc, addr);
 
-	if(!found) return badaccess; /* no vma means no possible access */
-	
-	vma = found->area;
+   if(!found) return badaccess; /* no vma means no possible access */
+   
+   vma = found->area;
 
-	lock_gate(&(vma->lock), LOCK_READ);
-	unlock_gate(&(proc->lock), LOCK_READ);
-	
-	VMM_DEBUG("[vmm:%i] fault at %x lies within vma %p (base %x size %i) in process %i\n",
-			  CPU_ID, addr, vma, vma->base, vma->size, proc->pid);
-	
-	/* fail this access if it's a write to a non-writeable area */
-	if((flags & VMA_WRITEABLE) && !(vma->flags & VMA_WRITEABLE))
-	{
-		unlock_gate(&(vma->lock), LOCK_READ);
-		return badaccess;
-	}
+   lock_gate(&(vma->lock), LOCK_READ);
+   unlock_gate(&(proc->lock), LOCK_READ);
+   
+   VMM_DEBUG("[vmm:%i] fault at %x lies within vma %p (base %x size %i) in process %i\n",
+           CPU_ID, addr, vma, vma->base, vma->size, proc->pid);
+   
+   /* fail this access if it's a write to a non-writeable area */
+   if((flags & VMA_WRITEABLE) && !(vma->flags & VMA_WRITEABLE))
+   {
+      unlock_gate(&(vma->lock), LOCK_READ);
+      return badaccess;
+   }
 
-	/* defer to the userspace page manager if it is managing this vma */
-	if(!(vma->flags & VMA_MEMSOURCE))
-	{
-		unlock_gate(&(vma->lock), LOCK_READ);
-		return external;
-	}
-	
-	/* if it's a linked vma then now's time to copy the page so this
-	   process can have its own private copy */
-	if(vma->refcount > 1)
-	{
-		unsigned int loop, loopmax, thisphys, phys;
-		process *search;
-		
-		/* if there's nothing to copy, then have a new private blank page */
-		if(!(flags & VMA_HASPHYS))
-		{
-			unlock_gate(&(vma->lock), LOCK_READ);
-			return newpage;
-		}
-		
-		/* to avoid leaking a page of phys mem, only clone if there are two
-		   or more processes (including this one) sharing one physical page */
-		if(pg_user2phys(&thisphys, proc->pgdir, addr))
-		{
-			KOOPS_DEBUG("[vmm:%i] OMGWTF page claimed to have physical memory - but doesn't\n", CPU_ID);
-			unlock_gate(&(vma->lock), LOCK_READ);
-			return badaccess;
-		}
-		
-		loopmax = vma->refcount;
-		for(loop = 0; loop < loopmax; loop++)
-		{
-			search = vma->users[loop];
-			if(search)
-				/* this process doesn't count in the search */
-				if(search != proc)
-					if(pg_user2phys(&phys, search->pgdir, addr) == success)
-						if(phys == thisphys)
-						{
-							unlock_gate(&(vma->lock), LOCK_READ);
-							return clonepage;
-						}
-		}
-		
-		/* it's writeable, it's present, we're the only ones using it.. */
-		unlock_gate(&(vma->lock), LOCK_READ);
-		return makewriteable;
-	}
+   /* defer to the userspace page manager if it is managing this vma */
+   if(!(vma->flags & VMA_MEMSOURCE))
+   {
+      unlock_gate(&(vma->lock), LOCK_READ);
+      return external;
+   }
+   
+   /* if it's a linked vma then now's time to copy the page so this
+      process can have its own private copy */
+   if(vma->refcount > 1)
+   {
+      unsigned int loop, loopmax, thisphys, phys;
+      process *search;
+      
+      /* if there's nothing to copy, then have a new private blank page */
+      if(!(flags & VMA_HASPHYS))
+      {
+         unlock_gate(&(vma->lock), LOCK_READ);
+         return newpage;
+      }
+      
+      /* to avoid leaking a page of phys mem, only clone if there are two
+         or more processes (including this one) sharing one physical page */
+      if(pg_user2phys(&thisphys, proc->pgdir, addr))
+      {
+         KOOPS_DEBUG("[vmm:%i] OMGWTF page claimed to have physical memory - but doesn't\n", CPU_ID);
+         unlock_gate(&(vma->lock), LOCK_READ);
+         return badaccess;
+      }
+      
+      loopmax = vma->refcount;
+      for(loop = 0; loop < loopmax; loop++)
+      {
+         search = vma->users[loop];
+         if(search)
+            /* this process doesn't count in the search */
+            if(search != proc)
+               if(pg_user2phys(&phys, search->pgdir, addr) == success)
+                  if(phys == thisphys)
+                  {
+                     unlock_gate(&(vma->lock), LOCK_READ);
+                     return clonepage;
+                  }
+      }
+      
+      /* it's writeable, it's present, we're the only ones using it.. */
+      unlock_gate(&(vma->lock), LOCK_READ);
+      return makewriteable;
+   }
 
-	/* if it's single-linked and has its own physical memory and writes are
-	   allowed then it's a page left over from a copy-on-write, so just
-	   mark it writeable */
-	if(vma->refcount == 1)
-	{	
-		/* but only if there's physical memory to write onto */
-		if(flags & VMA_HASPHYS)
-		{
-			unlock_gate(&(vma->lock), LOCK_READ);
-			return makewriteable;
-		}
-	
-		/* but if there's no physical memory and it's single-linked and
-		   writes are allowed then allocate some memory for this page */
-		unlock_gate(&(vma->lock), LOCK_READ);
-		return newpage;
-	}
+   /* if it's single-linked and has its own physical memory and writes are
+      allowed then it's a page left over from a copy-on-write, so just
+      mark it writeable */
+   if(vma->refcount == 1)
+   {   
+      /* but only if there's physical memory to write onto */
+      if(flags & VMA_HASPHYS)
+      {
+         unlock_gate(&(vma->lock), LOCK_READ);
+         return makewriteable;
+      }
+   
+      /* but if there's no physical memory and it's single-linked and
+         writes are allowed then allocate some memory for this page */
+      unlock_gate(&(vma->lock), LOCK_READ);
+      return newpage;
+   }
 
-	/* if this access satisfies no other cases then give up and fail it */
-	unlock_gate(&(vma->lock), LOCK_READ);
-	return badaccess;
+   /* if this access satisfies no other cases then give up and fail it */
+   unlock_gate(&(vma->lock), LOCK_READ);
+   return badaccess;
 }

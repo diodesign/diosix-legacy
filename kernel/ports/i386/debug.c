@@ -35,42 +35,42 @@ static int debug_writebyte(unsigned c, void **ptr)
 void debug_stacktrace(void)
 {
 #ifdef DEBUG
-	unsigned int *ptr, *base, sym_base;
-	unsigned int tid, pid;
-	char buffer[32];
-	
-	/* first, work out where the stack starts */
-	if(cpu_table[CPU_ID].current)
-	{
-		/* we're running threads, so find the current thread's kernel
-		   stack base */
-		base = (unsigned int *)cpu_table[CPU_ID].current->tss.esp0;
-		tid = cpu_table[CPU_ID].current->tid;
-		pid = cpu_table[CPU_ID].current->proc->pid;
-	}
-	else
-	{
-		/* kernel is still booting and using the initial stack */
-		base = (unsigned int *)&(KernelBootStackBase);
-		tid = pid = 0;
-	}
-	
-	/* grab a copy of the stack pointer */
-	__asm__ __volatile__("movl %%esp, %0" : "=a" (ptr));
-	
-	dprintf("[debug:%i] kernel stack backtrace requested: base %p stackptr %p size %i (tid %i pid %i)\n",
-			  CPU_ID, base, ptr, ((unsigned int)base - (unsigned int)ptr), tid, pid);
+   unsigned int *ptr, *base, sym_base;
+   unsigned int tid, pid;
+   char buffer[32];
+   
+   /* first, work out where the stack starts */
+   if(cpu_table[CPU_ID].current)
+   {
+      /* we're running threads, so find the current thread's kernel
+         stack base */
+      base = (unsigned int *)cpu_table[CPU_ID].current->tss.esp0;
+      tid = cpu_table[CPU_ID].current->tid;
+      pid = cpu_table[CPU_ID].current->proc->pid;
+   }
+   else
+   {
+      /* kernel is still booting and using the initial stack */
+      base = (unsigned int *)&(KernelBootStackBase);
+      tid = pid = 0;
+   }
+   
+   /* grab a copy of the stack pointer */
+   __asm__ __volatile__("movl %%esp, %0" : "=a" (ptr));
+   
+   dprintf("[debug:%i] kernel stack backtrace requested: base %p stackptr %p size %i (tid %i pid %i)\n",
+           CPU_ID, base, ptr, ((unsigned int)base - (unsigned int)ptr), tid, pid);
 
-	while(base >= ptr)
-	{
-		/* look up a kernel symbol if relevant */
-		if((*(base) >= KERNEL_VIRTUAL_BASE) && (*(base) < KERNEL_VIRTUAL_END))
-			if(debug_lookup_symbol(*(base), buffer, 32, &sym_base) == success)
-				dprintf("        [0x%p]  0x%x [func %s + 0x%x]\n",
-						  base, *(base), buffer, (*base) - sym_base);
-		base--;
-	}
-	dprintf("\n");
+   while(base >= ptr)
+   {
+      /* look up a kernel symbol if relevant */
+      if((*(base) >= KERNEL_VIRTUAL_BASE) && (*(base) < KERNEL_VIRTUAL_END))
+         if(debug_lookup_symbol(*(base), buffer, 32, &sym_base) == success)
+            dprintf("        [0x%p]  0x%x [func %s + 0x%x]\n",
+                    base, *(base), buffer, (*base) - sym_base);
+      base--;
+   }
+   dprintf("\n");
 #endif
 }
 
@@ -79,9 +79,9 @@ void debug_stacktrace(void)
  http://www.acm.uiuc.edu/sigops/roll_your_own/2.a.html */
 void debug_assert(char *exp, char *file, char *basefile, unsigned int line)
 {
-	debug_printf("[debug] assert(%s) failed in file %s (included from %s), line %d\n",
-					 exp, file, basefile, line);
-	debug_panic("assert() failed");
+   debug_printf("[debug] assert(%s) failed in file %s (included from %s), line %d\n",
+                exp, file, basefile, line);
+   debug_panic("assert() failed");
 }
 
 /* debug_panic
@@ -90,10 +90,10 @@ void debug_assert(char *exp, char *file, char *basefile, unsigned int line)
 */
 void debug_panic(const char *str)
 {
-	dprintf("*** PANIC: %s -- halting\n");
-	
-	x86_disable_interrupts();
-	while(1);
+   dprintf("*** PANIC: %s -- halting\n");
+   
+   x86_disable_interrupts();
+   while(1);
 }
 
 
@@ -118,23 +118,23 @@ unsigned int strlen(const unsigned char *str)
 typedef unsigned char *va_list;
 
 /* width of stack == width of int */
-#define	STACKITEM	int
+#define   STACKITEM   int
 
 /* round up width of objects pushed on stack. The expression before the
 & ensures that we get 0 for objects of size 0. */
-#define	VA_SIZE(TYPE)					\
-	((sizeof(TYPE) + sizeof(STACKITEM) - 1)	\
-		& ~(sizeof(STACKITEM) - 1))
+#define   VA_SIZE(TYPE)               \
+   ((sizeof(TYPE) + sizeof(STACKITEM) - 1)   \
+      & ~(sizeof(STACKITEM) - 1))
 
 /* &(LASTARG) points to the LEFTMOST argument of the function call
 (before the ...) */
-#define	va_start(AP, LASTARG)	\
-	(AP=((va_list)&(LASTARG) + VA_SIZE(LASTARG)))
+#define   va_start(AP, LASTARG)   \
+   (AP=((va_list)&(LASTARG) + VA_SIZE(LASTARG)))
 
-#define va_end(AP)	/* nothing */
+#define va_end(AP)   /* nothing */
 
-#define va_arg(AP, TYPE)	\
-	(AP += VA_SIZE(TYPE), *((TYPE *)(AP - VA_SIZE(TYPE))))
+#define va_arg(AP, TYPE)   \
+   (AP += VA_SIZE(TYPE), *((TYPE *)(AP - VA_SIZE(TYPE))))
 
 
 /* ------------------------------------------------------------------------
@@ -408,15 +408,15 @@ void debug_printf(const char *fmt, ...)
 {
    va_list args;
 
-	/* gain exclusive access to the debug output stream */
-	lock_spin(&debug_spinlock);
-	
+   /* gain exclusive access to the debug output stream */
+   lock_spin(&debug_spinlock);
+   
    va_start(args, fmt);
    (void)debug_do_printf(fmt, args, debug_writebyte, NULL);
    va_end(args);
-	
-	/* release the debug output stream */
-	unlock_spin(&debug_spinlock);
+   
+   /* release the debug output stream */
+   unlock_spin(&debug_spinlock);
 }
 
 /* keep a copy of the table pointer */
@@ -424,84 +424,84 @@ char *debug_sym_tbl_start = NULL;
 char *debug_sym_tbl_end = NULL;
 
 /* debug_init_sym_table
-	Prepare a text-based symbol table for look up
+   Prepare a text-based symbol table for look up
    => table = pointer to symbol table file in memory
       end = pointer to the end of the symbol table in memory
    <= success or an error code
 */
 kresult debug_init_sym_table(char *table, char *end)
-{	
-	debug_sym_tbl_start = table;
-	debug_sym_tbl_end = end;
+{   
+   debug_sym_tbl_start = table;
+   debug_sym_tbl_end = end;
 
-	return success;
+   return success;
 }
 
 /* debug_ascii2uint
    Convert a space-terminated ASCII string into a 32bit unsigned integer
    => str = pointer to word containing pointer to string to read
             this pointer is updated to point to the end of the string
-		base = 10 for unsigned decimal text or 16 for unsigned hex text
+      base = 10 for unsigned decimal text or 16 for unsigned hex text
    <= converted unsigned int
 */
 unsigned int debug_ascii2uint(char **str, unsigned char base)
 {
-	unsigned int value = 0, power = 1;
-	char *ptr = *str;
-	char *start = *str;
-	
-	/* skip to the end of the string */
-	while(*ptr != ' ')
-		ptr++;
+   unsigned int value = 0, power = 1;
+   char *ptr = *str;
+   char *start = *str;
+   
+   /* skip to the end of the string */
+   while(*ptr != ' ')
+      ptr++;
 
-	/* update the pointer to the end of the string */
-	*str = ptr;
+   /* update the pointer to the end of the string */
+   *str = ptr;
 
-	ptr--; /* reverse over the space terminator */
-	
-	/* now work our way back through the string... */
-	while((unsigned int)ptr >= (unsigned int)start)
-	{
-		/* ...converting the digits */
-		switch(*ptr)
-		{
-			case '0': value = value + (0 * power); break;
-			case '1': value = value + (1 * power); break;
-			case '2': value = value + (2 * power); break;
-			case '3': value = value + (3 * power); break;
-			case '4': value = value + (4 * power); break;
-			case '5': value = value + (5 * power); break;
-			case '6': value = value + (6 * power); break;
-			case '7': value = value + (7 * power); break;
-			case '8': value = value + (8 * power); break;
-			case '9': value = value + (9 * power); break;
-			/* uppercase hex codes */
-			case 'A': value = value + (10 * power); break;
-			case 'B': value = value + (11 * power); break;
-			case 'C': value = value + (12 * power); break;
-			case 'D': value = value + (13 * power); break;
-			case 'E': value = value + (14 * power); break;
-			case 'F': value = value + (15 * power); break;
-			/* lowercase hex codes */
-			case 'a': value = value + (10 * power); break;
-			case 'b': value = value + (11 * power); break;
-			case 'c': value = value + (12 * power); break;
-			case 'd': value = value + (13 * power); break;
-			case 'e': value = value + (14 * power); break;
-			case 'f': value = value + (15 * power); break;
-		}
+   ptr--; /* reverse over the space terminator */
+   
+   /* now work our way back through the string... */
+   while((unsigned int)ptr >= (unsigned int)start)
+   {
+      /* ...converting the digits */
+      switch(*ptr)
+      {
+         case '0': value = value + (0 * power); break;
+         case '1': value = value + (1 * power); break;
+         case '2': value = value + (2 * power); break;
+         case '3': value = value + (3 * power); break;
+         case '4': value = value + (4 * power); break;
+         case '5': value = value + (5 * power); break;
+         case '6': value = value + (6 * power); break;
+         case '7': value = value + (7 * power); break;
+         case '8': value = value + (8 * power); break;
+         case '9': value = value + (9 * power); break;
+         /* uppercase hex codes */
+         case 'A': value = value + (10 * power); break;
+         case 'B': value = value + (11 * power); break;
+         case 'C': value = value + (12 * power); break;
+         case 'D': value = value + (13 * power); break;
+         case 'E': value = value + (14 * power); break;
+         case 'F': value = value + (15 * power); break;
+         /* lowercase hex codes */
+         case 'a': value = value + (10 * power); break;
+         case 'b': value = value + (11 * power); break;
+         case 'c': value = value + (12 * power); break;
+         case 'd': value = value + (13 * power); break;
+         case 'e': value = value + (14 * power); break;
+         case 'f': value = value + (15 * power); break;
+      }
 
-		ptr--;
-		power = power * base;
-	}
-	
-	return value;
+      ptr--;
+      power = power * base;
+   }
+   
+   return value;
 }
 
 /* debug_lookup_symbol
-	Look up a symbol from its address and copy its name into
+   Look up a symbol from its address and copy its name into
    the given buffer
-	=> addr = address to query
+   => addr = address to query
       buffer = where to write the name string
       size = buffer size in bytes
       symbol = pointer to word to write in base address of found symbol
@@ -509,49 +509,49 @@ unsigned int debug_ascii2uint(char **str, unsigned char base)
 */
 kresult debug_lookup_symbol(unsigned int addr, char *buffer, unsigned int size, unsigned int *symbol)
 {
-	/* give up now if we don't have a symbol table */
-	if(!debug_sym_tbl_start || !debug_sym_tbl_end) return e_not_found;
-	
-	char *ptr = debug_sym_tbl_start;
-	unsigned int sym_addr, sym_size;
-	
-	KSYM_DEBUG("[debug:%i] looking up symbol for %x\n", CPU_ID, addr);
-	
-	/* attempt to parse a line in the symbol file - rather brute force */
-	while(ptr < debug_sym_tbl_end)
-	{
-		/* convert values, remembering to jump over space seperator */
-		sym_addr = debug_ascii2uint(&ptr, 16); ptr++;
-		sym_size = debug_ascii2uint(&ptr, 10); ptr++;
-		
-		KSYM_DEBUG("[debug:%i] found a symbol for %x size %i\n", CPU_ID, sym_addr, sym_size);
-		
-		/* look for an address match */
-		if(addr >= sym_addr && addr < (sym_addr + sym_size))
-		{
-			/* copy the symbol string into the buffer */
-			unsigned int loop = 0;
-			
-			while(*ptr != '\n' && loop < (size - sizeof(char)))
-			{
-				buffer[loop] = *ptr;
-				loop++;
-				ptr++;
-			}
-			
-			/* write in the sym base address, terminate the string and get out of here */
-			*symbol = sym_addr;
-			buffer[loop] = NULL;
-			return success;
-		}
-		
-		/* skip to the end of the line */
-		while(*ptr != '\n') ptr++;
-		ptr++; /* skip over the newline terminator */
-	}
-	
-	/* fail if we're still here */
-	return e_failure;
+   /* give up now if we don't have a symbol table */
+   if(!debug_sym_tbl_start || !debug_sym_tbl_end) return e_not_found;
+   
+   char *ptr = debug_sym_tbl_start;
+   unsigned int sym_addr, sym_size;
+   
+   KSYM_DEBUG("[debug:%i] looking up symbol for %x\n", CPU_ID, addr);
+   
+   /* attempt to parse a line in the symbol file - rather brute force */
+   while(ptr < debug_sym_tbl_end)
+   {
+      /* convert values, remembering to jump over space seperator */
+      sym_addr = debug_ascii2uint(&ptr, 16); ptr++;
+      sym_size = debug_ascii2uint(&ptr, 10); ptr++;
+      
+      KSYM_DEBUG("[debug:%i] found a symbol for %x size %i\n", CPU_ID, sym_addr, sym_size);
+      
+      /* look for an address match */
+      if(addr >= sym_addr && addr < (sym_addr + sym_size))
+      {
+         /* copy the symbol string into the buffer */
+         unsigned int loop = 0;
+         
+         while(*ptr != '\n' && loop < (size - sizeof(char)))
+         {
+            buffer[loop] = *ptr;
+            loop++;
+            ptr++;
+         }
+         
+         /* write in the sym base address, terminate the string and get out of here */
+         *symbol = sym_addr;
+         buffer[loop] = NULL;
+         return success;
+      }
+      
+      /* skip to the end of the line */
+      while(*ptr != '\n') ptr++;
+      ptr++; /* skip over the newline terminator */
+   }
+   
+   /* fail if we're still here */
+   return e_failure;
 }
 
 /* debug_initialise
@@ -561,7 +561,7 @@ void debug_initialise(void)
 {
 #ifdef DEBUG
    serial_initialise(); /* port-specific */
-	
+   
    /* can I get a witness? */
    dprintf("[core] Now debugging to serial port.\n");
 #endif

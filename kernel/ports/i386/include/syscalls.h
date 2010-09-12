@@ -16,7 +16,7 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 */
 
 #ifndef _SYSCALLS_H
-#define	_SYSCALLS_H
+#define   _SYSCALLS_H
 
 /* define a standard way of returning an error code */
 #define SYSCALL_RETURN(a) do { regs->eax = (unsigned int)(a); return; } while(0)

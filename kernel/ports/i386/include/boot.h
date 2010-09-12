@@ -16,17 +16,17 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 */
 
 #ifndef _BOOT_H
-#define	_BOOT_H
+#define   _BOOT_H
 
 /* welcome fluff */
-#define PORT_BANNER	"\n" \
-							" _|_|_|    _|    _|_|      _|_|_|  _|            \n" \
-							" _|    _|      _|    _|  _|            _|    _|  \n" \
-							" _|    _|  _|  _|    _|    _|_|    _|    _|_|    \n" \
-							" _|    _|  _|  _|    _|        _|  _|  _|    _|  \n" \
-							" _|_|_|    _|    _|_|    _|_|_|    _|  _|    _|  \n\n" \
-							" Copyright (c) Chris Williams and contributors, 2009-2010.\n" \
-							" See http://diodesign.co.uk/ for usage and licence.\n"
+#define PORT_BANNER  "\n" \
+                     " _|_|_|    _|    _|_|      _|_|_|  _|            \n" \
+                     " _|    _|      _|    _|  _|            _|    _|  \n" \
+                     " _|    _|  _|  _|    _|    _|_|    _|    _|_|    \n" \
+                     " _|    _|  _|  _|    _|        _|  _|  _|    _|  \n" \
+                     " _|_|_|    _|    _|_|    _|_|_|    _|  _|    _|  \n\n" \
+                     " Copyright (c) Chris Williams and contributors, 2009-2010.\n" \
+                     " See http://diodesign.co.uk/ for usage and licence.\n"
 
 /* kernel payload */
 extern unsigned int payload_modulemax;

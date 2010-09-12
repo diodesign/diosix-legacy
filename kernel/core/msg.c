@@ -23,12 +23,12 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
    supposed to be handling it, then returns. If no signal handler can be found
    then alert the caller.
    => target  = pointer to receiving process
-		signum  = signal code to send
+      signum  = signal code to send
       sigcode = additional reason code
    <= 0 for success or an error reason code */
 kresult msg_send_signal(process *target, unsigned int signum, unsigned int sigcode)
 {
-	return e_no_handler;
+   return e_no_handler;
 }
 
 /* msg_test_receiver
@@ -40,55 +40,55 @@ kresult msg_send_signal(process *target, unsigned int signum, unsigned int sigco
 */
 kresult msg_test_receiver(thread *sender, thread *target, diosix_msg_info *msg)
 {
-	diosix_msg_info *tmsg;
-	
-	/* sanity check */
-	if(!sender || !target || !msg)
-	{
-		KOOPS_DEBUG("[msg:%i] OMGWTF msg_test_receiver() called with sender %p target %p msg %p\n",
-				      CPU_ID, sender, target, msg);
-		return e_failure;
-	}
-	
-	/* protect us from changes to the target's metadata */
-	lock_gate(&(target->lock), LOCK_READ);
-	
-	/* threads can only recieve messages if they are in a layer below the sender - unless it's a 
-		reply. we check below whether this is a legit reply */
-	if((target->proc->layer >= sender->proc->layer) && !(msg->flags & DIOSIX_MSG_REPLY))
-		goto msg_test_receiver_failure;
-	
-	/* is this message waiting on a reply from this thread? */
-	if((target->state == waitingforreply) &&
-		(msg->flags & DIOSIX_MSG_REPLY) &&
-		(target->replysource == sender))
-		goto msg_test_receiver_success;
-	
-	/* is the target thread willing to accept the message type? */
-	if(target->msg)
-	{
-		/* don't forget that within the context of the sending thread we can't access the
-		 receiver's msg structure unless we go via a kernel mapping.. */
-		if(pg_user2kernel((unsigned int *)&tmsg, (unsigned int)(target->msg), target->proc))
-			goto msg_test_receiver_failure;		
-		
-		if((target->state == waitingformsg) &&
-			((msg->flags & DIOSIX_MSG_TYPEMASK) & tmsg->flags))
-			goto msg_test_receiver_success;
-	}
-	
-	/* give up */
-	unlock_gate(&(target->lock), LOCK_READ);
-	return e_no_receiver;
-	
+   diosix_msg_info *tmsg;
+   
+   /* sanity check */
+   if(!sender || !target || !msg)
+   {
+      KOOPS_DEBUG("[msg:%i] OMGWTF msg_test_receiver() called with sender %p target %p msg %p\n",
+                  CPU_ID, sender, target, msg);
+      return e_failure;
+   }
+   
+   /* protect us from changes to the target's metadata */
+   lock_gate(&(target->lock), LOCK_READ);
+   
+   /* threads can only recieve messages if they are in a layer below the sender - unless it's a 
+      reply. we check below whether this is a legit reply */
+   if((target->proc->layer >= sender->proc->layer) && !(msg->flags & DIOSIX_MSG_REPLY))
+      goto msg_test_receiver_failure;
+   
+   /* is this message waiting on a reply from this thread? */
+   if((target->state == waitingforreply) &&
+      (msg->flags & DIOSIX_MSG_REPLY) &&
+      (target->replysource == sender))
+      goto msg_test_receiver_success;
+   
+   /* is the target thread willing to accept the message type? */
+   if(target->msg)
+   {
+      /* don't forget that within the context of the sending thread we can't access the
+       receiver's msg structure unless we go via a kernel mapping.. */
+      if(pg_user2kernel((unsigned int *)&tmsg, (unsigned int)(target->msg), target->proc))
+         goto msg_test_receiver_failure;      
+      
+      if((target->state == waitingformsg) &&
+         ((msg->flags & DIOSIX_MSG_TYPEMASK) & tmsg->flags))
+         goto msg_test_receiver_success;
+   }
+   
+   /* give up */
+   unlock_gate(&(target->lock), LOCK_READ);
+   return e_no_receiver;
+   
 msg_test_receiver_failure:
-	unlock_gate(&(target->lock), LOCK_READ);
-	return e_failure;
-	
-	/* unlock and escape with success */
+   unlock_gate(&(target->lock), LOCK_READ);
+   return e_failure;
+   
+   /* unlock and escape with success */
 msg_test_receiver_success:
-	unlock_gate(&(target->lock), LOCK_READ);
-	return success;
+   unlock_gate(&(target->lock), LOCK_READ);
+   return success;
 }
 
 /* msg_find_receiver
@@ -99,57 +99,57 @@ msg_test_receiver_success:
 */
 thread *msg_find_receiver(thread *sender, diosix_msg_info *msg)
 {
-	process *proc;
-	thread *recv;
-	
-	/* start with basic checks */
-	if(!msg) return NULL;
-	proc = proc_find_proc(msg->pid);
-	if(!proc) return NULL;
-	
+   process *proc;
+   thread *recv;
+   
+   /* start with basic checks */
+   if(!msg) return NULL;
+   proc = proc_find_proc(msg->pid);
+   if(!proc) return NULL;
+   
 #ifdef MSG_DEBUG
-	MSG_DEBUG("[msg:%i] trying to find a receiver, sender=[tid %i pid %i] msg %p target=[tid %i pid %i]\n",
-			    CPU_ID, sender->tid, sender->proc->pid, msg, msg->tid, msg->pid);
+   MSG_DEBUG("[msg:%i] trying to find a receiver, sender=[tid %i pid %i] msg %p target=[tid %i pid %i]\n",
+             CPU_ID, sender->tid, sender->proc->pid, msg, msg->tid, msg->pid);
 #endif
-	
-	/* if a specific tid is given, then try that one */ 
-	if(msg->tid != DIOSIX_MSG_ANY_THREAD)
-	{
-		recv = thread_find_thread(proc, msg->tid);
-		if(msg_test_receiver(sender, recv, msg) == success) return recv;
-	}
-	else
-	{
-		/* otherwise search the targetted process for a thread that's blocking on
-		 receive */
-		unsigned int loop;
-		
-		/* protect us from process table changes */
-		lock_gate(&proc_lock, LOCK_READ);
-		
-		for(loop = 0; loop < THREAD_HASH_BUCKETS; loop++)
-		{
-			recv = proc->threads[loop];
-			while(recv)
-			{
-				if(msg_test_receiver(sender, recv, msg) == success)
-				{
-					unlock_gate(&proc_lock, LOCK_READ);
-					return recv;
-				}
-				recv = recv->hash_next;
-			}
-		}
-		
-		unlock_gate(&proc_lock, LOCK_READ);
-	}
-	
-	/* fall through to returning with nothing */
-	return NULL;
+   
+   /* if a specific tid is given, then try that one */ 
+   if(msg->tid != DIOSIX_MSG_ANY_THREAD)
+   {
+      recv = thread_find_thread(proc, msg->tid);
+      if(msg_test_receiver(sender, recv, msg) == success) return recv;
+   }
+   else
+   {
+      /* otherwise search the targetted process for a thread that's blocking on
+       receive */
+      unsigned int loop;
+      
+      /* protect us from process table changes */
+      lock_gate(&proc_lock, LOCK_READ);
+      
+      for(loop = 0; loop < THREAD_HASH_BUCKETS; loop++)
+      {
+         recv = proc->threads[loop];
+         while(recv)
+         {
+            if(msg_test_receiver(sender, recv, msg) == success)
+            {
+               unlock_gate(&proc_lock, LOCK_READ);
+               return recv;
+            }
+            recv = recv->hash_next;
+         }
+      }
+      
+      unlock_gate(&proc_lock, LOCK_READ);
+   }
+   
+   /* fall through to returning with nothing */
+   return NULL;
 }
 
 /* msg_copy
-	Copy message data from a sender into a receiver's buffer
+   Copy message data from a sender into a receiver's buffer
    => receiver = thread to receive the data
       data = pointer to start of data to copy
       size = number of bytes to copy
@@ -160,48 +160,48 @@ thread *msg_find_receiver(thread *sender, diosix_msg_info *msg)
 */
 kresult msg_copy(thread *receiver, void *data, unsigned int size, unsigned int *offset, thread *sender)
 {
-	diosix_msg_info *rmsg;
-	unsigned int recv;
-	unsigned int recv_base;
-	
-	/* protect us from metadata changes */
-	lock_gate(&(receiver->lock), LOCK_READ);
-	
-	/* don't forget that within the context of the sending thread we can't access the
-	 receiver's msg structure unless we go via a kernel mapping.. */
-	if(pg_user2kernel((unsigned int *)&rmsg, (unsigned int)(receiver->msg), receiver->proc))
-	{
-		unlock_gate(&(receiver->lock), LOCK_READ);
-		return e_failure;
-	}
-	
-	recv = (unsigned int)rmsg->recv;
-	recv_base = recv + (*(offset));
-	
-	/* stop abusive processes trying to smash out of a recv buffer */
-	if((size > DIOSIX_MSG_MAX_SIZE) ||
-		((recv_base + size) > (recv + rmsg->recv_max_size)))
-	{
-		unlock_gate(&(receiver->lock), LOCK_READ);
-		return e_too_big;
-	}
-	
-	lock_gate(&(sender->lock), LOCK_READ);
-	
-	/* hand it over to the vmm to copy process-to-process - it'll sanity check the addresses */
-	if(vmm_memcpyuser((void *)recv_base, receiver->proc, data, sender->proc, size))
-	{
-		unlock_gate(&(sender->lock), LOCK_READ);
-		unlock_gate(&(receiver->lock), LOCK_READ);
-		return e_failure;
-	}
-	
-	/* update offset */
-	*(offset) += size;
-	
-	unlock_gate(&(sender->lock), LOCK_READ);
-	unlock_gate(&(receiver->lock), LOCK_READ);
-	return success;
+   diosix_msg_info *rmsg;
+   unsigned int recv;
+   unsigned int recv_base;
+   
+   /* protect us from metadata changes */
+   lock_gate(&(receiver->lock), LOCK_READ);
+   
+   /* don't forget that within the context of the sending thread we can't access the
+    receiver's msg structure unless we go via a kernel mapping.. */
+   if(pg_user2kernel((unsigned int *)&rmsg, (unsigned int)(receiver->msg), receiver->proc))
+   {
+      unlock_gate(&(receiver->lock), LOCK_READ);
+      return e_failure;
+   }
+   
+   recv = (unsigned int)rmsg->recv;
+   recv_base = recv + (*(offset));
+   
+   /* stop abusive processes trying to smash out of a recv buffer */
+   if((size > DIOSIX_MSG_MAX_SIZE) ||
+      ((recv_base + size) > (recv + rmsg->recv_max_size)))
+   {
+      unlock_gate(&(receiver->lock), LOCK_READ);
+      return e_too_big;
+   }
+   
+   lock_gate(&(sender->lock), LOCK_READ);
+   
+   /* hand it over to the vmm to copy process-to-process - it'll sanity check the addresses */
+   if(vmm_memcpyuser((void *)recv_base, receiver->proc, data, sender->proc, size))
+   {
+      unlock_gate(&(sender->lock), LOCK_READ);
+      unlock_gate(&(receiver->lock), LOCK_READ);
+      return e_failure;
+   }
+   
+   /* update offset */
+   *(offset) += size;
+   
+   unlock_gate(&(sender->lock), LOCK_READ);
+   unlock_gate(&(receiver->lock), LOCK_READ);
+   return success;
 }
 
 /* msg_send
@@ -216,134 +216,134 @@ kresult msg_copy(thread *receiver, void *data, unsigned int size, unsigned int *
 */
 kresult msg_send(thread *sender, diosix_msg_info *msg)
 {
-	thread *receiver;
-	kresult err;
-	unsigned int bytes_copied = 0, priority;
-	diosix_msg_info *rmsg;
+   thread *receiver;
+   kresult err;
+   unsigned int bytes_copied = 0, priority;
+   diosix_msg_info *rmsg;
 
-	/* sanity check the msg data */
-	if(!msg || !sender) return e_bad_address;
-	
-	/* identify the receiver */
-	receiver = msg_find_receiver(sender, msg);
-	
-	if(!receiver) return e_no_receiver;
-	
-	/* copy the message data */
-	if(msg->flags & DIOSIX_MSG_MULTIPART)
-	{
-		/* gather the multipart message blocks */
-		unsigned int loop;
-		
-		diosix_msg_multipart *parts = msg->send;
-		
-		/* check that the multipart pointer isn't bogus */
-		if(((unsigned int)parts + (msg->send_size * sizeof(diosix_msg_multipart))) >= KERNEL_SPACE_BASE)
-			return e_bad_address;
-		
-		/* do the multipart copy */
-		for(loop = 0; loop < msg->send_size; loop++)
-		{
-			err = msg_copy(receiver, parts[loop].data, parts[loop].size, &bytes_copied, sender);
-			if(err || (bytes_copied > DIOSIX_MSG_MAX_SIZE)) break;
-		}
-	}
-	else
-		/* do a simple message copy */
-		err = msg_copy(receiver, msg->send, msg->send_size, &bytes_copied, sender);
-	
-	if(err) return err;
-	
-	/* protect us from changes to the receiver's metadata */
-	lock_gate(&(receiver->lock), LOCK_READ);
-	
-	/* update the sender's and receiver's message block*/
-	msg->pid = receiver->proc->pid;
-	msg->tid = receiver->tid;
-	
-	/* don't forget that within the context of the sending thread we can't access the
-	 receiver's msg structure unless we go via a kernel mapping.. */
-	if(pg_user2kernel((unsigned int *)&rmsg, (unsigned int)(receiver->msg), receiver->proc))
-	{
-		unlock_gate(&(receiver->lock), LOCK_READ);
-		return e_failure;
-	}
+   /* sanity check the msg data */
+   if(!msg || !sender) return e_bad_address;
+   
+   /* identify the receiver */
+   receiver = msg_find_receiver(sender, msg);
+   
+   if(!receiver) return e_no_receiver;
+   
+   /* copy the message data */
+   if(msg->flags & DIOSIX_MSG_MULTIPART)
+   {
+      /* gather the multipart message blocks */
+      unsigned int loop;
+      
+      diosix_msg_multipart *parts = msg->send;
+      
+      /* check that the multipart pointer isn't bogus */
+      if(((unsigned int)parts + (msg->send_size * sizeof(diosix_msg_multipart))) >= KERNEL_SPACE_BASE)
+         return e_bad_address;
+      
+      /* do the multipart copy */
+      for(loop = 0; loop < msg->send_size; loop++)
+      {
+         err = msg_copy(receiver, parts[loop].data, parts[loop].size, &bytes_copied, sender);
+         if(err || (bytes_copied > DIOSIX_MSG_MAX_SIZE)) break;
+      }
+   }
+   else
+      /* do a simple message copy */
+      err = msg_copy(receiver, msg->send, msg->send_size, &bytes_copied, sender);
+   
+   if(err) return err;
+   
+   /* protect us from changes to the receiver's metadata */
+   lock_gate(&(receiver->lock), LOCK_READ);
+   
+   /* update the sender's and receiver's message block*/
+   msg->pid = receiver->proc->pid;
+   msg->tid = receiver->tid;
+   
+   /* don't forget that within the context of the sending thread we can't access the
+    receiver's msg structure unless we go via a kernel mapping.. */
+   if(pg_user2kernel((unsigned int *)&rmsg, (unsigned int)(receiver->msg), receiver->proc))
+   {
+      unlock_gate(&(receiver->lock), LOCK_READ);
+      return e_failure;
+   }
 
-	/* protect us from changes to the sender's metadata */
-	lock_gate(&(sender->lock), LOCK_READ);
-	
-	rmsg->recv_size = bytes_copied;
-	rmsg->pid = sender->proc->pid;
-	rmsg->tid = sender->tid;
-	
-	/* was the send a reply or an actual send? */
-	if(msg->flags & DIOSIX_MSG_REPLY)
-	{
-		/* restore the receiver's priority if it was bumped up to send this reply */
-		if(receiver->prev_priority > receiver->priority)
-			priority = receiver->prev_priority;
-		else
-			priority = receiver->priority;
-	}
-	else
-	{		
-		/* if the sent message wasn't a reply, block sending thread to wait for a reply */
-		sched_remove(sender, waitingforreply);
-		
-		lock_gate(&(sender->lock), LOCK_WRITE);
+   /* protect us from changes to the sender's metadata */
+   lock_gate(&(sender->lock), LOCK_READ);
+   
+   rmsg->recv_size = bytes_copied;
+   rmsg->pid = sender->proc->pid;
+   rmsg->tid = sender->tid;
+   
+   /* was the send a reply or an actual send? */
+   if(msg->flags & DIOSIX_MSG_REPLY)
+   {
+      /* restore the receiver's priority if it was bumped up to send this reply */
+      if(receiver->prev_priority > receiver->priority)
+         priority = receiver->prev_priority;
+      else
+         priority = receiver->priority;
+   }
+   else
+   {      
+      /* if the sent message wasn't a reply, block sending thread to wait for a reply */
+      sched_remove(sender, waitingforreply);
+      
+      lock_gate(&(sender->lock), LOCK_WRITE);
 
-		sender->replysource = receiver;
-		
-		/* take a copy of the message block ptr */
-		sender->msg = msg;
+      sender->replysource = receiver;
+      
+      /* take a copy of the message block ptr */
+      sender->msg = msg;
 
-		unlock_gate(&(sender->lock), LOCK_WRITE);
-		
-		/* bump the receiver's priority up if the sender has a higher priority to
-		   avoid priority inversion */
-		receiver->prev_priority = receiver->priority;
-		if(sender->priority < receiver->priority)
-			priority = sender->priority;
-		else
-			priority = receiver->priority;		
-	}
+      unlock_gate(&(sender->lock), LOCK_WRITE);
+      
+      /* bump the receiver's priority up if the sender has a higher priority to
+         avoid priority inversion */
+      receiver->prev_priority = receiver->priority;
+      if(sender->priority < receiver->priority)
+         priority = sender->priority;
+      else
+         priority = receiver->priority;      
+   }
 
-	unlock_gate(&(sender->lock), LOCK_READ);
-	unlock_gate(&(receiver->lock), LOCK_READ);
-	
-	/* wake up the receiving thread */
-	sched_add(receiver->cpu, priority, receiver);
+   unlock_gate(&(sender->lock), LOCK_READ);
+   unlock_gate(&(receiver->lock), LOCK_READ);
+   
+   /* wake up the receiving thread */
+   sched_add(receiver->cpu, priority, receiver);
 
-	MSG_DEBUG("[msg:%x] thread %i of process %i sent message %x (%i bytes first word %x) to thread %i of process %i\n",
-			    CPU_ID, sender->tid, sender->proc->pid, msg->send, msg->send_size, *((unsigned int *)msg->send),
-			    receiver->tid, receiver->proc->pid);
-	
-	return success;
+   MSG_DEBUG("[msg:%x] thread %i of process %i sent message %x (%i bytes first word %x) to thread %i of process %i\n",
+             CPU_ID, sender->tid, sender->proc->pid, msg->send, msg->send_size, *((unsigned int *)msg->send),
+             receiver->tid, receiver->proc->pid);
+   
+   return success;
 }
 
 /* msg_recv
    Block a thread until a message or signal comes in
    => receiver = thread waiting to receive
-		info = block to fill with received message details
+      info = block to fill with received message details
    <= success or an error code
 */
 kresult msg_recv(thread *receiver, diosix_msg_info *msg)
 {
-	/* basic sanity checks */
-	if(!receiver || !msg) return e_bad_address;
-	if(((unsigned int)msg + sizeof(diosix_msg_info)) >= KERNEL_SPACE_BASE)
-		return e_bad_address;
-	if(!(msg->recv) || !(msg->recv_max_size)) return e_bad_address;
-	
-	/* keep a copy of this pointer */
-	lock_gate(&(receiver->lock), LOCK_WRITE);
-	receiver->msg = msg;
-	unlock_gate(&(receiver->lock), LOCK_WRITE);
+   /* basic sanity checks */
+   if(!receiver || !msg) return e_bad_address;
+   if(((unsigned int)msg + sizeof(diosix_msg_info)) >= KERNEL_SPACE_BASE)
+      return e_bad_address;
+   if(!(msg->recv) || !(msg->recv_max_size)) return e_bad_address;
+   
+   /* keep a copy of this pointer */
+   lock_gate(&(receiver->lock), LOCK_WRITE);
+   receiver->msg = msg;
+   unlock_gate(&(receiver->lock), LOCK_WRITE);
 
-	/* remove receiver from the queue until a message comes in */
-	sched_remove(receiver, waitingformsg);
-	
-	MSG_DEBUG("[msg:%i] tid %i pid %i now receiving (%p)\n", CPU_ID, receiver->tid, receiver->proc->pid, msg);
+   /* remove receiver from the queue until a message comes in */
+   sched_remove(receiver, waitingformsg);
+   
+   MSG_DEBUG("[msg:%i] tid %i pid %i now receiving (%p)\n", CPU_ID, receiver->tid, receiver->proc->pid, msg);
 
-	return success;
+   return success;
 }

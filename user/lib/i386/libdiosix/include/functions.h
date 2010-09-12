@@ -16,7 +16,7 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 */
 
 #ifndef _FUNCTIONS_H
-#define	_FUNCTIONS_H
+#define   _FUNCTIONS_H
 
 /* veneers to syscalls */
 

@@ -27,37 +27,37 @@ unsigned int diosix_exit(unsigned int code)
 /* end execution of this process with the given
    return code */
 {
-	/* send a message to the sysexec with the return code
-	   if it is non-zero */
-	
-	__asm__ __volatile__("int $0x90" : : "d" (SYSCALL_EXIT));
-	
-	/* execution shouldn't reach here */
-	while(1) diosix_yield();
+   /* send a message to the sysexec with the return code
+      if it is non-zero */
+   
+   __asm__ __volatile__("int $0x90" : : "d" (SYSCALL_EXIT));
+   
+   /* execution shouldn't reach here */
+   while(1) diosix_yield();
 }
 
 int diosix_fork(void)
 /* fork and create a child process, returns 0 for the child,
-	the new child PID for the parent, or -1 for failure */
+   the new child PID for the parent, or -1 for failure */
 {
-	int retval;
-	__asm__ __volatile__("int $0x90" : "=a" (retval) : "d" (SYSCALL_FORK));  
-	return retval;
+   int retval;
+   __asm__ __volatile__("int $0x90" : "=a" (retval) : "d" (SYSCALL_FORK));  
+   return retval;
 }
 
 unsigned int diosix_kill(unsigned int pid)
 /* attempt to kill a process with a matching pid.
    check the documentation on what you can and can't kill */
 {
-	unsigned int retval;
-	__asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (pid), "d" (SYSCALL_KILL));  
-	return retval;
+   unsigned int retval;
+   __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (pid), "d" (SYSCALL_KILL));  
+   return retval;
 }
 
 void diosix_yield(void)
 /* give up the processor now for another thread */
 {
-	__asm__ __volatile__("int $0x90" : : "d" (SYSCALL_YIELD));
+   __asm__ __volatile__("int $0x90" : : "d" (SYSCALL_YIELD));
 }
 
 /* --------------- threading basics -------------------- */
@@ -67,31 +67,31 @@ unsigned int diosix_thread_exit(unsigned int code)
  return code - will also kill the process if there are no
  other threads running */
 {
-	/* send a message to the sysexec with the return code
-	 if it is non-zero */
-	
-	__asm__ __volatile__("int $0x90" : : "d" (SYSCALL_THREAD_EXIT));
-	
-	/* execution shouldn't reach here */
-	while(1) diosix_yield();
+   /* send a message to the sysexec with the return code
+    if it is non-zero */
+   
+   __asm__ __volatile__("int $0x90" : : "d" (SYSCALL_THREAD_EXIT));
+   
+   /* execution shouldn't reach here */
+   while(1) diosix_yield();
 }
 
 int diosix_thread_fork(void)
 /* fork the current thread within the process. returns 0 for
-	the child or the new thread id (tid) for the parent, or -1 for failure */
+   the child or the new thread id (tid) for the parent, or -1 for failure */
 {
-	int retval;
-	__asm__ __volatile__("int $0x90" : "=a" (retval) : "d" (SYSCALL_THREAD_FORK));
-	return retval;	
+   int retval;
+   __asm__ __volatile__("int $0x90" : "=a" (retval) : "d" (SYSCALL_THREAD_FORK));
+   return retval;   
 }
 
 unsigned int diosix_thread_kill(unsigned int tid)
 /* attempt to kill a thread with a matching tid within this process.
    check the documentation on what you can and can't kill */
 {
-	unsigned int retval;
-	__asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (tid), "d" (SYSCALL_THREAD_KILL));
-	return retval;
+   unsigned int retval;
+   __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (tid), "d" (SYSCALL_THREAD_KILL));
+   return retval;
 }
 
 /* --------------- message basics -------------------- */
@@ -101,24 +101,24 @@ unsigned int diosix_msg_send(diosix_msg_info *info)
    => info = pointer to msg info block, filled in with reply info
 */
 {
-	unsigned int retval;
-	__asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (info), "d" (SYSCALL_MSG_SEND));
-	return retval;
+   unsigned int retval;
+   __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (info), "d" (SYSCALL_MSG_SEND));
+   return retval;
 }
 
 unsigned int diosix_msg_receive(diosix_msg_info *info)
 /* block until a message arrives, or return with a failure code
-	=> info = pointer to msg info block, filled in with received message info
+   => info = pointer to msg info block, filled in with received message info
 */
 {
-	unsigned int retval;
-	__asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (info), "d" (SYSCALL_MSG_RECV));  
-	return retval;
+   unsigned int retval;
+   __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (info), "d" (SYSCALL_MSG_RECV));  
+   return retval;
 }
 
 unsigned int diosix_msg_reply(diosix_msg_info *info)
 /* reply to a message to unblock the sender, or return with a failure code */
 {
-	info->flags |= DIOSIX_MSG_REPLY;
-	return diosix_msg_send(info);
+   info->flags |= DIOSIX_MSG_REPLY;
+   return diosix_msg_send(info);
 }

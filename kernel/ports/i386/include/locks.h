@@ -16,22 +16,22 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 */
 
 #ifndef _LOCKS_H
-#define	_LOCKS_H
+#define   _LOCKS_H
 
 /* allow a lock_gate timeout (in cpu cycles) if LOCK_TIME_CHECK is defined */
-#define LOCK_TIMEOUT			(1000000000)
+#define LOCK_TIMEOUT         (1000000000)
 
 /* lock settings */
-#define LOCK_READ				 (0)
-#define LOCK_WRITE			 (1 << 0)
+#define LOCK_READ             (0)
+#define LOCK_WRITE          (1 << 0)
 #define LOCK_SELFDESTRUCT   (1 << 1)
 #define LOCK_WRITEWAITING   (1 << 2)
 
 /* locking primitives for processes and threads */
 typedef struct
 {
-	/* lock value, owning thread, and status flags */
-	volatile unsigned int spinlock, owner, flags, refcount;
+   /* lock value, owning thread, and status flags */
+   volatile unsigned int spinlock, owner, flags, refcount;
 } rw_gate;
 
 /* low-level locking mechanisms */

@@ -16,28 +16,28 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 */
 
 #ifndef _SIGNAL_H
-#define	_SIGNAL_H
+#define   _SIGNAL_H
 
 /* userland UNIX signal numbers */
-#define SIGHUP		(1)
-#define SIGINT		(2)
-#define SIGQUIT	(3)
-#define SIGILL		(4)
-#define SIGTRAP	(5)
-#define SIGABRT	(6)
-#define SIGFPE		(8)
-#define SIGKILL	(9)
-#define SIGBUS		(10)  /* bus error, normally a general protection fault */
-#define SIGSEGV	(11)  /* segmentation violation, normally a page fault */
-#define SIGSYS		(12)  /* bad system call attempt */
-#define SIGPIPE	(13)
-#define SIGALRM	(14)
-#define SIGTERM	(15)
-#define SIGURG		(16)
-#define SIGSTOP	(17)
-#define SIGTSTP	(18)
-#define SIGCONT	(19)
-#define SIGCHLD	(20)
+#define SIGHUP    (1)
+#define SIGINT    (2)
+#define SIGQUIT   (3)
+#define SIGILL    (4)
+#define SIGTRAP   (5)
+#define SIGABRT   (6)
+#define SIGFPE    (8)
+#define SIGKILL   (9)
+#define SIGBUS    (10)  /* bus error, normally a general protection fault */
+#define SIGSEGV   (11)  /* segmentation violation, normally a page fault */
+#define SIGSYS    (12)  /* bad system call attempt */
+#define SIGPIPE   (13)
+#define SIGALRM   (14)
+#define SIGTERM   (15)
+#define SIGURG    (16)
+#define SIGSTOP   (17)
+#define SIGTSTP   (18)
+#define SIGCONT   (19)
+#define SIGCHLD   (20)
 #define SIGTTIN   (21)
 #define SIGTTOU   (22)
 #define SIGXCPU   (24)
@@ -48,11 +48,11 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #define SIGUSR2   (31)
 
 /* diosix-specific signals for trusted processes */
-#define SIGXPROCKILLED	 (32)	/* process has been killed, code = victim PID */
+#define SIGXPROCKILLED   (32)   /* process has been killed, code = victim PID */
 #define SIGXPROCCLONED   (33) /* process memory map has been cloned, code = new PID */
-#define SIGXPROCEXIT		 (34)	/* process has called SYSCALL_EXIT and must be killed, code = victim PID */
+#define SIGXPROCEXIT     (34)   /* process has called SYSCALL_EXIT and must be killed, code = victim PID */
 #define SIGXTHREADKILLED (35) /* a thread has been killed, code = thread owner's TID */
-#define SIGXTHREADEXIT	 (36)	/* a thread has called SYSCALL_THREAD_EXIT, code = thread owner's PID */
-#define SIGXIRQ			 (37) /* an IRQ has been raised, code = IRQ line number */
+#define SIGXTHREADEXIT   (36)   /* a thread has called SYSCALL_THREAD_EXIT, code = thread owner's PID */
+#define SIGXIRQ          (37) /* an IRQ has been raised, code = IRQ line number */
 
 #endif

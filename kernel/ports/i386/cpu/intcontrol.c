@@ -43,63 +43,63 @@ int_idt_descr int_idt_table[256];
 
 
 /* int_reload_idtr
-	Reload the idtr on this cpu */
+   Reload the idtr on this cpu */
 void int_reload_idtr(void)
 {
-	INT_DEBUG("[int:%i] loading idtr with %p (%x %x)\n",
-				 CPU_ID, &int_table_ptr, int_table_ptr.base, int_table_ptr.limit);	
-	
-	x86_load_idtr((unsigned int *)&int_table_ptr); /* in start.s */
+   INT_DEBUG("[int:%i] loading idtr with %p (%x %x)\n",
+             CPU_ID, &int_table_ptr, int_table_ptr.base, int_table_ptr.limit);   
+   
+   x86_load_idtr((unsigned int *)&int_table_ptr); /* in start.s */
 }
 
 /* int_set_gate
-	Update the interrupt handler table (int_idt_table) with new data
-	=> intnum  = interrupt number
-		base    = address of routine
-		segment = kernel segment selector for routine
-		flags   = handler descriptor flags
-		flush   = set to non-zero to force a reload of the cpu idt reg
+   Update the interrupt handler table (int_idt_table) with new data
+   => intnum  = interrupt number
+      base    = address of routine
+      segment = kernel segment selector for routine
+      flags   = handler descriptor flags
+      flush   = set to non-zero to force a reload of the cpu idt reg
 */
 void int_set_gate(unsigned char intnum, unsigned int base, unsigned short segment, unsigned char flags, unsigned char flush)
 {
-	INT_DEBUG("[int:%i] setting gate: #%i = %x:%x\n", CPU_ID, intnum, segment, base);
-	
-	int_idt_table[intnum].base_lo  = base & 0xFFFF;
+   INT_DEBUG("[int:%i] setting gate: #%i = %x:%x\n", CPU_ID, intnum, segment, base);
+   
+   int_idt_table[intnum].base_lo  = base & 0xFFFF;
    int_idt_table[intnum].base_hi  = (base >> 16) & 0xFFFF;
    int_idt_table[intnum].segment = segment;
    int_idt_table[intnum].always0  = 0; /* mandatory zero */
    int_idt_table[intnum].flags    = flags;
-	
-	if(flush)
-		int_reload_idtr();
+   
+   if(flush)
+      int_reload_idtr();
 }
 
 
 /* initialise the common entries in the int table for uni and multiproc systems */
 void int_table_initialise(void)
 {
-	INT_DEBUG("[int:%i] initialising interrupt vector table... \n", CPU_ID);
-	
-	/* initialise table pointer and idt table */
-	int_table_ptr.limit = (sizeof(int_idt_descr) * 256) - 1;
-	int_table_ptr.base  = (unsigned int)&int_idt_table;
-	vmm_memset(&int_idt_table, 0, (sizeof(int_idt_descr) * 256));
+   INT_DEBUG("[int:%i] initialising interrupt vector table... \n", CPU_ID);
+   
+   /* initialise table pointer and idt table */
+   int_table_ptr.limit = (sizeof(int_idt_descr) * 256) - 1;
+   int_table_ptr.base  = (unsigned int)&int_idt_table;
+   vmm_memset(&int_idt_table, 0, (sizeof(int_idt_descr) * 256));
 }
 
 /* default timer handler for the scheduler */
 kresult int_common_timer(unsigned char intnum, int_registers_block *regs)
 {
-	/* nudge the timeslice counters for the current thread */
-	sched_tick(regs);
-	return success;
+   /* nudge the timeslice counters for the current thread */
+   sched_tick(regs);
+   return success;
 }
 
 /* initialise the common entries in the int table for uni and multiproc systems */
 void int_initialise_common(void)
 {
-	int_table_initialise();
-	exceptions_initialise();
-	pic_initialise();
+   int_table_initialise();
+   exceptions_initialise();
+   pic_initialise();
 }
 
 /* int_initialise_mproc
@@ -109,25 +109,25 @@ void int_initialise_common(void)
  */
 void int_initialise_mproc(unsigned char flags)
 {
-	if(flags & INT_IAMBSP)
-		int_initialise_common();
-	
-	/* initialise the system's IOAPIC */
-	if(mp_ioapics)
-		ioapic_initialise(0);
-	
-	/* initialise the boot cpu's local APIC */
-	lapic_initialise(INT_IAMBSP);
-}	
+   if(flags & INT_IAMBSP)
+      int_initialise_common();
+   
+   /* initialise the system's IOAPIC */
+   if(mp_ioapics)
+      ioapic_initialise(0);
+   
+   /* initialise the boot cpu's local APIC */
+   lapic_initialise(INT_IAMBSP);
+}   
 
 /* int_initialise_uniproc
  Set up the machine's sole cpu with exception and
  interrupt handlers and program the timer */
 void int_initialise_uniproc(void)
 {
-	int_initialise_common();
-	
-	/* set up a 100Hz ticker for the scheduler  */
-	x86_timer_init(SCHED_FREQUENCY);
-	INT_DEBUG("[int:%i] uniproc: set up timer (%iHz)...\n", CPU_ID, SCHED_FREQUENCY);
+   int_initialise_common();
+   
+   /* set up a 100Hz ticker for the scheduler  */
+   x86_timer_init(SCHED_FREQUENCY);
+   INT_DEBUG("[int:%i] uniproc: set up timer (%iHz)...\n", CPU_ID, SCHED_FREQUENCY);
 }

@@ -18,43 +18,43 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #include <portdefs.h>
 
 /* bus_register_name
-	Register a named bus so that device drivers can attach themselves to
-	interrupt lines on specific buses
+   Register a named bus so that device drivers can attach themselves to
+   interrupt lines on specific buses
    => id = bus ID number
        name = name to associate with bus
    <= 0 for success or a failure code
 */
 kresult bus_register_name(unsigned int id, char *name)
 {
-	BUS_DEBUG("[bus:%i] registering bus %i as '%s'\n", CPU_ID, id, name);
-	
-	/* TODO: unimplemented */
-	
-	return e_failure;
+   BUS_DEBUG("[bus:%i] registering bus %i as '%s'\n", CPU_ID, id, name);
+   
+   /* TODO: unimplemented */
+   
+   return e_failure;
 }
 
 /* bus_add_route
    Register a route between an interrupt on a bus and a particular pin on an
-	IOAPIC chip. This allows the kernel to take an IOAPIC interrupt and identify
+   IOAPIC chip. This allows the kernel to take an IOAPIC interrupt and identify
    the driver responsible for it. A driver thread will know about an interrupt
-	on the end of a particular bus but can't assume how it is routed into an IOAPIC.
+   on the end of a particular bus but can't assume how it is routed into an IOAPIC.
    This route database marries up driver threads to IOAPIC interrupts
-	=> flags = flags
-		busid = ID number of bus
+   => flags = flags
+      busid = ID number of bus
       busirq = interrupt pin number on the bus
       ioapicid = ID number of the IOAPIC the interrupt is routed to
       ioapicirq = interrupt pin on the IOAPIC
    <= 0 for success or a failure code
 */
 kresult bus_add_route(unsigned int flags, unsigned int busid, unsigned int busirq,
-							 unsigned int ioapicid, unsigned int ioapicirq)
+                      unsigned int ioapicid, unsigned int ioapicirq)
 {
-	BUS_DEBUG("[bus:%1] adding route: bus %i irq % ==> ioapic %i irq %i (flags %i)\n", CPU_ID,
-				 busid, busirq, ioapicid, ioapicirq, flags);
-	
-	/* TODO: unimplemented */
-	
-	return e_failure;
+   BUS_DEBUG("[bus:%1] adding route: bus %i irq % ==> ioapic %i irq %i (flags %i)\n", CPU_ID,
+             busid, busirq, ioapicid, ioapicirq, flags);
+   
+   /* TODO: unimplemented */
+   
+   return e_failure;
 }
 
 /* bus_find_irq
@@ -66,6 +66,6 @@ kresult bus_add_route(unsigned int flags, unsigned int busid, unsigned int busir
 */
 kresult bus_find_irq(unsigned char *cpuirq, char *busname, unsigned int busirq)
 {
-	return e_failure;
+   return e_failure;
 }
 

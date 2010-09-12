@@ -26,11 +26,11 @@ unsigned int chips_table_size = 0;
 unsigned int chips_nextid = 0;
 
 /* chip_register
-	Add a chip to the system's table and generate a system ID for the
+   Add a chip to the system's table and generate a system ID for the
    device. Note that the system ID will not necessary be the APIC ID.
    The kernel IDs chips sequentially, your BIOS may have other ideas...
-	=> type   = chip type
-		state  = chip state
+   => type   = chip type
+      state  = chip state
       data   = pointer to control block for chip
       apicid = APIC ID assigned by BIOS to the chip
       sysid  = pointer to 32bit word in which the new system ID will be stored,
@@ -38,18 +38,18 @@ unsigned int chips_nextid = 0;
    <= returns success or a failure code */
 kresult chip_register(chip_type type, chip_state state, void *data, unsigned int apicid, unsigned int *sysid)
 {
-	/* resize the table if required */
-	if(!chip_table || (chips_table_size =< chips_table_registered))
-	{
-		/* increment the chip table size by 4, a nice round number for now */
-		chip_entry *new_chip_table = vmm_realloc(chip_table, 4 * sizeof(chip_entry *));
-		if(!new_chip_table)
-			return e_not_enough_bytes;
-		
-		chip_table = new_chip_table;
-		chips_table_size += 4;
-	}
-	
-	/* find an appropriate system ID for this chip */
-	
+   /* resize the table if required */
+   if(!chip_table || (chips_table_size =< chips_table_registered))
+   {
+      /* increment the chip table size by 4, a nice round number for now */
+      chip_entry *new_chip_table = vmm_realloc(chip_table, 4 * sizeof(chip_entry *));
+      if(!new_chip_table)
+         return e_not_enough_bytes;
+      
+      chip_table = new_chip_table;
+      chips_table_size += 4;
+   }
+   
+   /* find an appropriate system ID for this chip */
+   
 }

@@ -20,71 +20,71 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 void do_listen(void)
 {
-	diosix_msg_info msg;
-	unsigned int buffer;
-	kresult err;
-	
-	/* listen and reply */
-	while(1)
-	{
-		/* accept any message from any thread/process */
-		msg.tid = DIOSIX_MSG_ANY_THREAD;
-		msg.pid = DIOSIX_MSG_ANY_PROCESS;
-		msg.flags = DIOSIX_MSG_ANY_TYPE;
-		msg.recv = &buffer;
-		msg.recv_max_size = sizeof(unsigned int);
+   diosix_msg_info msg;
+   unsigned int buffer;
+   kresult err;
+   
+   /* listen and reply */
+   while(1)
+   {
+      /* accept any message from any thread/process */
+      msg.tid = DIOSIX_MSG_ANY_THREAD;
+      msg.pid = DIOSIX_MSG_ANY_PROCESS;
+      msg.flags = DIOSIX_MSG_ANY_TYPE;
+      msg.recv = &buffer;
+      msg.recv_max_size = sizeof(unsigned int);
 
-		if(diosix_msg_receive(&msg) == success)
-		{
-			buffer++;
-			do
-			{
-				msg.flags = DIOSIX_MSG_GENERIC;
-				msg.send = &buffer;
-				msg.send_size = sizeof(unsigned int);
-				err = diosix_msg_reply(&msg);
-			} while(err != success);
-		}
-	}
+      if(diosix_msg_receive(&msg) == success)
+      {
+         buffer++;
+         do
+         {
+            msg.flags = DIOSIX_MSG_GENERIC;
+            msg.send = &buffer;
+            msg.send_size = sizeof(unsigned int);
+            err = diosix_msg_reply(&msg);
+         } while(err != success);
+      }
+   }
 }
 
 void main(void)
 {
-	diosix_msg_info msg;
-	unsigned int loop;
-	unsigned int child;
-	unsigned int message = 0;
-	
-	diosix_fork();
-	while(1) __asm__ __volatile__("pause");
-	
-	/* create processes to idle away */
-	for(loop = 0; loop < 10; loop++)
-	{
-		child = diosix_fork();
-		if(child == 0) while(1) diosix_yield();
-	}
-	
-	/* create new process to receive */
-	child = diosix_fork();
-	if(child == 0) do_listen(); /* child does the listening */
-	
-	/* send the message to the child */
-	while(1)
-	{
-		/* set up message block */
-		msg.tid = DIOSIX_MSG_ANY_THREAD;
-		msg.pid = child;
-		msg.flags = DIOSIX_MSG_GENERIC;
-		msg.send = &message;
-		msg.send_size = sizeof(unsigned int);
-		msg.recv = &message;
-		msg.recv_max_size = sizeof(unsigned int);
-		
-		/* send message any listening thread */		
-		if(diosix_msg_send(&msg) == success)
-			message++;
-		else
-			diosix_yield(); /* give the child a chance to listen */
-	}
+   diosix_msg_info msg;
+   unsigned int loop;
+   unsigned int child;
+   unsigned int message = 0;
+   
+   diosix_fork();
+   while(1) __asm__ __volatile__("pause");
+   
+   /* create processes to idle away */
+   for(loop = 0; loop < 10; loop++)
+   {
+      child = diosix_fork();
+      if(child == 0) while(1) diosix_yield();
+   }
+   
+   /* create new process to receive */
+   child = diosix_fork();
+   if(child == 0) do_listen(); /* child does the listening */
+   
+   /* send the message to the child */
+   while(1)
+   {
+      /* set up message block */
+      msg.tid = DIOSIX_MSG_ANY_THREAD;
+      msg.pid = child;
+      msg.flags = DIOSIX_MSG_GENERIC;
+      msg.send = &message;
+      msg.send_size = sizeof(unsigned int);
+      msg.recv = &message;
+      msg.recv_max_size = sizeof(unsigned int);
+      
+      /* send message any listening thread */      
+      if(diosix_msg_send(&msg) == success)
+         message++;
+      else
+         diosix_yield(); /* give the child a chance to listen */
+   }
 }

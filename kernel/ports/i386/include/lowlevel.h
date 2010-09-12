@@ -16,7 +16,7 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 */
 
 #ifndef _LOWLEVEL_H
-#define	_LOWLEVEL_H
+#define   _LOWLEVEL_H
 
 /* define pointer dereferencer if needed */
 #ifndef NULL
@@ -28,11 +28,11 @@ void serial_writebyte(unsigned char c);
 void serial_initialise(void);
 
 /* low level */
-#define X86_CMOS_RESET_BYTE	(0xf0)
-#define X86_CMOS_RESET_WARM	(0x0a)
-#define X86_CMOS_RESET_COLD	(0x00)
-#define X86_CMOS_ADDR_PORT		(0x70)
-#define X86_CMOS_DATA_PORT		(0x71)
+#define X86_CMOS_RESET_BYTE   (0xf0)
+#define X86_CMOS_RESET_WARM   (0x0a)
+#define X86_CMOS_RESET_COLD   (0x00)
+#define X86_CMOS_ADDR_PORT    (0x70)
+#define X86_CMOS_DATA_PORT    (0x71)
 
 unsigned x86_inportb(unsigned short port);
 void x86_outportb(unsigned port, unsigned val);

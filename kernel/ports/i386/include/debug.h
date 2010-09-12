@@ -16,7 +16,7 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 */
 
 #ifndef _DEBUG_H
-#define	_DEBUG_H
+#define   _DEBUG_H
 
 /* use with care - debugging is sent to the serial port by default 
    DEBUG is the master switch - define this to enable any debugging */
@@ -29,125 +29,125 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #endif
 
 /* these are usually always on */
-#define BOOT_DEBUG	dprintf  /* initialisation messages */
-#define KOOPS_DEBUG	dprintf  /* potentially serious kernel failures */
+#define BOOT_DEBUG   dprintf  /* initialisation messages */
+#define KOOPS_DEBUG   dprintf  /* potentially serious kernel failures */
 
 /* these are conditional - define *_DEBUG to activate them */
 #ifdef BUS_DEBUG
 # undef BUS_DEBUG
-# define BUS_DEBUG		dprintf
+# define BUS_DEBUG      dprintf
 #else
 # define BUS_DEBUG if(0) dprintf
 #endif
 
 #ifdef MSG_DEBUG
 # undef MSG_DEBUG
-# define MSG_DEBUG		dprintf
+# define MSG_DEBUG      dprintf
 #else
 # define MSG_DEBUG if(0) dprintf
 #endif
 
 #ifdef PROC_DEBUG
 # undef PROC_DEBUG
-# define PROC_DEBUG	dprintf
+# define PROC_DEBUG   dprintf
 #else
 # define PROC_DEBUG if(0) dprintf
 #endif 
 
 #ifdef SCHED_DEBUG
 # undef SCHED_DEBUG
-# define SCHED_DEBUG	dprintf
+# define SCHED_DEBUG   dprintf
 #else
 # define SCHED_DEBUG if(0) dprintf
 #endif 
 
 #ifdef THREAD_DEBUG
 # undef THREAD_DEBUG
-# define THREAD_DEBUG	dprintf
+# define THREAD_DEBUG   dprintf
 #else
 # define THREAD_DEBUG if(0) dprintf
 #endif 
 
 #ifdef VMM_DEBUG
 # undef VMM_DEBUG
-# define VMM_DEBUG		dprintf
+# define VMM_DEBUG      dprintf
 #else
 # define VMM_DEBUG if(0) dprintf
 #endif
 
 #ifdef XPT_DEBUG
 # undef XPT_DEBUG
-# define XPT_DEBUG		dprintf
+# define XPT_DEBUG      dprintf
 #else
 # define XPT_DEBUG if(0) dprintf
 #endif 
 
 #ifdef INT_DEBUG
 # undef INT_DEBUG
-# define INT_DEBUG		dprintf
+# define INT_DEBUG      dprintf
 #else
 # define INT_DEBUG if(0) dprintf
 #endif 
 
 #ifdef IRQ_DEBUG
 # undef IRQ_DEBUG
-# define IRQ_DEBUG		dprintf
+# define IRQ_DEBUG      dprintf
 #else
 # define IRQ_DEBUG if(0) dprintf
 #endif 
 
 #ifdef MP_DEBUG
 # undef MP_DEBUG
-# define MP_DEBUG		dprintf
+# define MP_DEBUG      dprintf
 #else
 # define MP_DEBUG if(0) dprintf
 #endif
 
 #ifdef PAGE_DEBUG
 # undef PAGE_DEBUG
-# define PAGE_DEBUG	dprintf
+# define PAGE_DEBUG   dprintf
 #else
 # define PAGE_DEBUG if(0) dprintf
 #endif 
 
 #ifdef KSYM_DEBUG
 # undef KSYM_DEBUG
-# define KSYM_DEBUG	dprintf
+# define KSYM_DEBUG   dprintf
 #else
 # define KSYM_DEBUG if(0) dprintf
 #endif 
 
 #ifdef IOAPIC_DEBUG
 # undef IOAPIC_DEBUG
-# define IOAPIC_DEBUG	dprintf
+# define IOAPIC_DEBUG   dprintf
 #else
 # define IOAPIC_DEBUG if(0) dprintf
 #endif 
 
 #ifdef LAPIC_DEBUG
 # undef LAPIC_DEBUG
-# define LAPIC_DEBUG	dprintf
+# define LAPIC_DEBUG   dprintf
 #else
 # define LAPIC_DEBUG if(0) dprintf
 #endif
 
 #ifdef LOCK_DEBUG
 # undef LOCK_DEBUG
-# define LOCK_DEBUG	dprintf
+# define LOCK_DEBUG   dprintf
 #else
 # define LOCK_DEBUG if(0) dprintf
 #endif 
 
 #ifdef LOLVL_DEBUG
 # undef LOLVL_DEBUG
-# define LOLVL_DEBUG	dprintf
+# define LOLVL_DEBUG   dprintf
 #else
 # define LOLVL_DEBUG if(0) dprintf
 #endif 
 
 #ifdef PIC_DEBUG
 # undef PIC_DEBUG
-# define PIC_DEBUG		dprintf
+# define PIC_DEBUG      dprintf
 #else
 # define PIC_DEBUG if(0) dprintf
 #endif

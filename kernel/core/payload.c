@@ -37,12 +37,12 @@ multiboot_info_t *mbd_ptr = NULL;
 kresult payload_exist_here(unsigned int ptr)
 {
    mb_module_t *module = NULL;
-	unsigned int loop;
+   unsigned int loop;
 
    for(loop = 0; loop < payload_modulemax; loop++)
    {
-		module = payload_readmodule(loop);
-		
+      module = payload_readmodule(loop);
+      
       if(ptr >= module->mod_start && ptr < module->mod_end)
          return e_payload_obj_here;
    }
@@ -57,14 +57,14 @@ kresult payload_exist_here(unsigned int ptr)
 */
 mb_module_t *payload_readmodule(unsigned int modulenum)
 {
-	mb_module_t *module = (mb_module_t *)mbd_ptr->mods_addr;
-	
-	if(!module)
-		debug_panic("trying to probe payloads before preinit");
-	
-	module = (mb_module_t *)((unsigned int)module + 
-									 (sizeof(mb_module_t) * modulenum));
-	
+   mb_module_t *module = (mb_module_t *)mbd_ptr->mods_addr;
+   
+   if(!module)
+      debug_panic("trying to probe payloads before preinit");
+   
+   module = (mb_module_t *)((unsigned int)module + 
+                            (sizeof(mb_module_t) * modulenum));
+   
    return (mb_module_t *)KERNEL_PHYS2LOG(module);
 }
 
@@ -87,25 +87,25 @@ payload_type payload_parsemodule(mb_module_t *module, payload_descr *payload)
    Elf32_Ehdr *fheader;
    Elf32_Phdr *pheader;
 
-	/* is this a symbol table for debugging? */
-	if(magic[0] == 'K' &&
+   /* is this a symbol table for debugging? */
+   if(magic[0] == 'K' &&
       magic[1] == 'S' &&
       magic[2] == 'Y' &&
       magic[3] == 'M')
    {
       BOOT_DEBUG("[payload:%i] found a kernel symbol table (%x - %x)\n",
-				     CPU_ID, module->mod_start, module->mod_end);
+                 CPU_ID, module->mod_start, module->mod_end);
       if(debug_init_sym_table((char *)((unsigned int)magic + (sizeof(char) * 5)),
-										(char *)KERNEL_PHYS2LOG(module->mod_end)) == success)
-			return payload_sym;
-		else
-			return payload_bad;
+                              (char *)KERNEL_PHYS2LOG(module->mod_end)) == success)
+         return payload_sym;
+      else
+         return payload_bad;
    }
-	
-	/* is this an ELF to load as a user process? */
-	fheader = (Elf32_Ehdr *)KERNEL_PHYS2LOG(module->mod_start);
-   BOOT_DEBUG("[payload:%i] parsing binary: %s (%x)", CPU_ID, (char *)KERNEL_PHYS2LOG(module->string), fheader);	
-	
+   
+   /* is this an ELF to load as a user process? */
+   fheader = (Elf32_Ehdr *)KERNEL_PHYS2LOG(module->mod_start);
+   BOOT_DEBUG("[payload:%i] parsing binary: %s (%x)", CPU_ID, (char *)KERNEL_PHYS2LOG(module->string), fheader);   
+   
    /* sanity check the ELF we're trying to load */
    if(fheader->e_ident[0] != 0x7f ||
       fheader->e_ident[1] != 'E'  ||
@@ -165,8 +165,8 @@ payload_type payload_parsemodule(mb_module_t *module, payload_descr *payload)
    <= 0 for success, or result code
 */
 kresult payload_preinit(multiboot_info_t *mbd)
-{	
-	mbd = (multiboot_info_t *)KERNEL_PHYS2LOG(mbd);
+{   
+   mbd = (multiboot_info_t *)KERNEL_PHYS2LOG(mbd);
 
    /* keep a copy of the multiboot info pointer */
    mbd_ptr = mbd;
@@ -180,7 +180,7 @@ kresult payload_preinit(multiboot_info_t *mbd)
 
    BOOT_DEBUG("[payload:%i] %i module(s) in payload\n", CPU_ID, mbd->mods_count);
 
-	payload_modulemax = mbd->mods_count;
-	
+   payload_modulemax = mbd->mods_count;
+   
    return success;
 }
