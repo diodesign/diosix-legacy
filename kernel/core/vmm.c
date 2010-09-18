@@ -78,29 +78,29 @@ kheap_block *kheap_allocated = NULL; /* head of unsorted allocated list */
 */
 kresult vmm_malloc(void **addr, unsigned int size)
 {
-   unsigned int safe_size, *addr_word = (unsigned int *)addr;
-   kheap_block *block, *extra;
-   
+   unsigned int required_capacity, *addr_word = (unsigned int *)addr;
+   kheap_block *block;
+      
    lock_gate(&(vmm_lock), LOCK_WRITE);
    
-   /* adjust size to include our block header plus enough memory to tack
-      a header onto any left over memory - we round up to a set size
+   /* round up size to a fixed multple, including our block header. we round up to a set size
       (default 64 bytes) to reduce fragmentation and aid quick realloc'ing */
-   size += sizeof(kheap_block);
-   safe_size = size + sizeof(kheap_block);
-   safe_size = KHEAP_PAD(safe_size);
+   required_capacity = KHEAP_ROUND_UP(size);
+
+   VMM_DEBUG("[vmm:%i] request to allocate %i bytes (rounded up to %i)\n", CPU_ID,
+             size, required_capacity);
    
    /* scan through free list to find the first block that will fit the
       requested size */
    block = kheap_free;
    while(block)
    {
-      if(block->size > safe_size)
+      if(block->capacity >= required_capacity)
          break;
       block = block->next;
    }
 
-   /* if the block is set, then we've found something suitable in the free
+   /* if block is set, then we've found something suitable in the free
       list. remove it from the free list */
    if(block)
    {
@@ -113,29 +113,29 @@ kresult vmm_malloc(void **addr, unsigned int size)
       if(kheap_free == block)
          kheap_free = block->next;
    }
-
+   else
    /* if block is unset then we haven't found a suitable block (or the free
       list is empty). so allocate enough pages for the request */
-   if(!block)
    {
+      /* try using high memory first */
       int pg_count, type = MEM_HIGH_PG;
-      kresult result = vmm_ensure_pgs(safe_size, type);
+      kresult result = vmm_ensure_pgs(required_capacity, type);
       if(result)
       {
          /* try using low memory */
          type = MEM_LOW_PG;
-         result = vmm_ensure_pgs(safe_size, type);
+         result = vmm_ensure_pgs(required_capacity, type);
          if(result)
          {
             VMM_DEBUG("[vmm:%i] failed to grab physical pages for kernel heap (req size %i bytes)\n",
-                    CPU_ID, safe_size);
+                    CPU_ID, required_capacity);
             unlock_gate(&(vmm_lock), LOCK_WRITE);
             return result; /* give up otherwise */
          }
       }
       
       /* by now, we've verified that we have a run of pages so grab them */
-      for(pg_count = 0; pg_count < ((safe_size / MEM_PGSIZE) + 1); pg_count++)
+      for(pg_count = 0; pg_count < ((required_capacity / MEM_PGSIZE) + 1); pg_count++)
       {
          result = vmm_req_phys_pg((void **)&block, type); /* get pages in reverse order */
          if(result)
@@ -146,28 +146,24 @@ kresult vmm_malloc(void **addr, unsigned int size)
          }
       }
 
-#ifdef VMM_DEBUG
-      VMM_DEBUG("[vmm:%i] asked for a block of pages for %i bytes: %p\n", CPU_ID, safe_size, block);
-#endif
+      VMM_DEBUG("[vmm:%i] grabbed %i pages for %i bytes (block %p)\n", CPU_ID, pg_count, required_capacity, block);
       
       /* don't forget to convert from physical to kernel's logical */
       block = KERNEL_PHYS2LOG(block);
-      block->size = (unsigned int)MEM_PGALIGN(safe_size) + MEM_PGSIZE;
-#ifdef VMM_DEBUG
-      VMM_DEBUG("[vmm:%i] grabbed %i bytes from mem %p for heap\n", CPU_ID, block->size, block); 
-#endif
+      
+      block->capacity = (unsigned int)MEM_PGALIGN(required_capacity) + MEM_PGSIZE;
+      VMM_DEBUG("[vmm:%i] created block %p (max %i) in heap\n", CPU_ID, block, block->capacity); 
    }
 
-   /* trim off excess memory and add this to the free list */
-   extra = (kheap_block *)((unsigned int)block + size);
-   extra->magic = KHEAP_FREE;
-   extra->size = block->size - size;
-   vmm_heap_add_to_free(extra);
+   block->magic = KHEAP_INUSE;
+   block->inuse = size;
 
+   /* trim off excess memory and add this to the free list if there's enough to make
+      at least a minimum-sized block */
+   vmm_trim(block);
+   
    /* write pointer to the start of data and the block's header details */
    *addr_word = (unsigned int)block + sizeof(kheap_block);
-   block->magic = KHEAP_INUSE;
-   block->size = size; /* the true size of the requested block inc header */
 
    /* add to head of allocated link list */
    block->next = kheap_allocated;
@@ -176,23 +172,58 @@ kresult vmm_malloc(void **addr, unsigned int size)
    kheap_allocated = block;
 
    unlock_gate(&(vmm_lock), LOCK_WRITE);
+
+   VMM_DEBUG("[vmm:%i] allocated block %p addr %p capacity %i inuse %i magic %x next %p prev %p\n",
+             CPU_ID, block, *addr_word, block->capacity, block->inuse, block->magic,
+             block->next, block->previous);
+   
    return success;
 }
 
-/* vmm_malloc_read_size
-   Return the allocated size of a given block in bytes or 0 for bad block */
-unsigned int vmm_malloc_read_size(void *addr)
+/* vmm_trim
+   If the capacity of a heap block exceeds the allocated bytes by at least one multiple of the
+   minimum-block size, then trim off the end of the block and release it into the free pool
+   => block = heap block to operate on
+   <= 0 for success (which does not indicate any memory was freed) or an error code
+*/
+kresult vmm_trim(kheap_block *block)
 {
-   kheap_block *block = (kheap_block *)((unsigned int)addr - sizeof(kheap_block));
-   return block->size;
-}
-
-/* vmm_malloc_write_size
-   Update the allocated size of a given block in bytes */
-void vmm_malloc_write_size(void *addr, unsigned int size)
-{
-   kheap_block *block = (kheap_block *)((unsigned int)addr - sizeof(kheap_block));
-   block->size = size;
+   /* sanity checks */
+   if(block->magic != KHEAP_INUSE)
+   {
+      KOOPS_DEBUG("[vmm:%i] OMGWTF! vmm_trim: Bad magic block %p to trim (magic %x)\n",
+                  CPU_ID, block, block->magic);
+      return e_bad_magic;
+   }
+   
+   if(KHEAP_ROUND_UP(block->inuse) > block->capacity)
+   {
+      KOOPS_DEBUG("[vmm:%i] OMGWTF! vmm_trim: allocated bytes %i (rounded-up %i) in block %p exceeds capacity %i\n",
+                  CPU_ID, block->inuse, KHEAP_ROUND_UP(block->inuse), block, block->capacity);
+      return e_failure;
+   }
+   
+   unsigned int difference = block->capacity - KHEAP_ROUND_UP(block->inuse);
+   
+   VMM_DEBUG("[vmm:%i] trimming block %p capacity %i inuse %i rounded up to %i diff %i\n",
+             CPU_ID, block, block->capacity, block->inuse, KHEAP_ROUND_UP(block->inuse), difference);
+   
+   if(difference >= KHEAP_BLOCK_MULTIPLE)
+   {
+      kheap_block *extra = (kheap_block *)((unsigned int)block + KHEAP_ROUND_UP(block->inuse));
+      
+      extra->magic = KHEAP_INUSE; /* keep vmm_heap_add_to_free() happy */
+      extra->capacity = difference;
+      extra->inuse = 0;
+      
+      block->capacity -= extra->capacity; /* old block just got smaller */
+      vmm_heap_add_to_free(extra);
+      
+      VMM_DEBUG("[vmm:%i] trimmed %i bytes off the end and freed. new capacity %i\n",
+                CPU_ID, extra->capacity, block->capacity);
+   }
+   
+   return success;
 }
 
 /* vmm_heap_add_to_free
@@ -203,6 +234,14 @@ void vmm_malloc_write_size(void *addr, unsigned int size)
 */
 void vmm_heap_add_to_free(kheap_block *block)
 {
+   /* sanity check */
+   if(block->magic != KHEAP_INUSE)
+   {
+      KOOPS_DEBUG("[vmm:%i] OMGWTF! Tried to free non-allocated block at %p (magic %x)\n",
+                  CPU_ID, block, block->magic);
+      return;
+   }
+   
    lock_gate(&(vmm_lock), LOCK_WRITE);
    
    kheap_block *block_loop = kheap_free;
@@ -243,7 +282,9 @@ void vmm_heap_add_to_free(kheap_block *block)
       kheap_free = block;
    }
 
+   /* reset metadata */
    block->magic = KHEAP_FREE;
+   block->inuse = 0;
 
    /* merge adjoining blocks */
    block_loop = kheap_free;
@@ -252,12 +293,12 @@ void vmm_heap_add_to_free(kheap_block *block)
       kheap_block *target = block_loop->next;
       if(!target) break; /* sanity check next ptr */
 
-      if((unsigned int)target == ((unsigned int)block_loop + block_loop->size))
+      if((unsigned int)target == ((unsigned int)block_loop + block_loop->capacity))
       {
          block_loop->next = target->next;
          if(target->next)
             target->next->previous = block_loop;
-         block_loop->size += target->size;
+         block_loop->capacity += target->capacity;
       }
       block_loop = block_loop->next;
    }
@@ -295,9 +336,6 @@ kresult vmm_free(void *addr)
    }
 
    lock_gate(&(vmm_lock), LOCK_WRITE);
-   
-   /* update magic */
-   block->magic = KHEAP_FREE;
 
    /* remove from allocated linked list */
    if(block->previous)
@@ -313,6 +351,8 @@ kresult vmm_free(void *addr)
    vmm_heap_add_to_free(block);
 
    unlock_gate(&(vmm_lock), LOCK_WRITE);
+   
+   VMM_DEBUG("[vmm:%i] freed heap block %p (addr %p)\n", CPU_ID, block, addr);
    
    return success;
 }
@@ -330,72 +370,83 @@ kresult vmm_free(void *addr)
 void *vmm_realloc(void *addr, signed int change)
 {
    void *new;
-   unsigned int size;
+   kheap_block *block;
    
+   /* do a straight vmm_malloc() call if addr is NULL */
    if(!addr)
-   {
-      KOOPS_DEBUG("[vmm:%i] OMGWTF tried to alter size of a dereferenced block by %i bytes\n",
-                  CPU_ID, change);
-      return NULL; /* failed */
-   }
-   
-   /* read the size of the block in bytes - if the size is zero (because the block
-      was not found), then treat as a malloc */
-   size = vmm_malloc_read_size(addr);
-   
-   if(!size)
-   {
-      /* we can't decrease or unchange a block that didn't exist... */
+   {      
       if(change < 1)
       {
-         KOOPS_DEBUG("[vmm:%i] OMGWTF tried to shrink a non-existent block by %i bytes\n",
-                     CPU_ID, 0 - change);
-         return NULL; /* failed */         
+         KOOPS_DEBUG("[vmm:%i] OMGWTF! vmm_realloc: tried to alloc a block of size %i bytes\n",
+                     CPU_ID, change);
+         return NULL; /* failed, reject nonsense allocations */
       }
       
       if(vmm_malloc(&new, change) == success)
          return new; /* we succeeded, send back the pointer */
       else
-         return NULL; /* failed to allocate */
+         return NULL; /* failed to allocate */     
+   }
+   
+   block = (kheap_block *)((unsigned int)addr - sizeof(kheap_block));
+   
+   /* sanity checks */
+   if(!block)
+   {
+      KOOPS_DEBUG("[vmm:%i] OMGWTF! vmm_realloc: tried to alter size of dereferenced block by %i bytes\n",
+                  CPU_ID, change);
+      return NULL; /* failed */
+   }
+   
+   if(block->magic != KHEAP_INUSE)
+   {
+      KOOPS_DEBUG("[vmm:%i] OMGWTF! vmm_realloc: bad magic (%x) reallocing block %p by %i bytes\n",
+                  CPU_ID, block->magic, change);
+      return NULL; /* failed */
    }
    
    /* a change of zero bytes will always be successful once we've ascertained that the
       block pointer is valid */
    if(change == 0) return addr;
    
-   /* we can't shrink a block to and beyond zero */
-   if(change < 1)
+   if(change < 0)
    {
-      if((0 - change) >= size)
+      /* we can't shrink a block to and beyond zero */
+      if((0 - change) >= block->inuse)
       {
-         KOOPS_DEBUG("[vmm:%i] OMGWTF tried to shrink a block of size %i by %i bytes\n",
-                     CPU_ID, size, 0 - change);
+         KOOPS_DEBUG("[vmm:%i] OMGWTF tried to shrink block %p of inuse size %i by %i bytes\n",
+                     CPU_ID, block, block->inuse, 0 - change);
          return NULL; /* failed */
       }
    }
 
    /* sanity checks passed, try to grow/shrink the block within the padding of the block */
-   if((size + change) <= KHEAP_PAD_SAFE(size))
+   if(KHEAP_ROUND_UP(block->inuse + change) <= block->capacity)
    {
       /* update the size stats and return the same pointer */
-      vmm_malloc_write_size(addr, size + change);
+      block->inuse += change;
+      
+      VMM_DEBUG("[vmm:%i] realloc'd block %p to %i bytes within capacity %i\n",
+                CPU_ID, block, block->inuse, block->capacity);
+      
+      vmm_trim(block); /* attempt to free up leftover memory */
       return addr;
    }
    
    /* we can't extend within our block padding so it's time to malloc-copy-free */
-   if(vmm_malloc((void **)&new, size + change) == success)
+   if(vmm_malloc((void **)&new, block->inuse + change) == success)
    {
       /* so far so good, copy the contents of the old block to the new one,
          free the old block and return the new pointer */
       if(change > 0)
-         vmm_memcpy(new, addr, size);
+         vmm_memcpy(new, addr, block->inuse);
       else
-         vmm_memcpy(new, addr, size + change);
+         vmm_memcpy(new, addr, block->inuse + change);
       vmm_free(addr);
       return new;
    }
    
-   /* fall through to a malloc failure */
+   /* fall through to a remalloc failure */
    return NULL;
 }
 
@@ -785,10 +836,6 @@ kresult vmm_initialise(multiboot_info_t *mbd)
       space using pagination */
    pg_init(); /* non-portable code */
    
-   /* prime the kernel heap while we still have contiguous space */
-   vmm_malloc(&heap_init, KHEAP_INITSIZE);
-   vmm_free(heap_init);
-
    return 0;
 }
 

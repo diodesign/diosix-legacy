@@ -167,7 +167,7 @@ typedef struct
 extern mp_core *cpu_table;
 
 kresult mp_initialise(void); /* if this fails then the machine is probably toast */
-void mp_post_initialise(void);
+kresult mp_post_initialise(void);
 void mp_catch_ap(void);
 
 #endif

@@ -180,10 +180,11 @@ kresult irq_register_driver(unsigned int irq_num, unsigned int flags,
    
    /* bail out on a wild irq_num */
    if(irq_num >= IRQ_MAX_LINES) return e_bad_params;
-   
+
    /* allocate memory for the new driver entry and zero it */
    err = vmm_malloc((void **)&new, sizeof(irq_driver_entry));
    if(err) return err;
+
    vmm_memset((void *)&new, 0, sizeof(irq_driver_entry));
    
    /* fill in the blanks */

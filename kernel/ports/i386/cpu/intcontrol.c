@@ -40,8 +40,6 @@ typedef struct
 int_idt_ptr int_table_ptr;
 int_idt_descr int_idt_table[256];
 
-
-
 /* int_reload_idtr
    Reload the idtr on this cpu */
 void int_reload_idtr(void)
@@ -74,18 +72,6 @@ void int_set_gate(unsigned char intnum, unsigned int base, unsigned short segmen
       int_reload_idtr();
 }
 
-
-/* initialise the common entries in the int table for uni and multiproc systems */
-void int_table_initialise(void)
-{
-   INT_DEBUG("[int:%i] initialising interrupt vector table... \n", CPU_ID);
-   
-   /* initialise table pointer and idt table */
-   int_table_ptr.limit = (sizeof(int_idt_descr) * 256) - 1;
-   int_table_ptr.base  = (unsigned int)&int_idt_table;
-   vmm_memset(&int_idt_table, 0, (sizeof(int_idt_descr) * 256));
-}
-
 /* default timer handler for the scheduler */
 kresult int_common_timer(unsigned char intnum, int_registers_block *regs)
 {
@@ -94,40 +80,43 @@ kresult int_common_timer(unsigned char intnum, int_registers_block *regs)
    return success;
 }
 
-/* initialise the common entries in the int table for uni and multiproc systems */
+/* int_initialise_common
+   initialise the common entries in the int table for uni and multiproc systems */
 void int_initialise_common(void)
 {
-   int_table_initialise();
+   INT_DEBUG("[int:%i] initialising interrupt vector table... \n", CPU_ID);
+   
+   /* initialise table pointer and idt table */
+   int_table_ptr.limit = (sizeof(int_idt_descr) * 256) - 1;
+   int_table_ptr.base  = (unsigned int)&int_idt_table;
+   vmm_memset(&int_idt_table, 0, (sizeof(int_idt_descr) * 256));   
+   
+   /* get exceptions handled */
    exceptions_initialise();
-   pic_initialise();
 }
 
-/* int_initialise_mproc
- Set up a cpu on a multiprocessor system
- => flags = flag up who's calling this function
- INT_IAMBSP = 1 for the BSP, which will create the int table
- */
-void int_initialise_mproc(unsigned char flags)
+/* int_initialise
+   Set up interrupt handling and device management */
+kresult int_initialise(void)
 {
-   if(flags & INT_IAMBSP)
-      int_initialise_common();
+   /* initialise the basic PIC chipset */
+   pic_initialise();
    
-   /* initialise the system's IOAPIC */
-   if(mp_ioapics)
-      ioapic_initialise(0);
+   /* on a uniproc machine? */
+   if(mp_cpus == 1)
+   {      
+      /* set up a 100Hz ticker for the scheduler  */
+      x86_timer_init(SCHED_FREQUENCY);
+      INT_DEBUG("[int:%i] uniproc: set up timer (%iHz)...\n", CPU_ID, SCHED_FREQUENCY);
+      
+      return success;
+   }
    
+   /* initialise the smp system's IOAPIC */
+   if(mp_ioapics) ioapic_initialise(0);
+      
    /* initialise the boot cpu's local APIC */
    lapic_initialise(INT_IAMBSP);
-}   
-
-/* int_initialise_uniproc
- Set up the machine's sole cpu with exception and
- interrupt handlers and program the timer */
-void int_initialise_uniproc(void)
-{
-   int_initialise_common();
    
-   /* set up a 100Hz ticker for the scheduler  */
-   x86_timer_init(SCHED_FREQUENCY);
-   INT_DEBUG("[int:%i] uniproc: set up timer (%iHz)...\n", CPU_ID, SCHED_FREQUENCY);
+   return success;
 }

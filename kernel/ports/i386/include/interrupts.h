@@ -90,8 +90,8 @@ struct irq_driver_entry
 };
 
 /* interrupt-related functions */
-void int_initialise_uniproc(void);
-void int_initialise_mproc(unsigned char flags);
+kresult int_initialise(void);
+void int_initialise_common(void);
 kresult int_common_timer(unsigned char intnum, int_registers_block *regs);
 void int_reload_idtr(void);
 void int_set_gate(unsigned char intnum, unsigned int base, unsigned short segment, unsigned char flags, unsigned char flush);
@@ -136,6 +136,7 @@ kresult irq_deregister_driver(unsigned int irq_num, unsigned int type, unsigned 
 #define IRQ_IOAPIC_TIMER   (IOAPIC_VECTOR_BASE)
 
 #define INT_IAMBSP         (1)
+#define INT_IAMAP          (0)
 
 #define ISA_8254_IRQ       (0)
 

@@ -41,8 +41,9 @@ void _mp_catch_ap(void)
    mp_ap_ready = 1;
    
    /* don't forget to initialise interrupts for this cpu */
-   int_initialise_mproc(0); /* 0 = not boot processor */
-      
+   lapic_initialise(INT_IAMAP);
+   int_reload_idtr();
+
    /* loop waiting for the first thread to run */
    while(1)
    {      
@@ -167,7 +168,7 @@ void mp_init_cpu_table(void)
 
 /* mp_post_initialise
    Bring up processors prior to running the first processes */
-void mp_post_initialise(void)
+kresult mp_post_initialise(void)
 {
    unsigned int ap_loop, wokenup = 0;
    unsigned int *kaddr, phys_gdt, phys_gdtptr, phys_pgdir;
@@ -176,7 +177,7 @@ void mp_post_initialise(void)
    /* get the processors ready to run */
    mp_init_cpu_table();
    
-   if(mp_cpus < 2) return; /* uniproc machines need not apply for the rest */
+   if(mp_cpus < 2) return success; /* uniproc machines need not apply for the rest */
 
    /* calculate address to copy the trampoline code into */
    kaddr = KERNEL_PHYS2LOG(MP_AP_START_VECTOR << MP_AP_START_VECTOR_SHIFT);
@@ -235,6 +236,8 @@ void mp_post_initialise(void)
    
    /* put the CMOS byte back to normal */
    x86_cmos_write(X86_CMOS_RESET_BYTE, X86_CMOS_RESET_COLD);
+   
+   return success;
 }
 
 kresult mp_initialise(void)
@@ -300,7 +303,7 @@ kresult mp_initialise(void)
       BOOT_DEBUG("[mp] assuming uniprocessor machine\n");
       mp_cpus = 1;
       mp_boot_cpu = 0;
-      int_initialise_uniproc();
+      int_initialise_common();
       return success;
    }
 
@@ -345,7 +348,7 @@ kresult mp_initialise(void)
             break;
             
          case 1: /* bus entry */
-            bus_register_name(info_block->id, &(info_block->entry.bus.name));
+            bus_register_name(info_block->id, (char *)&(info_block->entry.bus.name));
             block_size = 8;
             break;
             
@@ -355,7 +358,7 @@ kresult mp_initialise(void)
             if(info_block->entry.ioapic.flags & MP_IS_IOAPIC_ENABLED)
             {
                /* if this chip is set to go, then register it with the system */
-               if(ioapic_register_chip(info_block->id, info_block->entry.ioapic.physaddr) == success)
+               if(ioapic_register_chip(info_block->id, (unsigned int)info_block->entry.ioapic.physaddr) == success)
                   mp_ioapics++;
             }
 
@@ -380,7 +383,7 @@ kresult mp_initialise(void)
            *(LAPIC_ID_REG), *(LAPIC_VER_REG));
    
    /* let the bootstrap processor continue the initialisation */
-   int_initialise_mproc(INT_IAMBSP);
+   int_initialise_common();
    
    return success;
 }

@@ -40,7 +40,7 @@ void _main(multiboot_info_t *mbd, unsigned int magic)
       dprintf("*** warning: bootloader magic was %x (expecting %x).\n", magic, MULTIBOOT_MAGIC);
    
    /* ---- multiboot + SMP data must be preserved during these calls ------- */
-   /* initialise interrupt handling and discover processor(s) */
+   /* discover processor(s), get exception handling running */
    if(mp_initialise()) goto goforhalt;
    
    /* parse modules payloaded by the boot loader, best halt if there are none? */
@@ -48,14 +48,19 @@ void _main(multiboot_info_t *mbd, unsigned int magic)
 
    /* initialise the memory manager or halt if it fails */
    if(vmm_initialise(mbd)) goto goforhalt;
-
-   /* initialise process and thread management, prepare first processes */
-   sched_pre_initalise();
    
-   /* bring up the processor(s) */
-   mp_post_initialise();
+   /* initialise the interrupt and hardware driver subsystem */
+   if(int_initialise()) goto goforhalt;
    
+   /* get the scheduler setup */
+   if(sched_pre_initalise()) goto goforhalt;
+   
+   /* bring up the remaining processor(s) cores */
+   if(mp_post_initialise()) goto goforhalt;
+   
+   /* initialise process and thread management, prepare first process */
    if(proc_initialise()) goto goforhalt;
+   
    /* ---- multiboot + SMP data is no longer required by this point ------- */
 
    /* hocus pocus, mumbo jumbo, black magic */

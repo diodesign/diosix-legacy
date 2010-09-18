@@ -613,10 +613,12 @@ unsigned char sched_pick_queue(unsigned char hint)
 
 /* sched_pre_initalise
    Perform initialisation prior to any sched_*() calls */
-void sched_pre_initalise(void)
+kresult sched_pre_initalise(void)
 {
    /* initialise lock */
-   vmm_memset(&sched_lock, 0, sizeof(rw_gate));   
+   vmm_memset(&sched_lock, 0, sizeof(rw_gate));
+
+   return success;
 }
 
 /* sched_initialise

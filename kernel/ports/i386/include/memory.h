@@ -59,23 +59,25 @@ extern unsigned int KernelBootStackBase, APStack;
 #define MEM_LOW_PG           (0)
 
 /* vmm magic */
-#define KHEAP_FREE         (0xdeaddead)
-#define KHEAP_INUSE        (0x6b6c4268) /* 'kBlk' */
-#define KHEAP_INITSIZE     (64 * 1024)
+#define KHEAP_FREE           (0xdeaddead)
+#define KHEAP_INUSE          (0xd105d105)
 
-/* round the number of bytes in a kernel heap block up to a multiple of 64 */
-#define KHEAP_PAD(a)         (((unsigned int)(a) + 64) & ~(64 - 1))
-/* the safe space is the number of bytes usable in a block - there needs to
-   be space to store the block's metadata and the metadata for a fragment of
-   the block when it is free'd and partially reallocated */
-#define KHEAP_PAD_SAFE(a)   (KHEAP_PAD(a) - (2 * sizeof(kheap_block)))
+/* heap management */
+/* define the minimum block size in bytes to mitigate fragmentation */
+#define KHEAP_BLOCK_MULTIPLE (128)
 
-/* managing the kernel heap */
+/* round the number of bytes in a kernel heap block up to a set multiple including 
+   the metadata header */
+#define KHEAP_ROUND_UP(a)  (((unsigned int)(a) + KHEAP_BLOCK_MULTIPLE + sizeof(kheap_block)) & ~(KHEAP_BLOCK_MULTIPLE - 1))
+
+/* describe a kernel heap block */
 typedef struct kheap_block kheap_block;
 struct kheap_block
 {
-   unsigned int magic;    /* indicate either free or in use */
-   unsigned int size;     /* allocated size of the block in memory including this header */
+   unsigned int magic;    /* indicate either free or in use. any other value will indicate corruption */
+   unsigned int inuse;    /* number of bytes allocated within the block, not including the header */
+   unsigned int capacity; /* total size of the block, which will be a multiple of KHEAP_BLOCK_MULTIPLE, 
+                             including the block header */
    kheap_block *previous, *next;  /* linked list pointers */
    /* ... data follows ... */
 };
@@ -86,9 +88,9 @@ struct kheap_block
    ask the page code to carry out */
 typedef enum
 {
-   clonepage,      /* grab a blank phys page, map it in at same virtual addr, copy the data, mark writeable */
+   clonepage,     /* grab a blank phys page, map it in at same virtual addr, copy the data, mark writeable */
    makewriteable, /* it's safe to mark the page as writeable and continue */
-   newpage,         /* grab a blank phys page, map it in and continue */
+   newpage,       /* grab a blank phys page, map it in and continue */
    external,      /* get the external page manage to fix up this access */
    badaccess      /* the fault can't be handled */
 } vmm_decision;
@@ -100,6 +102,7 @@ kresult vmm_enough_pgs(unsigned int size);
 kresult vmm_ensure_pgs(unsigned int size, int type);
 kresult vmm_free(void *addr);
 kresult vmm_malloc(void **addr, unsigned int size);
+kresult vmm_trim(kheap_block *block);
 void vmm_heap_add_to_free(kheap_block *block);
 void vmm_memset(void *addr, unsigned char value, unsigned int count);
 void vmm_memcpy(void *target, void *source, unsigned int count);

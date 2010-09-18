@@ -23,7 +23,7 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 /* scheduling */
 void sched_initialise(void);
-void sched_pre_initalise(void);
+kresult sched_pre_initalise(void);
 void sched_add(unsigned char cpu, unsigned char priority, thread *torun);
 void sched_remove(thread *victim, thread_state state);
 void sched_tick(int_registers_block *regs);

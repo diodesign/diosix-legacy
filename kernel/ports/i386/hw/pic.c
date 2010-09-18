@@ -66,14 +66,14 @@ void pic_initialise(void)
    int_set_gate(PIC_SLAVE_VECTOR_BASE + 5, (unsigned int)irq13, 0x18, 0x8E, 0);
    int_set_gate(PIC_SLAVE_VECTOR_BASE + 6, (unsigned int)irq14, 0x18, 0x8E, 0);
    int_set_gate(PIC_SLAVE_VECTOR_BASE + 7, (unsigned int)irq15, 0x18, 0x8E, 1);
-   
+      
    /* install the default handler - route the IRQ lines to our boot cpu */
    for(loop = 0; loop < 8; loop++)
       irq_register_driver(PIC_MASTER_VECTOR_BASE + loop, IRQ_DRIVER_FUNCTION, 0, &pic_irq_default);
-
+   
    for(loop = 0; loop < 8; loop++)
       irq_register_driver(PIC_SLAVE_VECTOR_BASE + loop, IRQ_DRIVER_FUNCTION, 0, &pic_irq_default);
-   
+
    /* register the timer handler for the scheduler */
    irq_register_driver(ISA_8254_IRQ, IRQ_DRIVER_FUNCTION, 0, &int_common_timer);
 }
