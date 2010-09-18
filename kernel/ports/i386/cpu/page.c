@@ -606,6 +606,8 @@ void pg_dump_pagedir(unsigned int *pgdir)
 {
    unsigned int i;
    
+   if(!pgdir) return;
+   
    PAGE_DEBUG("[page:%i] contents of pgdir at %p (%x)\n", 
            CPU_ID, pgdir, KERNEL_LOG2PHYS(pgdir));
    
@@ -624,11 +626,13 @@ void pg_postmortem(int_registers_block *regs)
    unsigned int pgdir_index = (faultaddr >> PG_DIR_BASE) & PG_INDEX_MASK;
    unsigned int pgtable_index = (faultaddr >> PG_TBL_BASE) & PG_INDEX_MASK;
    unsigned int *pgtable; 
-   thread *running = cpu_table[CPU_ID].current;
-   process *proc;
+   thread *running = NULL;
+   process *proc = NULL;
    char func[32];
    unsigned int sym_base = 0;
 
+   if(cpu_table) running = cpu_table[CPU_ID].current;
+   
    /* get the function name of faulting instruction */
    if((regs->eip >= KERNEL_VIRTUAL_BASE) && (regs->eip < KERNEL_VIRTUAL_END))
       if(debug_lookup_symbol(regs->eip, func, 32, &sym_base) != success)

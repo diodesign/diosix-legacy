@@ -40,7 +40,7 @@ void debug_stacktrace(void)
    char buffer[32];
    
    /* first, work out where the stack starts */
-   if(cpu_table[CPU_ID].current)
+   if(cpu_table && cpu_table[CPU_ID].current)
    {
       /* we're running threads, so find the current thread's kernel
          stack base */
@@ -90,7 +90,7 @@ void debug_assert(char *exp, char *file, char *basefile, unsigned int line)
 */
 void debug_panic(const char *str)
 {
-   dprintf("*** PANIC: %s -- halting\n");
+   dprintf("*** PANIC: %s -- halting\n", str);
    
    x86_disable_interrupts();
    while(1);

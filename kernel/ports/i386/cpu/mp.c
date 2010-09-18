@@ -24,7 +24,7 @@ unsigned char mp_boot_cpu = 0;
 unsigned char mp_domains = 0;
 
 /* pointer to table of cpu descriptors */
-mp_core *cpu_table;
+mp_core *cpu_table = NULL;
  
 /* set to 1 by an AP to indicate it's reached startup, reset to 0 before attempting to bake an AP */
 volatile unsigned char mp_ap_ready = 0;

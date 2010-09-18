@@ -185,8 +185,8 @@ kresult irq_register_driver(unsigned int irq_num, unsigned int flags,
    err = vmm_malloc((void **)&new, sizeof(irq_driver_entry));
    if(err) return err;
 
-   vmm_memset((void *)&new, 0, sizeof(irq_driver_entry));
-   
+   vmm_memset(new, 0, sizeof(irq_driver_entry));
+
    /* fill in the blanks */
    if(flags & IRQ_DRIVER_FUNCTION)
       new->func = func; /* driver is a kernel function */
