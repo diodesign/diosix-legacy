@@ -37,12 +37,12 @@ void irq_handler(int_registers_block *regs)
 #endif
 
    irq_driver_entry *driver;
+
+   IRQ_DEBUG("[irq:%i] processing IRQ %i (registers at %p)\n", CPU_ID, regs->intnum, regs);
    
    /* make sure we only consider the low byte, which contains the irq number */
    regs->intnum = regs->intnum % IRQ_MAX_LINES;
-
-   IRQ_DEBUG("[irq:%i] processing IRQ %i (registers at %p)\n", CPU_ID, regs->intnum, regs);
-
+   
    lock_gate(&irq_lock, LOCK_READ);
    
    /* find the registered drivers */
@@ -219,6 +219,6 @@ kresult irq_register_driver(unsigned int irq_num, unsigned int flags,
 void irq_initialise(void)
 {
    /* zero the table of IRQ pointers and the lock */
-   vmm_memset((void *)&irq_drivers, 0, sizeof(irq_driver_entry *) * IRQ_MAX_LINES);
-   vmm_memset((void *)&irq_lock, 0, sizeof(rw_gate));
+   vmm_memset(irq_drivers, 0, sizeof(irq_driver_entry *) * IRQ_MAX_LINES);
+   vmm_memset(&irq_lock, 0, sizeof(rw_gate));
 }
