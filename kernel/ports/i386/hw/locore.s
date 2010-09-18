@@ -288,9 +288,9 @@ x86_start_ap_end:
 %macro ISR_NOERRCODE 1  ; define a macro, taking one parameter
   [global isr%1]        ; %1 accesses the first parameter.
   isr%1:
-    cli                  ; switch off /all/ interrupts FIXME :(
+    cli                 ; switch off /all/ interrupts FIXME :(
     push byte 0         ; stack a dummy error code
-    push byte %1         ; stack the interrupt number
+    push byte %1        ; stack the interrupt number
     jmp int_enter_knl   ; begin to connect asm to C world
 %endmacro
 
@@ -298,8 +298,8 @@ x86_start_ap_end:
 %macro ISR_ERRCODE 1
   [global isr%1]
   isr%1:
-    cli                  ; switch off /all/ interrupts FIXME :(
-    push byte %1         ; stack int number, error code already stacked
+    cli                 ; switch off /all/ interrupts FIXME :(
+    push byte %1        ; stack int number, error code already stacked
     jmp int_enter_knl   ; begin to connect asm to C world
 %endmacro
 
@@ -307,9 +307,9 @@ x86_start_ap_end:
 %macro IRQ 2            ; two parameters: IRQ number and ISR number
   [global irq%1]
   irq%1:
-    cli                  ; switch off /all/ interrupts FIXME :(
+    cli                 ; switch off /all/ interrupts FIXME :(
     push byte 0         ; stack a zero
-    push byte %2         ; stack the interrupt number
+    push byte %2        ; stack the interrupt number
     jmp irq_enter_knl   ; begin to connect asm to C world
 %endmacro
 
@@ -414,14 +414,14 @@ int_enter_knl:
    push eax                 ; stacks the data segment descriptor
 
    mov ax, 0x10             ; kernel data segment is 3rd GDT entry
-   mov ds, ax                ;   thus: (3 - 1) * sizeof(GDT entry)
-   mov es, ax                ;         = 2 * 8 = 16 = 0x10
+   mov ds, ax               ;   thus: (3 - 1) * sizeof(GDT entry)
+   mov es, ax               ;         = 2 * 8 = 16 = 0x10
    mov fs, ax               ;
    mov gs, ax               ;   so set up the correct segment
 
-   call exception_handler    ; bounce into the kernel, all regs preserved on exit
+   call exception_handler   ; bounce into the kernel, all regs preserved on exit
 
-   pop eax                   ; restore the original data segment descriptor
+   pop eax                  ; restore the original data segment descriptor
    mov ds, ax
    mov es, ax
    mov fs, ax
@@ -430,7 +430,7 @@ int_enter_knl:
    popa                     ; restore edi, esi, ebp et al
    add esp, 8               ; fix-up the stacked error code and intr number
    sti                      ; /all/ interrupts reenabled FIXME :(
-   iret                      ; restore CS, EIP, EFLAGS, SS, and ESP
+   iret                     ; restore CS, EIP, EFLAGS, SS, and ESP
    
 ; device interrupt handler stub
 ; routine to jump from this crude asm world into our lovely C kernel
@@ -440,29 +440,29 @@ irq_enter_knl:
    push eax                 ; stacks the data segment descriptor
 
    mov ax, 0x10             ; kernel data segment is 3rd GDT entry
-   mov ds, ax                ;   thus: (3 - 1) * sizeof(GDT entry)
-   mov es, ax                ;         = 2 * 8 = 16 = 0x10
+   mov ds, ax               ;   thus: (3 - 1) * sizeof(GDT entry)
+   mov es, ax               ;         = 2 * 8 = 16 = 0x10
    mov fs, ax               ;
    mov gs, ax               ;   so set up the correct segment
    
-   call irq_handler          ; bounce into the kernel, all regs preserved on exit
+   call irq_handler         ; bounce into the kernel, all regs preserved on exit
 
-   pop eax                   ; restore the original data segment descriptor
+   pop eax                  ; restore the original data segment descriptor
    mov ds, ax
    mov es, ax
    mov fs, ax
    mov gs, ax
 
    popa                     ; restore edi, esi, ebp et al
-   add esp, 8                ; fix-up the stacked error code and intr number
+   add esp, 8               ; fix-up the stacked error code and intr number
    sti                      ; /all/ interrupts reenabled FIXME :(
    iret                     ; restore CS, EIP, EFLAGS, SS, and ESP
 
 ; ---------------- assembler to load the lidt ---------------------------------
 [global x86_load_idtr]     ; what it says on the tin
 x86_load_idtr:
-   mov eax, [esp+4]         ; get the pointer to the idt from the stack 
-   lidt [eax]               ; load the idt pointer
+   mov eax, [esp+4]        ; get the pointer to the idt from the stack 
+   lidt [eax]              ; load the idt pointer
    ret                     ; and bounce back to the caller
    
 ; ---------------- assembler to load the task state register ------------------

@@ -56,7 +56,10 @@ void main(void)
    unsigned int message = 0;
    
    diosix_fork();
-   while(1) __asm__ __volatile__("pause");
+   while(1)
+   {
+      diosix_yield();
+   }
    
    /* create processes to idle away */
    for(loop = 0; loop < 10; loop++)

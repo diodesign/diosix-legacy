@@ -30,30 +30,30 @@ irq_driver_entry *irq_drivers[IRQ_MAX_LINES];
  Master interrupt handler -- investigate and delegate
  => r = pointer to stacked registers
  */
-void irq_handler(int_registers_block *regs)
-{   
+void irq_handler(int_registers_block regs)
+{
 #ifdef PERFORMANCE_DEBUG
    unsigned long long debug_cycles = x86_read_cyclecount();
 #endif
 
    irq_driver_entry *driver;
 
-   IRQ_DEBUG("[irq:%i] processing IRQ %i (registers at %p)\n", CPU_ID, regs->intnum, regs);
+   IRQ_DEBUG("[irq:%i] processing IRQ %i (registers at %p)\n", CPU_ID, regs.intnum, &regs);
    
    /* make sure we only consider the low byte, which contains the irq number */
-   regs->intnum = regs->intnum % IRQ_MAX_LINES;
+   regs.intnum = regs.intnum % IRQ_MAX_LINES;
    
    lock_gate(&irq_lock, LOCK_READ);
    
    /* find the registered drivers */
-   driver = irq_drivers[regs->intnum];
+   driver = irq_drivers[regs.intnum];
    while(driver)
    {
       switch(driver->flags & IRQ_DRIVER_TYPEMASK)
       {
          case IRQ_DRIVER_FUNCTION:
             /* call the kernel function */
-            (driver->func)(regs->intnum, regs);
+            (driver->func)(regs.intnum, &regs);
             break;
             
          case IRQ_DRIVER_PROCESS:
@@ -61,7 +61,7 @@ void irq_handler(int_registers_block *regs)
             /* poke the driver process */
             process *target = proc_find_proc(driver->pid);
             if(target)
-               msg_send_signal(target, SIGXIRQ, regs->intnum);
+               msg_send_signal(target, SIGXIRQ, regs.intnum);
          }
          break;
       }
@@ -72,7 +72,7 @@ void irq_handler(int_registers_block *regs)
    unlock_gate(&irq_lock, LOCK_READ);
    
    PERFORMANCE_DEBUG("[irq:%i] hardware interrupt %x took about %i cycles to process\n",
-                     CPU_ID, regs->intnum, (unsigned int)(x86_read_cyclecount() - debug_cycles));
+                     CPU_ID, regs.intnum, (unsigned int)(x86_read_cyclecount() - debug_cycles));
 }
 /* ----------------------------------------------------------------------- */
 
