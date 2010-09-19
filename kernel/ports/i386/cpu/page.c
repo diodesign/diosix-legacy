@@ -601,7 +601,7 @@ void pg_init(void)
 
 
 /* pg_dump_pagedir
-   For debug purposes, dump a copy of the current page directory */
+   For debug purposes, dump a copy of the given page directory */
 void pg_dump_pagedir(unsigned int *pgdir)
 {
    unsigned int i;

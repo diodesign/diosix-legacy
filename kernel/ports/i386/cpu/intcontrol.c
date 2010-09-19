@@ -106,12 +106,13 @@ kresult int_initialise(void)
    if(mp_cpus == 1)
    {      
       /* set up a 100Hz ticker for the scheduler  */
-      x86_timer_init(SCHED_FREQUENCY);
       INT_DEBUG("[int:%i] uniproc: set up timer (%iHz)...\n", CPU_ID, SCHED_FREQUENCY);
+      x86_timer_init(SCHED_FREQUENCY);
+      irq_register_driver(PIC_8254_IRQ, IRQ_DRIVER_FUNCTION, 0, &int_common_timer);
       
       return success;
    }
-   
+
    /* initialise the smp system's IOAPIC */
    if(mp_ioapics) ioapic_initialise(0);
       

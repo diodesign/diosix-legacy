@@ -49,7 +49,7 @@ kresult bus_register_name(unsigned int id, char *name)
 kresult bus_add_route(unsigned int flags, unsigned int busid, unsigned int busirq,
                       unsigned int ioapicid, unsigned int ioapicirq)
 {
-   BUS_DEBUG("[bus:%1] adding route: bus %i irq % ==> ioapic %i irq %i (flags %i)\n", CPU_ID,
+   BUS_DEBUG("[bus:%i] adding route: bus %i irq %i ==> ioapic %i irq %i (flags %i)\n", CPU_ID,
              busid, busirq, ioapicid, ioapicirq, flags);
    
    /* TODO: unimplemented */

@@ -41,7 +41,7 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #define LAPIC_TIMERDIV       ((volatile unsigned int *)(LAPIC_BASE + 0x3e0))
          
 /* APIC register bits */
-#define LAPIC_ENABLE       (1 << 8)      /* in the spurious int vect reg */
+#define LAPIC_ENABLE       (1 << 8)    /* in the spurious int vect reg */
 #define LAPIC_LVT_MASK     (1 << 16)   /* in the timer/lint0/etc lvt regs */
 #define LAPIC_LVT_NMI      (1 << 10)   /* in the timer/lint0/etc lvt regs */
 #define LAPIC_TIMER_TP     (1 << 17)   /* in the timer lvt reg */
@@ -123,6 +123,7 @@ kresult irq_deregister_driver(unsigned int irq_num, unsigned int type, unsigned 
 #define PIC_MASTER_VECTOR_BASE   (32)
 #define PIC_SLAVE_VECTOR_BASE    (PIC_MASTER_VECTOR_BASE + 8)
 
+#define APIC_TIMER_PASSES  (4)
 #define APIC_VECTOR_BASE   (48)
 #define IRQ_APIC_TIMER     (APIC_VECTOR_BASE + 0)
 #define IRQ_APIC_LINT0     (APIC_VECTOR_BASE + 1)
@@ -133,15 +134,11 @@ kresult irq_deregister_driver(unsigned int irq_num, unsigned int type, unsigned 
 #define IRQ_APIC_SPURIOUS  (63) /* bits 0-3 must be set */
 
 #define IOAPIC_VECTOR_BASE (64)
-#define IRQ_IOAPIC_TIMER   (IOAPIC_VECTOR_BASE)
 
 #define INT_IAMBSP         (1)
 #define INT_IAMAP          (0)
 
-/* the 8254 PIC timer IRQ wired via a PIC chip on a uniproc machine */
+/* the 8254 PIT timer kernel IRQ wired via a PIC chip on a uniproc machine */
 #define PIC_8254_IRQ       (PIC_MASTER_VECTOR_BASE + 0)
-
-/* the 8254 PIC timer IRQ wired via the ISA bus on an SMP machine */
-#define ISA_8254_IRQ       (0)
 
 #endif

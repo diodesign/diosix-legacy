@@ -265,6 +265,8 @@ void sched_caretaker(void)
 */
 void sched_tick(int_registers_block *regs)
 {
+   if(!cpu_table) return; /* give up now if the system isn't ready yet */
+   
    mp_core *cpu = &cpu_table[CPU_ID];
 
    /* give up if no thread running */

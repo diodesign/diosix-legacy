@@ -75,7 +75,4 @@ void pic_initialise(void)
    
    for(loop = 0; loop < 8; loop++)
       irq_register_driver(PIC_SLAVE_VECTOR_BASE + loop, IRQ_DRIVER_FUNCTION, 0, &pic_irq_default);
-   
-   /* register the timer handler for the scheduler */
-   irq_register_driver(PIC_8254_IRQ, IRQ_DRIVER_FUNCTION, 0, &int_common_timer);
 }
