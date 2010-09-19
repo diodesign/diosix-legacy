@@ -268,9 +268,6 @@ void sched_tick(int_registers_block *regs)
    if(!cpu_table) return; /* give up now if the system isn't ready yet */
    
    mp_core *cpu = &cpu_table[CPU_ID];
-
-   /* give up if no thread running */
-   if(!(cpu->current)) return;
    
    /* check to see if it's time for maintanence */
    /* make sure only the boot cpu runs this? */
@@ -289,10 +286,14 @@ void sched_tick(int_registers_block *regs)
    /* bail out if we're not running anything */
    if(!(cpu->current))
    {
+      SCHED_DEBUG("[sched:%i] nothing running on this core\n", CPU_ID);
       unlock_gate(&(cpu->lock), LOCK_READ);
       return;
    }
    unlock_gate(&(cpu->lock), LOCK_READ);
+   
+   SCHED_DEBUG("[sched:%i] tick for thread %i of process %i\n",
+               CPU_ID, cpu->current->tid, cpu->current->proc->pid);
    
    lock_gate(&(cpu->current->lock), LOCK_WRITE);
    
@@ -464,7 +465,7 @@ void sched_add(unsigned char cpu, unsigned char priority, thread *torun)
       
    lock_gate(&(cpu_table[cpu].lock), LOCK_WRITE);
    lock_gate(&(torun->lock), LOCK_WRITE);
-      
+
    /* add it to the start of the queue */
    if(cpu_table[cpu].queue_head)
    {

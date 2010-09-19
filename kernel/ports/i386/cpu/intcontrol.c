@@ -74,7 +74,7 @@ void int_set_gate(unsigned char intnum, unsigned int base, unsigned short segmen
 
 /* default timer handler for the scheduler */
 kresult int_common_timer(unsigned char intnum, int_registers_block *regs)
-{
+{   
    /* nudge the timeslice counters for the current thread */
    sched_tick(regs);
    return success;

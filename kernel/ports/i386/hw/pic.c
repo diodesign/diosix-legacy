@@ -34,7 +34,6 @@ kresult pic_irq_default(unsigned char intnum, int_registers_block *regs)
    x86_pic_reset(1); /* as well as the master */
    
    PIC_DEBUG("[pic:%i] default irq handler called: int %i\n", CPU_ID, intnum);
-   
    return success;
 }
 

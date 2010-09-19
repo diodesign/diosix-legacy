@@ -407,6 +407,8 @@ void x86_warm_kickstart(void)
    /* inform the CPU that things have changed */   
    next_tss->esp0 = next->kstackbase;
    x86_change_tss(&(cpu_table[CPU_ID].gdtptr), cpu_table[CPU_ID].tssentry, next_tss);
+   
+   cpu_table[CPU_ID].current = next;
 
    /* now return to the usermode thread - all the registers are stacked up in the 
       thread's reg block - see int_handler in locore.s for this return code */

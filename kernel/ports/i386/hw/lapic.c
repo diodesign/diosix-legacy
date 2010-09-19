@@ -44,10 +44,10 @@ kresult lapic_preflight_timer(unsigned char intnum, int_registers_block *regs)
    lapic_preflight_timer_lap[lapic_preflight_timer_pass] = (*LAPIC_TIMERNOW) / APIC_TIMER_PASSES;
    if(lapic_preflight_timer_pass < APIC_TIMER_PASSES)
       lapic_preflight_timer_pass++;
-   
+
    /* reload to max value */
    lapic_write(LAPIC_TIMERINIT, 0xffffffff);
-   
+
    return success;
 }
 
@@ -180,12 +180,12 @@ void lapic_initialise(unsigned char flags)
       /* set the old-world timer to fire every at the rate expcted by the scheduler
        and see how far the CPU's APIC counts down in those periods */
       lapic_write(LAPIC_TIMERDIV, LAPIC_DIV_128); /* divide down the bus clock by 128 */
-      x86_timer_init(SCHED_FREQUENCY);
       lapic_write(LAPIC_TIMERINIT, 0xffffffff);
+      x86_timer_init(SCHED_FREQUENCY);
       x86_enable_interrupts();
-
+      
       /* loop until all done - don't optimise it out */
-      while(lapic_preflight_timer_pass < 4) __asm__ __volatile__("pause");
+      while(lapic_preflight_timer_pass < APIC_TIMER_PASSES) __asm__ __volatile__("pause");
 
       /* tear down this preflight check */
       x86_disable_interrupts();

@@ -58,8 +58,9 @@ void main(void)
    child = diosix_fork();
    while(1)
    {
-      /* only the parent calls yield() */
-      if(child) diosix_yield();
+      /* only the parent calls yield(), child just spins waiting to be pre-empted */
+      // if(child) diosix_yield();
+      __asm__ __volatile__ ("pause");
    }
    
    /* create processes to idle away */
