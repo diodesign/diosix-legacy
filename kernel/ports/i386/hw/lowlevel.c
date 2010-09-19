@@ -408,6 +408,7 @@ void x86_warm_kickstart(void)
    next_tss->esp0 = next->kstackbase;
    x86_change_tss(&(cpu_table[CPU_ID].gdtptr), cpu_table[CPU_ID].tssentry, next_tss);
    
+   /* this seems to be the only sensible place to set this state variable */
    cpu_table[CPU_ID].current = next;
 
    /* now return to the usermode thread - all the registers are stacked up in the 

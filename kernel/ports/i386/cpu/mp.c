@@ -50,8 +50,8 @@ void _mp_catch_ap(void)
       /* we've got one! */
       if((volatile unsigned int)(cpu_table[me].queue_head))
       {
-         dprintf("[mp:%i] found thread %i of process %i to kickstart\n",
-                 CPU_ID, cpu_table[me].queue_head->tid, cpu_table[me].queue_head->proc->pid);
+         MP_DEBUG("[mp:%i] found thread %i of process %i to kickstart\n",
+                  CPU_ID, cpu_table[me].queue_head->tid, cpu_table[me].queue_head->proc->pid);
          x86_warm_kickstart();
       }
    }
