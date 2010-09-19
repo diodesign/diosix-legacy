@@ -55,10 +55,11 @@ void main(void)
    unsigned int child;
    unsigned int message = 0;
    
-   diosix_fork();
+   child = diosix_fork();
    while(1)
    {
-      diosix_yield();
+      /* only the parent calls yield() */
+      if(child) diosix_yield();
    }
    
    /* create processes to idle away */

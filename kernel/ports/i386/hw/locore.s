@@ -367,7 +367,7 @@ IRQ       14, 46
 IRQ       15, 47
 
 ; APIC interrupt handlers
-IRQ       16, 48   ; TIMER 
+IRQ       16, 48  ; TIMER 
 IRQ       17, 49  ; LINT0
 IRQ       18, 50  ; LINT1
 IRQ       19, 51  ; PCINT

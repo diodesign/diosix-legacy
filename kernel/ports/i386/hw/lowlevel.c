@@ -295,6 +295,9 @@ void x86_timer_init(unsigned char freq)
    /* send the frequency divisor to channel 0 data port */
    x86_outportb(0x40, lo);
    x86_outportb(0x40, hi);
+   
+   LOLVL_DEBUG("[x86:%i] programmed PIT to fire interrupt %i times a second\n",
+               CPU_ID, freq);
 }
 
 /* x86_load_cr3

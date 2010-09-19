@@ -138,6 +138,10 @@ kresult irq_deregister_driver(unsigned int irq_num, unsigned int type, unsigned 
 #define INT_IAMBSP         (1)
 #define INT_IAMAP          (0)
 
+/* the 8254 PIC timer IRQ wired via a PIC chip on a uniproc machine */
+#define PIC_8254_IRQ       (PIC_MASTER_VECTOR_BASE + 0)
+
+/* the 8254 PIC timer IRQ wired via the ISA bus on an SMP machine */
 #define ISA_8254_IRQ       (0)
 
 #endif

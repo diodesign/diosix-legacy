@@ -36,6 +36,7 @@ void irq_handler(int_registers_block regs)
    unsigned long long debug_cycles = x86_read_cyclecount();
 #endif
 
+   unsigned int handled = 0;
    irq_driver_entry *driver;
 
    IRQ_DEBUG("[irq:%i] processing IRQ %i (registers at %p)\n", CPU_ID, regs.intnum, &regs);
@@ -44,32 +45,46 @@ void irq_handler(int_registers_block regs)
    regs.intnum = regs.intnum % IRQ_MAX_LINES;
    
    lock_gate(&irq_lock, LOCK_READ);
-   
+
    /* find the registered drivers */
    driver = irq_drivers[regs.intnum];
+
    while(driver)
    {
       switch(driver->flags & IRQ_DRIVER_TYPEMASK)
       {
          case IRQ_DRIVER_FUNCTION:
+            IRQ_DEBUG("[irq:%i] calling kernel function %p for IRQ %i (driver %p)\n",
+                      CPU_ID, driver->func, regs.intnum, driver);
             /* call the kernel function */
             (driver->func)(regs.intnum, &regs);
+            handled = 1;
             break;
             
          case IRQ_DRIVER_PROCESS:
-         {
-            /* poke the driver process */
-            process *target = proc_find_proc(driver->pid);
-            if(target)
-               msg_send_signal(target, SIGXIRQ, regs.intnum);
-         }
-         break;
+            {
+               /* poke the driver process */
+               process *target = proc_find_proc(driver->pid);
+               IRQ_DEBUG("[irq:%i] signalling process %i for IRQ %i (driver %p)\n",
+                         CPU_ID, driver->pid, regs.intnum, driver);
+               if(target)
+               {
+                  msg_send_signal(target, SIGXIRQ, regs.intnum);
+                  handled = 1;
+               }
+            }
+            break;
       }
       
       driver = driver->next;
    }
-      
+
    unlock_gate(&irq_lock, LOCK_READ);
+
+   if(!handled)
+   {
+      IRQ_DEBUG("[irq:%i] spurious IRQ %i!\n", CPU_ID, regs.intnum);
+   }
    
    PERFORMANCE_DEBUG("[irq:%i] hardware interrupt %x took about %i cycles to process\n",
                      CPU_ID, regs.intnum, (unsigned int)(x86_read_cyclecount() - debug_cycles));
@@ -192,6 +207,7 @@ kresult irq_register_driver(unsigned int irq_num, unsigned int flags,
       new->func = func; /* driver is a kernel function */
    else
       new->pid = pid; /* driver is a userspace process */
+   new->flags = flags;
    
    /* protect the data structure during update */
    lock_gate(&irq_lock, LOCK_WRITE);

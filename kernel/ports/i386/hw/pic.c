@@ -33,6 +33,8 @@ kresult pic_irq_default(unsigned char intnum, int_registers_block *regs)
       x86_pic_reset(2); /* reset the slave if necessary */
    x86_pic_reset(1); /* as well as the master */
    
+   PIC_DEBUG("[pic:%i] default irq handler called: int %i\n", CPU_ID, intnum);
+   
    return success;
 }
 
@@ -66,14 +68,14 @@ void pic_initialise(void)
    int_set_gate(PIC_SLAVE_VECTOR_BASE + 5, (unsigned int)irq13, 0x18, 0x8E, 0);
    int_set_gate(PIC_SLAVE_VECTOR_BASE + 6, (unsigned int)irq14, 0x18, 0x8E, 0);
    int_set_gate(PIC_SLAVE_VECTOR_BASE + 7, (unsigned int)irq15, 0x18, 0x8E, 1);
-      
-   /* install the default handler - route the IRQ lines to our boot cpu */
+   
+   /* install the default handler, which will ack interrupts */
    for(loop = 0; loop < 8; loop++)
       irq_register_driver(PIC_MASTER_VECTOR_BASE + loop, IRQ_DRIVER_FUNCTION, 0, &pic_irq_default);
    
    for(loop = 0; loop < 8; loop++)
       irq_register_driver(PIC_SLAVE_VECTOR_BASE + loop, IRQ_DRIVER_FUNCTION, 0, &pic_irq_default);
-
+   
    /* register the timer handler for the scheduler */
-   irq_register_driver(ISA_8254_IRQ, IRQ_DRIVER_FUNCTION, 0, &int_common_timer);
+   irq_register_driver(PIC_8254_IRQ, IRQ_DRIVER_FUNCTION, 0, &int_common_timer);
 }
