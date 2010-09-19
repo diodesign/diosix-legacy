@@ -52,7 +52,7 @@ void _mp_catch_ap(void)
       {
          MP_DEBUG("[mp:%i] found thread %i of process %i to kickstart\n",
                   CPU_ID, cpu_table[me].queue_head->tid, cpu_table[me].queue_head->proc->pid);
-         x86_warm_kickstart();
+         lowlevel_kickstart();
       }
    }
 }

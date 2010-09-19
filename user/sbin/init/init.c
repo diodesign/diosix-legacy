@@ -55,11 +55,11 @@ void main(void)
    unsigned int child;
    unsigned int message = 0;
    
-   child = diosix_fork();
+   child = diosix_thread_fork();
    while(1)
    {
       /* only the parent calls yield(), child just spins waiting to be pre-empted */
-      // if(child) diosix_yield();
+      if(child) diosix_yield();
       __asm__ __volatile__ ("pause");
    }
    

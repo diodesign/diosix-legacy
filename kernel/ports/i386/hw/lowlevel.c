@@ -410,7 +410,7 @@ void x86_warm_kickstart(void)
    
    /* this seems to be the only sensible place to set this state variable */
    cpu_table[CPU_ID].current = next;
-
+   
    /* now return to the usermode thread - all the registers are stacked up in the 
       thread's reg block - see int_handler in locore.s for this return code */
    __asm__ __volatile__

@@ -150,12 +150,16 @@ void syscall_do_thread_fork(int_registers_block *regs)
       ebp if it looks like an active frame pointer, ugh :( */
    new->regs.useresp = new->stackbase - (current->stackbase - regs->useresp);
    
-   if((regs->ebp <= new->stackbase) &&
-      (regs->ebp > (new->stackbase - (THREAD_MAX_STACK * MEM_PGSIZE))))
+   if((regs->ebp <= current->stackbase) &&
+      (regs->ebp > (current->stackbase - (THREAD_MAX_STACK * MEM_PGSIZE))))
+   {
       new->regs.ebp = new->stackbase - (current->stackbase - regs->ebp);
+      SYSCALL_DEBUG("[sys:%i] fixing up ebp from %x to %x\n",
+                    CPU_ID, regs->ebp, new->regs.ebp);
+   }
 
-   SYSCALL_DEBUG("[sys:%i] cloning stack: target esp %x source esp %x (%i bytes) (target stackbase %x source stackbase %x)\n",
-           CPU_ID, new->regs.useresp, regs->useresp, current->stackbase - regs->useresp, new->stackbase, current->stackbase);
+   SYSCALL_DEBUG("[sys:%i] cloning stack: target esp %x ebp %x source esp %x ebp %x (%i bytes) (target stackbase %x source stackbase %x)\n",
+           CPU_ID, new->regs.useresp, new->regs.ebp, regs->useresp, regs->ebp, current->stackbase - regs->useresp, new->stackbase, current->stackbase);
    
    vmm_memcpy((void *)(new->regs.useresp), (void *)(regs->useresp), current->stackbase - regs->useresp);
    

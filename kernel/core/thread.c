@@ -103,7 +103,7 @@ thread *thread_duplicate(process *proc, thread *source)
    new->timeslice     = source->timeslice;
    new->priority      = source->priority;
    new->prev_priority = source->prev_priority;
-   new->stackbase       = source->stackbase;
+   new->stackbase     = source->stackbase;
 
    /* the new thread is asleep and due to be scheduled */
    new->state = sleeping;
