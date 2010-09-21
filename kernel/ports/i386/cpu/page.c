@@ -88,7 +88,7 @@ kresult pg_fault(int_registers_block *regs)
             PAGE_DEBUG("[page:%i] mapped new page for process %i: virtual %x -> physical %x\n",
                     CPU_ID, proc->pid, faultaddr & PG_4K_MASK, new_phys);
          }
-         return success;         
+         return success;
          
       case clonepage:
          {
@@ -167,13 +167,14 @@ pf_fault_bad:
 
 /* pg_clone_pgdir
    Create a page directory based on another dir and any pages tables too -
-   maintaining links to read-only data and 
+   maintaining links to read-only data 
    => source = pointer to page directory array for the pgdir we want to clone
    <= returns pointer to new page directory array, or NULL for failure
  */
 unsigned int **pg_clone_pgdir(unsigned int **source)
 {
    unsigned int loop;
+   unsigned int source_touched = 0;
    unsigned int **new = NULL;
 
    /* ask the vmm for a physical page */
@@ -218,6 +219,7 @@ unsigned int **pg_clone_pgdir(unsigned int **source)
                
                /* in the parent */
                src_table[page] = src_table[page] & (~PG_RW); /* clear R/W */
+               source_touched = 1;
             }
          }
          
@@ -226,6 +228,14 @@ unsigned int **pg_clone_pgdir(unsigned int **source)
       }
       else
          new[loop] = NULL;
+   }
+   
+   /* if the parent page tables were altered then the core running it should reload 
+       it page directory */
+   if(source_touched)
+   {
+      if(cpu_table[CPU_ID].current->proc->pgdir == source)
+         x86_load_cr3(KERNEL_LOG2PHYS(source));
    }
    
    return new;

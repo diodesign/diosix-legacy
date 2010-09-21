@@ -401,6 +401,7 @@ void x86_warm_kickstart(void)
            "      intnum %x errcode %x eip %x cs %x eflags %x useresp %x ss %x\n",
            CPU_ID, regs->ds, regs->edi, regs->esi, regs->ebp, regs->esp, regs->ebx, regs->edx, regs->ecx, regs->eax,
            regs->intnum, regs->errcode, regs->eip, regs->cs, regs->eflags, regs->useresp, regs->ss);
+
    /* load page directory */
    x86_load_cr3(KERNEL_LOG2PHYS(next->proc->pgdir));
    
@@ -410,6 +411,17 @@ void x86_warm_kickstart(void)
    
    /* this seems to be the only sensible place to set this state variable */
    cpu_table[CPU_ID].current = next;
+   
+#ifdef LOLVL_DEBUG
+   if((regs->useresp <= regs->ebp) && (regs->ebp < KERNEL_SPACE_BASE))
+   {
+      unsigned int loop;
+      LOLVL_DEBUG("[x86:%i] inspecting thread's stack: usresp %x ebp %x...\n",
+                  CPU_ID, regs->useresp, regs->ebp);
+      for(loop = regs->ebp + 4; loop >= regs->useresp; loop -= sizeof(unsigned int))
+         LOLVL_DEBUG("      %x : %x\n", loop, *((volatile unsigned int *)loop));
+   }
+#endif
    
    /* now return to the usermode thread - all the registers are stacked up in the 
       thread's reg block - see int_handler in locore.s for this return code */
@@ -483,7 +495,7 @@ void x86_kickstart(void)
      movl %%eax, %%es; \
      movl %%eax, %%fs; \
      movl %%eax, %%gs; \
-      movl %0, %%eax; \
+     movl %0, %%eax; \
      pushl $0x23; \
      pushl %%eax; \
      pushf; \

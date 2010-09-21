@@ -55,7 +55,7 @@ void main(void)
    unsigned int child;
    unsigned int message = 0;
    
-   child = diosix_thread_fork();
+   child = diosix_fork();
    while(1)
    {
       /* only the parent calls yield(), child just spins waiting to be pre-empted */
