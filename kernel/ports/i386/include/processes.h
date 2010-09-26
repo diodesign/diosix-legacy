@@ -30,21 +30,10 @@ typedef enum
    inrunqueue,        /* in queue, not running, waiting for cpu time */
    running,           /* in queue, is running, not waiting */
    waitingforreply,   /* not in queue, not running, waiting for a msg reply */
-   waitingformsg,       /* not in queue, not running, waiting for a non-reply msg */
+   waitingformsg,     /* not in queue, not running, waiting for a non-reply msg */
    held,              /* not in queue, not running, forced to wait by a senior process */
    dead               /* not in queue, not running, not waiting, soon to be destroyed */
 } thread_state;
-
-/* scheduler */
-/* priority levels explained...
-   lvl 0     = interrupt handlers
-   lvl 1     = interactive processes
-   lvl 2 & 3 = slower processes
-*/
-#define SCHED_PRIORITY_LEVELS     (4)
-#define SCHED_TIMESLICE           (5) /* 50ms timeslice */
-#define SCHED_FREQUENCY           (100) /* tick every 10ms */
-#define SCHED_CARETAKER           (1000) /* run maintainance every 1000 ticks */
 
 /* describe how an area of the payload is going to appear in memory */
 typedef struct
@@ -175,7 +164,9 @@ typedef struct
    unsigned int errcode, eip, cs, eflags, useresp, ss;
 } int_registers_block;
 
-#define THREAD_INUSERMODE   (1)
+#define THREAD_FLAG_INUSERMODE       (1 << 0)
+#define THREAD_FLAG_INMSGCOPY        (1 << 1)
+#define THREAD_FLAG_ISDRIVER         (1 << 2)
 
 /* describe each thread */
 struct thread
@@ -184,13 +175,19 @@ struct thread
    unsigned int tid;          /* thread id, unique within process */
    unsigned int cpu;          /* actual cpu running this thread */
    
-   unsigned char flags;       /* status flags for this thread */
-   unsigned char timeslice; /* preempt when it reaches zero */
-   unsigned char priority;  /* priority level */
-   unsigned char prev_priority; /* a previous priority level for this thread */
+   unsigned char flags;            /* status flags for this thread */
+   unsigned char timeslice;        /* preempt when it reaches zero */
+   unsigned char priority;         /* priority level - see sched.h */
+   unsigned char priority_granted; /* a priority level temporarily granted by another process */
+   unsigned int priority_points; /* when a thread changes priority this variable is
+                                    loaded with the value 2^priority. One point is deducted
+                                    if the thread has to be preempted but gains a point if it
+                                    blocks (such as sending a message). If it hits zero, it drops
+                                    a priority level and is rescheduled. If it hits 2*(2^priority)
+                                    then it is bumped up a priority level and rescheduled. */
    
    thread_state state;      /* the running state of the thread */
-   thread *replysource;       /* thread awaiting reply from */
+   thread *replysource;     /* thread awaiting reply from */
    diosix_msg_info *msg;    /* copy of the message block ptr submitted to syscall msg_send/recv */
    
    /* simple thread locking mechanism - acquire a lock before modifying
@@ -236,6 +233,8 @@ struct process
    /* thread management */
    thread **threads; /* hash table of threads */
    unsigned int thread_count, next_tid;
+   unsigned int priority_low, priority_high; /* minimum and maximum scheduling
+                                                priority for this process's threads */ 
    
    /* memory management */
    unsigned int entry; /* where code execution should begin */

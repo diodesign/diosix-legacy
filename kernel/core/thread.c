@@ -97,13 +97,17 @@ thread *thread_duplicate(process *proc, thread *source)
    }
    threads = proc->threads;
    
-   new->proc          = proc;
-   new->tid           = source->tid;
-   new->flags         = source->flags;
-   new->timeslice     = source->timeslice;
-   new->priority      = source->priority;
-   new->prev_priority = source->prev_priority;
-   new->stackbase     = source->stackbase;
+   /* fill in the blanks */
+   new->proc             = proc;
+   new->tid              = source->tid;
+   new->flags            = source->flags & (THREAD_FLAG_INUSERMODE | THREAD_FLAG_ISDRIVER);
+   
+   new->timeslice        = source->timeslice;
+   new->priority         = source->priority;
+   new->priority_granted = SCHED_PRIORITY_INVALID; /* new threads don't inherit granted pri */ 
+   sched_priority_calc(new, priority_reset);
+   
+   new->stackbase        = source->stackbase;
 
    /* the new thread is asleep and due to be scheduled */
    new->state = sleeping;
@@ -277,6 +281,11 @@ thread *thread_new(process *proc)
    /* fill in more details */
    new->proc = proc;
    proc->thread_count++;
+   
+   /* calculate the base priority points score */
+   new->priority = proc->priority_low;
+   new->priority_granted = SCHED_PRIORITY_INVALID;
+   sched_priority_calc(new, priority_reset);
 
    /* create a vma for the thread's user stack - don't forget stacks grow down */
    stackbase = KERNEL_SPACE_BASE - (THREAD_MAX_STACK * MEM_PGSIZE * new->tid);

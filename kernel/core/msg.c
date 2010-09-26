@@ -280,10 +280,8 @@ kresult msg_send(thread *sender, diosix_msg_info *msg)
    if(msg->flags & DIOSIX_MSG_REPLY)
    {
       /* restore the receiver's priority if it was bumped up to send this reply */
-      if(receiver->prev_priority > receiver->priority)
-         priority = receiver->prev_priority;
-      else
-         priority = receiver->priority;
+      receiver->priority_granted = SCHED_PRIORITY_INVALID;
+      sched_priority_calc(receiver, priority_check);
    }
    else
    {      
@@ -301,18 +299,18 @@ kresult msg_send(thread *sender, diosix_msg_info *msg)
       
       /* bump the receiver's priority up if the sender has a higher priority to
          avoid priority inversion */
-      receiver->prev_priority = receiver->priority;
       if(sender->priority < receiver->priority)
-         priority = sender->priority;
+         receiver->priority_granted = sender->priority;
       else
-         priority = receiver->priority;      
+         receiver->priority_granted = SCHED_PRIORITY_INVALID;
+      sched_priority_calc(receiver, priority_check);
    }
 
    unlock_gate(&(sender->lock), LOCK_READ);
    unlock_gate(&(receiver->lock), LOCK_READ);
    
    /* wake up the receiving thread */
-   sched_add(receiver->cpu, priority, receiver);
+   sched_add(receiver->cpu, receiver);
 
    MSG_DEBUG("[msg:%x] thread %i of process %i sent message %x (%i bytes first word %x) to thread %i of process %i\n",
              CPU_ID, sender->tid, sender->proc->pid, msg->send, msg->send_size, *((unsigned int *)msg->send),

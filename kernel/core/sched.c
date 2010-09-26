@@ -48,6 +48,136 @@ void sched_dec_queued_threads(void)
    SCHED_DEBUG("[sched:%i] total queued threads now: %i (down one)\n", CPU_ID, sched_total_queued);
 }
 
+/* sched_determine_priority
+   Return the priority level of the given thread - assumes lock is held on the thread's metadata */
+unsigned char sched_determine_priority(thread *target)
+{
+   unsigned char priority;
+   
+   /* driver threads always get priority 0 */
+   if(target->flags & THREAD_FLAG_ISDRIVER) return SCHED_PRIORITY_INTERRUPTS;
+   
+   /* if the thread's been granted a better priority then use that */
+   if(target->priority_granted != SCHED_PRIORITY_INVALID &&
+      target->priority > target->priority_granted)
+      priority = target->priority_granted;
+   else
+      priority = target->priority;
+   
+   /* sanitise the priority in case something's gone wrong */
+   if(priority > SCHED_PRIORITY_MAX) priority = SCHED_PRIORITY_MAX;
+
+   return priority;
+}
+
+/* sched_get_next_to_run
+   Return a pointer to the thread that should be run next on the
+   given core, or NULL for no threads to run */
+thread *sched_get_next_to_run(unsigned char cpuid)
+{
+   mp_core *cpu = &cpu_table[cpuid];
+   mp_thread_queue *cpu_queue;
+   thread *torun;
+   
+   lock_gate(&(cpu->lock), LOCK_READ);
+   cpu_queue = &(cpu->queues[cpu->lowest_queue_filled]);
+   torun = cpu_queue->queue_head;
+   unlock_gate(&(cpu->lock), LOCK_READ);
+   
+   return torun;
+}
+
+/* sched_priority_calc
+   Re-calculate the priority points for a thread: either reset a thread's
+   points to their base score for its priority level or subtract a point or 
+   add a point or sanity check the points score.
+   => tocalc = pointer to thread to operate on
+      request = priority_reset, priority_reward, priority_punish or priority_check
+*/
+void sched_priority_calc(thread *tocalc, sched_priority_request request)
+{
+   unsigned int priority;
+   
+   /* sanatise input */
+   if(!tocalc)
+   {
+      KOOPS_DEBUG("[sched:%i] sched_priority_calc: called with nonsense thread pointer\n",
+                  CPU_ID);
+      return;
+   }
+   
+   /* interrupt-handling driver threads are immune to this */
+   if(tocalc->flags & THREAD_FLAG_ISDRIVER) return;
+   
+   lock_gate(&(tocalc->lock), LOCK_WRITE);
+   
+   /* get the correct priority level to use */
+   priority = sched_determine_priority(tocalc);
+   
+   switch(request)
+   {
+      /* set the base priority points for a thread in its priority level */
+      case priority_reset:
+         tocalc->priority = SCHED_PRIORITY_BASE_POINTS(priority);
+         break;
+         
+      /* add a scheduling point */
+      case priority_reward:
+         if(tocalc->priority_points < SCHED_PRIORITY_MAX_POINTS(priority))
+            tocalc->priority_points++;
+         
+         /* if we exceed (2 * (2 ^ priority)) then enhance the priority level (by reducing it) */
+         if(tocalc->priority_points == SCHED_PRIORITY_MAX_POINTS(priority))
+         {
+            if(tocalc->priority > SCHED_PRIORITY_MIN)
+            {
+               tocalc->priority--;
+               tocalc->priority_points = SCHED_PRIORITY_BASE_POINTS(priority);
+            }
+         }
+         break;
+         
+      /* subtract a scheduling point */   
+      case priority_punish:
+         if(tocalc->priority_points > 0)
+            tocalc->priority_points--;
+         
+         /* if we drop to zero then diminish the priority level (by increasing it) */
+         if(tocalc->priority_points == 0)
+         {
+            if(tocalc->priority < SCHED_PRIORITY_MAX_POINTS(priority))
+            {
+               tocalc->priority++;
+               tocalc->priority_points = SCHED_PRIORITY_BASE_POINTS(priority);
+            }
+         }
+         break;
+         
+      /* check everything's sane */
+      case priority_check:
+         if(tocalc->priority_points > SCHED_PRIORITY_MAX_POINTS(priority))
+            tocalc->priority_points = SCHED_PRIORITY_MAX_POINTS(priority);
+         if(tocalc->priority > SCHED_PRIORITY_MAX)
+            tocalc->priority = SCHED_PRIORITY_MAX;
+         if(tocalc->priority < SCHED_PRIORITY_MIN)
+            tocalc->priority = SCHED_PRIORITY_MIN;
+         if(tocalc->priority_granted != SCHED_PRIORITY_INVALID)
+         {
+            if(tocalc->priority_granted > SCHED_PRIORITY_MAX)
+               tocalc->priority_granted = SCHED_PRIORITY_MAX;
+            if(tocalc->priority_granted < SCHED_PRIORITY_MIN)
+               tocalc->priority_granted = SCHED_PRIORITY_MIN;
+         }
+         break;
+         
+      default:
+         KOOPS_DEBUG("[sched:%i] sched_priority_calc: unknown request %i for thread %p\n",
+                     CPU_ID, (unsigned int)request, tocalc);
+   }
+   
+   unlock_gate(&(tocalc->lock), LOCK_WRITE);
+}
+
 /* sched_lock_thread
  Stop a thread from running, remove it from the queue and lock
  it out until it is unlocked. This will momentarily block until
@@ -177,7 +307,7 @@ kresult sched_unlock_thread(thread *towake)
    /* if the thread is held then put it back on the run queue, but 
       don't requeue if the whole process is blocked */
    if(towake->state == held && !(towake->proc->flags & PROC_FLAG_RUNLOCKED))
-      sched_add(towake->proc->cpu, towake->priority, towake);
+      sched_add(towake->proc->cpu, towake);
    else
    {
       unlock_gate(&(towake->lock), LOCK_READ);
@@ -253,7 +383,8 @@ kresult sched_unlock_proc(process *proc)
    cpus by adjusting the cpu id for waiting threads. if a
    thread is to wake up on a loaded cpu, then move it to a
    quieter one. don't move running threads around for fear of
-   cache performance issues */
+   cache performance issues. if debug is enabled then check
+   the sanity of the queues */
 void sched_caretaker(void)
 {
    SCHED_DEBUG("[sched:%i] caretaker tick\n", CPU_ID);
@@ -306,10 +437,13 @@ void sched_tick(int_registers_block *regs)
    {
       SCHED_DEBUG("[sched:%i] timeslice for thread %i of process %i expired\n",
               CPU_ID, cpu->current->tid, cpu->current->proc->pid);
-      
+
       unlock_gate(&(cpu->current->lock), LOCK_WRITE);
       
-      sched_move_to_end(CPU_ID, cpu->current->priority, cpu->current);
+      /* punish the thread for using up all its timeslice */
+      sched_priority_calc(cpu->current, priority_punish);
+      sched_move_to_end(CPU_ID, cpu->current);
+
       sched_pick(regs);
    }
    else
@@ -318,6 +452,7 @@ void sched_tick(int_registers_block *regs)
 
 /* sched_pick
    Check the run queues for new higher prority threads to run
+   and perform a task switch if one is present
    => pointer to the interrupted thread's kernel stack
 */
 void sched_pick(int_registers_block *regs)
@@ -325,13 +460,15 @@ void sched_pick(int_registers_block *regs)
    thread *now, *next;
 
    mp_core *cpu = &cpu_table[CPU_ID];
+   mp_thread_queue *cpu_queue;
    
 #ifdef SCHED_DEBUG
    {
-      thread *t = cpu->queue_head;
+      cpu_queue = &(cpu->queues[cpu->lowest_queue_filled]);
+      thread *t = cpu_queue->queue_head;
       if(!t)
       {
-         SCHED_DEBUG("[sched:%i] queue empty!\n", CPU_ID);
+         SCHED_DEBUG("[sched:%i] queue empty for priority %i!\n", CPU_ID, cpu->lowest_queue_filled);
       }
       else
       {
@@ -342,9 +479,9 @@ void sched_pick(int_registers_block *regs)
             SCHED_DEBUG("(t%i p%i) ", t->tid, t->proc->pid);
             t = t->queue_next;
          }
-         if(cpu->queue_tail)
+         if(cpu_queue->queue_tail)
          {
-            SCHED_DEBUG("end[t%i p%i]\n", cpu->queue_tail->tid, cpu->queue_tail->proc->pid);
+            SCHED_DEBUG("end[t%i p%i]\n", cpu_queue->queue_tail->tid, cpu_queue->queue_tail->proc->pid);
          }
          else 
          {
@@ -359,16 +496,14 @@ void sched_pick(int_registers_block *regs)
    now = cpu->current;
    unlock_gate(&(cpu->lock), LOCK_READ);
    
-   /* if the queue head is empty, then spin until it's there */
-   do
-   {
-      lock_gate(&(cpu->lock), LOCK_READ);
-      next = (volatile thread *)(cpu->queue_head);
-      unlock_gate(&(cpu->lock), LOCK_READ);
-   }
-   while (!next);
-   
+   /* see if there's another thread to run */
+   next = sched_get_next_to_run(CPU_ID);
+   if(!next) return;
+
+   /* keep with the currently running thread if it's
+      the highest priority thread queued */
    if(next == now) return; /* easy quick switch back to where we were */
+   if(next->priority > now->priority) return;
    
    /* update thread states */
    lock_gate(&(now->lock), LOCK_WRITE);
@@ -398,38 +533,39 @@ void sched_pick(int_registers_block *regs)
 /* sched_move_to_end
    Put a thread at the end of a run queue
    => cpu = id of per-cpu run queue
-      priority = priority queue to use
       toqueue = thread to queue up
 */
-void sched_move_to_end(unsigned char cpu, unsigned char priority, thread *toqueue)
+void sched_move_to_end(unsigned char cpu, thread *toqueue)
 {
+   mp_thread_queue *cpu_queue;
+   unsigned char priority;
+   
    if((cpu > mp_cpus) || !toqueue)
       return; /* bail if parameters are insane */
    
    lock_gate(&(toqueue->lock), LOCK_WRITE);
-   
+      
    /* remove from the run queue if present */
    if(toqueue->state == running || toqueue->state == inrunqueue)
       sched_remove(toqueue, held);
    
    lock_gate(&(cpu_table[cpu].lock), LOCK_WRITE);
    
+   priority = sched_determine_priority(toqueue);
+   cpu_queue = &(cpu_table[cpu].queues[priority]);
+   
    /* add it to the end of the queue */
-   if(cpu_table[cpu].queue_tail)
-      cpu_table[cpu].queue_tail->queue_next = toqueue;
+   if(cpu_queue->queue_tail)
+      cpu_queue->queue_tail->queue_next = toqueue;
 
-   toqueue->queue_prev = cpu_table[cpu].queue_tail;
+   toqueue->queue_prev = cpu_queue->queue_tail;
    
    /* if the head is empty, then fix up */
-   if(cpu_table[cpu].queue_head == NULL)
-      cpu_table[cpu].queue_head = toqueue;
+   if(cpu_queue->queue_head == NULL)
+      cpu_queue->queue_head = toqueue;
    
-   cpu_table[cpu].queue_tail = toqueue;
+   cpu_queue->queue_tail = toqueue;
    toqueue->queue_next = NULL;
-   
-   /* cap out-of-control priorities */
-   if(priority >= SCHED_PRIORITY_LEVELS)
-      priority = SCHED_PRIORITY_LEVELS - 1;
    
    /* update accounting */
    if(toqueue->state != running && toqueue->state != inrunqueue)
@@ -438,7 +574,6 @@ void sched_move_to_end(unsigned char cpu, unsigned char priority, thread *toqueu
       sched_inc_queued_threads();
    }
 
-   toqueue->priority  = priority;
    toqueue->state     = inrunqueue;
    toqueue->timeslice = SCHED_TIMESLICE;
    
@@ -450,42 +585,43 @@ void sched_move_to_end(unsigned char cpu, unsigned char priority, thread *toqueu
 }
 
 /* sched_add
-   Add a thread to a run queue for a cpu
+   Add a thread to a run queue for a cpu at the priority
+   level set in the thread's structure
    => cpu = id of the requested per-cpu run queue
-      priority = the priority level of the process
       torun = the thread to add
 */
-void sched_add(unsigned char cpu, unsigned char priority, thread *torun)
+void sched_add(unsigned char cpu, thread *torun)
 {
    if((cpu > mp_cpus) || !torun)
       return; /* bail if parameters are insane */
-
+   
+   unsigned char priority;
+   mp_thread_queue *cpu_queue;
+      
    /* perform some load balancing */
    cpu = sched_pick_queue(cpu);
       
    lock_gate(&(cpu_table[cpu].lock), LOCK_WRITE);
    lock_gate(&(torun->lock), LOCK_WRITE);
 
-   /* add it to the start of the queue */
-   if(cpu_table[cpu].queue_head)
+   /* pick the right queue and add it to the start */
+   priority = sched_determine_priority(torun);
+   cpu_queue = &(cpu_table[cpu].queues[priority]);
+   if(cpu_queue->queue_head)
    {
-      cpu_table[cpu].queue_head->queue_prev = torun;
-      torun->queue_next = cpu_table[cpu].queue_head;
+      cpu_queue->queue_head->queue_prev = torun;
+      torun->queue_next = cpu_queue->queue_head;
    }
    else
    {
       torun->queue_next = NULL;
    }
    /* if the tail is empty, then fix up */
-   if(!(cpu_table[cpu].queue_tail))
-      cpu_table[cpu].queue_tail = torun;
+   if(!(cpu_queue->queue_tail))
+      cpu_queue->queue_tail = torun;
    
-   cpu_table[cpu].queue_head = torun;
+   cpu_queue->queue_head = torun;
    torun->queue_prev = NULL;
-      
-   /* cap out-of-control priorities */
-   if(priority >= SCHED_PRIORITY_LEVELS)
-      priority = SCHED_PRIORITY_LEVELS - 1;
    
    /* update accounting */
    if(torun->state != running && torun->state != inrunqueue)
@@ -494,10 +630,14 @@ void sched_add(unsigned char cpu, unsigned char priority, thread *torun)
       sched_inc_queued_threads();
    }
 
-   torun->priority  = priority;
    torun->state     = inrunqueue;
    torun->timeslice = SCHED_TIMESLICE;
-   torun->cpu        = cpu;
+   torun->cpu       = cpu;
+   
+   /* take a note of the highest priority level ready to run */
+   cpu_queue = &(cpu_table[cpu].queues[cpu_table[cpu].lowest_queue_filled]);
+   if(cpu_table[cpu].lowest_queue_filled > priority || !cpu_queue->queue_head)
+      cpu_table[cpu].lowest_queue_filled = priority;
    
    unlock_gate(&(torun->lock), LOCK_WRITE);
    unlock_gate(&(cpu_table[cpu].lock), LOCK_WRITE);
@@ -514,23 +654,29 @@ void sched_add(unsigned char cpu, unsigned char priority, thread *torun)
 void sched_remove(thread *victim, thread_state state)
 {
    unsigned int cpu = victim->cpu;
+   mp_thread_queue *cpu_queue;
+   unsigned char priority;
    
    lock_gate(&(cpu_table[cpu].lock), LOCK_WRITE);
    lock_gate(&(victim->lock), LOCK_WRITE);
+   
+   priority = sched_determine_priority(victim);   
+   cpu_queue = &(cpu_table[cpu].queues[priority]);
    
    /* remove it from the queue */
    if(victim->queue_next)
       victim->queue_next->queue_prev = victim->queue_prev;
    else
       /* we were the tail, so fix up */
-      cpu_table[cpu].queue_tail = victim->queue_prev;
+      cpu_queue->queue_tail = victim->queue_prev;
    if(victim->queue_prev)
       victim->queue_prev->queue_next = victim->queue_next;
    else
    /* we were the queue head, so fixup pointers */
-      cpu_table[cpu].queue_head = victim->queue_next;
+      cpu_queue->queue_head = victim->queue_next;
    
-   /* update accounting */
+   /* update accounting - why do these checks after we've
+      tried to unlink the thread from a run queue?? */
    if(victim->state == running || victim->state == inrunqueue)
    {
       cpu_table[cpu].queued--;
@@ -538,6 +684,18 @@ void sched_remove(thread *victim, thread_state state)
    }
 
    victim->state = state;
+   
+   /* determine the highest priority run queue that's non-empty */
+   if(cpu_table[cpu].lowest_queue_filled >= priority)
+   {
+      unsigned int loop;
+      for(loop = 0; loop < SCHED_PRIORITY_LEVELS; loop++)
+         if(cpu_table[cpu].queues[loop].queue_head)
+         {
+            cpu_table[cpu].lowest_queue_filled = loop;
+            break;
+         }
+   }
    
    unlock_gate(&(victim->lock), LOCK_WRITE);   
    unlock_gate(&(cpu_table[cpu].lock), LOCK_WRITE);
@@ -632,5 +790,5 @@ void sched_initialise(void)
 
    /* start running process 1, thread 1 in user mode, which
       should spawn system managers and continue the boot process */
-   while(1) lowlevel_kickstart();
+   lowlevel_kickstart();
 }

@@ -390,7 +390,7 @@ void x86_init_tss(thread *toinit)
    Jumpstart the processor with its top queued thread that's already been put into usermode */
 void x86_warm_kickstart(void)
 {
-   thread *next = cpu_table[CPU_ID].queue_head;
+   thread *next = sched_get_next_to_run(CPU_ID);
    int_registers_block *regs = &(next->regs);
    tss_descr *next_tss = (tss_descr *)&(next->tss);
    
@@ -444,19 +444,17 @@ void x86_warm_kickstart(void)
    Jumpstart the processor by executing the top queued thread in usermode  */
 void x86_kickstart(void)
 {
-   thread *torun = cpu_table[CPU_ID].queue_head;
+   thread *torun = NULL;
    process *proc;
    tss_descr *tss;
    unsigned int usresp;
    
-   if(!torun)
-   {
-      KOOPS_DEBUG("[x86:%i] OMGWTF: cannot find a thread to kickstart.\n", CPU_ID);
-      return;
-   }
+   /* loop waiting for a thread to become ready to run */
+   while(!torun)
+      torun = sched_get_next_to_run(CPU_ID);
    
    /* has this thread already entered usermode? */
-   if(torun->flags & THREAD_INUSERMODE)
+   if(torun->flags & THREAD_FLAG_INUSERMODE)
    {
       x86_warm_kickstart();
       return;
@@ -477,7 +475,7 @@ void x86_kickstart(void)
    torun->state = running;
    torun->timeslice = SCHED_TIMESLICE;
    cpu_table[CPU_ID].current = torun;
-   torun->flags = THREAD_INUSERMODE; /* well, we're about to be.. */
+   torun->flags |= THREAD_FLAG_INUSERMODE; /* well, we're about to be.. */
    
    /* assume we're going to kickstart an i386-elf, so prepare the stack pointer appropriately.
       the page holding the stack will have been zero'd, so we just move the ptr down a few words

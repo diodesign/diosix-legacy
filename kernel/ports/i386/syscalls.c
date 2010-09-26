@@ -61,7 +61,7 @@ void syscall_do_fork(int_registers_block *regs)
    regs->eax = new->pid;
    
    /* run the new thread */
-   sched_add(tnew->proc->cpu, tnew->priority, tnew);
+   sched_add(tnew->proc->cpu, tnew);
 }
          
 /* syscall: kill - terminate the given process. processes can only kill processes
@@ -100,7 +100,9 @@ void syscall_do_yield(int_registers_block *regs)
             CPU_ID, cpu_table[CPU_ID].current->proc->pid, cpu_table[CPU_ID].current->proc,
             cpu_table[CPU_ID].current->tid);
 
-   sched_move_to_end(CPU_ID, cpu_table[CPU_ID].current->priority, cpu_table[CPU_ID].current);
+   /* reward the thread for giving up cpu time */
+   sched_priority_calc(cpu_table[CPU_ID].current, priority_reward);
+   sched_move_to_end(CPU_ID, cpu_table[CPU_ID].current);
 
    /* the syscall dispatch will call sched_pick() for us */
 }
@@ -140,7 +142,7 @@ void syscall_do_thread_fork(int_registers_block *regs)
    /* create new thread and mark it as ready to run in usermode */
    new = thread_new(current->proc);
    if(!new) SYSCALL_RETURN(POSIX_GENERIC_FAILURE);
-   new->flags |= THREAD_INUSERMODE;
+   new->flags |= THREAD_FLAG_INUSERMODE;
    
    /* copy the state of the caller thread into the state of the new thread */
    vmm_memcpy(&(new->regs), regs, sizeof(int_registers_block));
@@ -168,7 +170,7 @@ void syscall_do_thread_fork(int_registers_block *regs)
    regs->eax = new->tid;
    
    /* run the new thred */
-   sched_add(new->proc->cpu, new->priority, new);   
+   sched_add(new->proc->cpu, new);   
 }
 
 /* syscall: thread_kill - terminate the given thread. threads can only kill threads
@@ -221,6 +223,9 @@ void syscall_do_msg_send(int_registers_block *regs)
    
    /* do the actual sending */
    send_result = msg_send(current, msg);
+   
+   /* reward the thread for multitasking */
+   if(!send_result) sched_priority_calc(cpu_table[CPU_ID].current, priority_reward);
    
    /* should we wait for a follow-up message if this was a reply? */
    if(!send_result && (msg->flags & DIOSIX_MSG_REPLY) && (msg->flags & DIOSIX_MSG_RECVONREPLY))

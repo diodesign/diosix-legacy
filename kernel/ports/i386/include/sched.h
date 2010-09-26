@@ -18,17 +18,41 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #ifndef _SCHED_H
 #define   _SCHED_H
 
-/* rate at which thread timeslices are reduced by 1 (in Hz) */
-#define SCHED_FREQUENCY   (100)
+/* priority levels explained...
+ lvl 0  = interrupt handlers
+ lvl 1 to SCHED_PRIORITY_MAX = normal threads
+ */
+#define SCHED_PRIORITY_LEVELS     (8)
+#define SCHED_PRIORITY_INVALID    (99)
+#define SCHED_PRIORITY_INTERRUPTS (0)
+#define SCHED_PRIORITY_MIN        (SCHED_PRIORITY_INTERRUPTS + 1)
+#define SCHED_PRIORITY_MAX        (SCHED_PRIORITY_LEVELS - 1)
+#define SCHED_PRIORITY_BASE_POINTS(a) (2 ^ (a))
+#define SCHED_PRIORITY_MAX_POINTS(a) (2 * (2 ^ (a)))
+
+#define SCHED_TIMESLICE           (5) /* 50ms timeslice */
+#define SCHED_FREQUENCY           (100) /* tick every 10ms */
+#define SCHED_CARETAKER           (1000) /* run maintainance every 1000 ticks */
+
+typedef enum
+{
+   priority_reward,
+   priority_punish,
+   priority_reset,
+   priority_check
+} sched_priority_request;
 
 /* scheduling */
 void sched_initialise(void);
 kresult sched_pre_initalise(void);
-void sched_add(unsigned char cpu, unsigned char priority, thread *torun);
+thread *sched_get_next_to_run(unsigned char cpuid);
+void sched_priority_calc(thread *tocalc, sched_priority_request request);
+unsigned char sched_determine_priority(thread *target);
+void sched_add(unsigned char cpu, thread *torun);
 void sched_remove(thread *victim, thread_state state);
 void sched_tick(int_registers_block *regs);
 void sched_pick(int_registers_block *regs);
-void sched_move_to_end(unsigned char cpu, unsigned char priority, thread *toqueue);
+void sched_move_to_end(unsigned char cpu, thread *toqueue);
 kresult sched_lock_proc(process *proc);
 kresult sched_unlock_proc(process *proc);
 kresult sched_lock_thread(thread *victim);

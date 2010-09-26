@@ -30,6 +30,7 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 /* the order of these should not be important */
 #include <boot.h>
+#include <sched.h>
 #include <chips.h>
 #include <buses.h>
 #include <memory.h>
@@ -37,7 +38,6 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #include <cpu.h>
 #include <ipc.h>
 #include <lowlevel.h>
-#include <sched.h>
 #include <syscalls.h>
 
 #endif

@@ -32,12 +32,10 @@ volatile unsigned char mp_ap_ready = 0;
 /* mp_catch_ap
    This is the point where an application processor joins the kernel proper */
 void _mp_catch_ap(void)
-{
-   unsigned int me = CPU_ID;
+{   
+   MP_DEBUG("[mp:%i] I'm alive! application processor waiting for work\n", CPU_ID);
    
-   MP_DEBUG("[mp:%i] I'm alive! application processor waiting for work\n", me);
-   
-   /* signal that we're done */
+   /* signal that we're done to the boot cpu */
    mp_ap_ready = 1;
    
    /* don't forget to initialise interrupts for this cpu */
@@ -45,16 +43,7 @@ void _mp_catch_ap(void)
    int_reload_idtr();
 
    /* loop waiting for the first thread to run */
-   while(1)
-   {      
-      /* we've got one! */
-      if((volatile unsigned int)(cpu_table[me].queue_head))
-      {
-         MP_DEBUG("[mp:%i] found thread %i of process %i to kickstart\n",
-                  CPU_ID, cpu_table[me].queue_head->tid, cpu_table[me].queue_head->proc->pid);
-         lowlevel_kickstart();
-      }
-   }
+   lowlevel_kickstart();
 }
 
 /* mp_delay

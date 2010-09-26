@@ -245,11 +245,13 @@ process *proc_new(process *current, thread *caller)
          return NULL;         
       }
       
-      new->parentpid   = current->pid;
-      new->flags       = current->flags;
-      new->cpu         = current->cpu;
-      new->layer        = current->layer;
+      new->parentpid     = current->pid;
+      new->flags         = current->flags;
+      new->cpu           = current->cpu;
+      new->layer         = current->layer;
       new->rights        = current->rights;
+      new->priority_low  = current->priority_low;
+      new->priority_high = current->priority_high;
       
       if(proc_attach_child(current, new))
       {
@@ -281,6 +283,11 @@ process *proc_new(process *current, thread *caller)
    }
    else
    {
+      /* assume this is the system's first first process, so
+         set some defaults */
+      new->priority_low = SCHED_PRIORITY_MIN;
+      new->priority_high = SCHED_PRIORITY_MAX;
+      
       /* initialise the process's hash table of threads and 
        create a new thread for execution */
       new->next_tid = FIRST_TID;
@@ -508,7 +515,7 @@ kresult proc_initialise(void)
          
          /* set the entry program counter and get ready to run it */
          new->entry = (unsigned int)payload.entry;
-         sched_add(CPU_ID, 1, new->threads[FIRST_TID]);
+         sched_add(CPU_ID, new->threads[FIRST_TID]);
       }
    }
 

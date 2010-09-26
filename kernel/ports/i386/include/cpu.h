@@ -26,15 +26,15 @@ extern unsigned char mp_cpus;
 extern unsigned char mp_ioapics;
 extern unsigned char mp_boot_cpu;
 
-#define MP_MAGIC_SIG      (0x5f504d5f)   /* _MP_ */
+#define MP_MAGIC_SIG     (0x5f504d5f)   /* _MP_ */
 #define MP_RSDT_SIG      (0x52534454)   /* RSDT */
 
 /* areas of memory to search for the magic _MP_ word */
 #define MP_EBDA_START   (0x80000)
-#define MP_EBDA_END      (0x90000)
-#define MP_LASTK_START   ((640 * 1024) - 1024)
-#define MP_LASTK_END      (640 * 1024)
-#define MP_ROM_START      (0xf0000)
+#define MP_EBDA_END     (0x90000)
+#define MP_LASTK_START  ((640 * 1024) - 1024)
+#define MP_LASTK_END    (640 * 1024)
+#define MP_ROM_START    (0xf0000)
 #define MP_ROM_END      (0xfffff)
 /* MP structure bits */
 #define MP_IS_BSP              (1 << 1)
@@ -55,16 +55,16 @@ typedef struct
 typedef struct
 {
    unsigned int signature;
-   unsigned short   base_table_length;
+   unsigned short base_table_length;
    unsigned char spec_rev;
    unsigned char checksum;
    unsigned char oemid[8];
    unsigned char productid[12];
    void *oem_table_pointer;
-   unsigned short   oem_table_size;
-   unsigned short   entry_count;
+   unsigned short oem_table_size;
+   unsigned short entry_count;
    void *apic_address;
-   unsigned short   extended_table_length;
+   unsigned short extended_table_length;
    unsigned char extended_table_checksum;
    unsigned char reserved;
 } __attribute__((packed)) mp_config_block;
@@ -141,16 +141,22 @@ typedef struct
    mp_rsdt_block *rsdt;
 } __attribute__((packed)) mp_rsdp_header;
 
+typedef struct
+{
+   thread *queue_head, *queue_tail;
+} mp_thread_queue;
+
 /* describe an mp core */
 typedef struct
 {
    chip_state state;
-   thread *current;          /* must point to the thread being run */
-   rw_gate lock;             /* lock for the cpu metadata */
+   thread *current;  /* must point to the thread being run */
+   rw_gate lock;     /* lock for the cpu metadata */
    
    /* prioritised run queues */
-   thread *queue_head, *queue_tail;
-   thread *queue_marker[SCHED_PRIORITY_LEVELS]; /* priority levels */
+   mp_thread_queue queues[SCHED_PRIORITY_LEVELS];
+   unsigned int lowest_queue_filled; /* index into queues of the lowest priority
+                                       queue with threads in it */
    unsigned int queued; /* how much workload this processor has */
    
    /* pointers to this CPU's gdt table and into its TSS selector */
@@ -161,7 +167,7 @@ typedef struct
 
 /* multiprocessing support */
 #define MP_AP_START_STACK_SIZE   (1024)
-#define MP_AP_START_VECTOR         (0x80)
+#define MP_AP_START_VECTOR       (0x80)
 #define MP_AP_START_VECTOR_SHIFT (12)
 
 extern mp_core *cpu_table;
