@@ -33,22 +33,6 @@ typedef enum
    disabled       /* chip has been disabled at boot */
 } chip_state;
 
-/* describe a cpu core */
-typedef struct
-{
-   thread *current;          /* must point to the thread being run */
-   rw_gate lock;             /* lock for the cpu metadata */
-   
-   /* prioritised run queues */
-   thread *queue_head, *queue_tail;
-   thread *queue_marker[SCHED_PRIORITY_LEVELS]; /* priority levels */
-   unsigned int queued; /* how much workload this processor has */
-   
-   /* pointers to this CPU's gdt table and into its TSS selector */
-   gdtptr_descr gdtptr;
-   gdt_entry *tssentry;
-} chip_core;
-
 /* define an ioapic chip */
 typedef struct
 {
@@ -70,7 +54,6 @@ typedef struct
    union
    {
       chip_ioapic *ioapic;
-      chip_core *core;
    } data;
 } chip_entry;
 

@@ -45,6 +45,7 @@ typedef enum
 /* scheduling */
 void sched_initialise(void);
 kresult sched_pre_initalise(void);
+void sched_list_queues(void);
 thread *sched_get_next_to_run(unsigned char cpuid);
 void sched_priority_calc(thread *tocalc, sched_priority_request request);
 unsigned char sched_determine_priority(thread *target);

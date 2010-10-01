@@ -141,10 +141,12 @@ typedef struct
    mp_rsdt_block *rsdt;
 } __attribute__((packed)) mp_rsdp_header;
 
-typedef struct
+/* describe a cpu run-queue - typedef'd in processes.h */
+struct mp_thread_queue
 {
    thread *queue_head, *queue_tail;
-} mp_thread_queue;
+   unsigned int priority; /* priority level for this run-queue */
+};
 
 /* describe an mp core */
 typedef struct

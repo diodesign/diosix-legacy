@@ -150,12 +150,24 @@ kresult mp_init_ap(unsigned int id)
    Initialise the table of present cpus and prepare the slave cpu launch trampoline */
 void mp_init_cpu_table(void)
 {
+   unsigned int cpu_loop, priority_loop;
+   
    if(vmm_malloc((void **)&cpu_table, sizeof(mp_core) * mp_cpus))
    {
       MP_DEBUG("[mp:%i] can't allocate cpu table! halting...\n");
       while(1);
    }
+   
+   /* zero everything */
    vmm_memset((void *)cpu_table, 0, sizeof(mp_core) * mp_cpus);
+   
+   /* initialise all cpu run queues */
+   for(cpu_loop = 0; cpu_loop < mp_cpus; cpu_loop++)
+      for(priority_loop = 0; priority_loop < SCHED_PRIORITY_MAX; priority_loop++)
+      {
+         mp_thread_queue *cpu_queue = &(cpu_table[cpu_loop].queues[priority_loop]);
+         cpu_queue->priority = priority_loop;
+      }   
    
    MP_DEBUG("[mp:%i] initialised run-time cpu table %p (%i cpus)\n", CPU_ID, cpu_table, mp_cpus);
 }

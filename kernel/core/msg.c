@@ -50,13 +50,20 @@ kresult msg_test_receiver(thread *sender, thread *target, diosix_msg_info *msg)
       return e_failure;
    }
    
+   MSG_DEBUG("[msg:%i] testing receiver %p (tid %i pid %i buffer %p) for sender %p (tid %i pid %i msg %p)\n",
+             CPU_ID, target, target->tid, target->proc->pid, target->msg, sender, sender->tid, sender->proc->pid, msg);
+   
    /* protect us from changes to the target's metadata */
    lock_gate(&(target->lock), LOCK_READ);
    
    /* threads can only recieve messages if they are in a layer below the sender - unless it's a 
       reply. we check below whether this is a legit reply */
-   if((target->proc->layer >= sender->proc->layer) && !(msg->flags & DIOSIX_MSG_REPLY))
+   if((target->proc->layer > sender->proc->layer) && !(msg->flags & DIOSIX_MSG_REPLY))
+   {
+      MSG_DEBUG("[msg:%i] recv layer %i not below sender layer %i and message isn't a reply (%i)\n",
+                CPU_ID, target->proc->layer, sender->proc->layer, msg->flags);
       goto msg_test_receiver_failure;
+   }
    
    /* is this message waiting on a reply from this thread? */
    if((target->state == waitingforreply) &&
@@ -75,19 +82,25 @@ kresult msg_test_receiver(thread *sender, thread *target, diosix_msg_info *msg)
       if((target->state == waitingformsg) &&
          ((msg->flags & DIOSIX_MSG_TYPEMASK) & tmsg->flags))
          goto msg_test_receiver_success;
+      
+      MSG_DEBUG("[msg:%i] something's not right with the receiver: state %i (should be %i) msg type %x recv type %x\n",
+                CPU_ID, target->state, waitingformsg, msg->flags & DIOSIX_MSG_TYPEMASK, tmsg->flags);
    }
    
    /* give up */
    unlock_gate(&(target->lock), LOCK_READ);
+   MSG_DEBUG("[msg:%i] gave up testing receiver\n", CPU_ID);
    return e_no_receiver;
    
 msg_test_receiver_failure:
    unlock_gate(&(target->lock), LOCK_READ);
+   MSG_DEBUG("[msg:%i] receiver failed its test\n", CPU_ID);
    return e_failure;
    
    /* unlock and escape with success */
 msg_test_receiver_success:
    unlock_gate(&(target->lock), LOCK_READ);
+   MSG_DEBUG("[msg:%i] receiver passed its test\n", CPU_ID);
    return success;
 }
 
@@ -107,10 +120,8 @@ thread *msg_find_receiver(thread *sender, diosix_msg_info *msg)
    proc = proc_find_proc(msg->pid);
    if(!proc) return NULL;
    
-#ifdef MSG_DEBUG
    MSG_DEBUG("[msg:%i] trying to find a receiver, sender=[tid %i pid %i] msg %p target=[tid %i pid %i]\n",
              CPU_ID, sender->tid, sender->proc->pid, msg, msg->tid, msg->pid);
-#endif
    
    /* if a specific tid is given, then try that one */ 
    if(msg->tid != DIOSIX_MSG_ANY_THREAD)

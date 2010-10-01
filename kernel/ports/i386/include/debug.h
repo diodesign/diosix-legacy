@@ -56,9 +56,11 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 #ifdef SCHED_DEBUG
 # undef SCHED_DEBUG
-# define SCHED_DEBUG   dprintf
+# define SCHED_DEBUG  dprintf
+# define SCHED_DEBUG_QUEUES sched_list_queues()
 #else
 # define SCHED_DEBUG if(0) dprintf
+# define SCHED_DEBUG_QUEUES if(0)
 #endif 
 
 #ifdef THREAD_DEBUG

@@ -68,6 +68,7 @@ typedef enum
 /* these are needed below and defined further down */
 typedef struct process process;
 typedef struct thread thread;
+typedef struct mp_thread_queue mp_thread_queue; /* in cpu.h */
 
 /* vmm_area flags */
 #define VMA_READABLE    (0 << 0)
@@ -175,9 +176,9 @@ struct thread
    unsigned int tid;          /* thread id, unique within process */
    unsigned int cpu;          /* actual cpu running this thread */
    
-   unsigned char flags;            /* status flags for this thread */
-   unsigned char timeslice;        /* preempt when it reaches zero */
-   unsigned char priority;         /* priority level - see sched.h */
+   unsigned char flags;          /* status flags for this thread */
+   unsigned char timeslice;      /* preempt when it reaches zero */
+   unsigned char priority;       /* priority level - see sched.h */
    unsigned char priority_granted; /* a priority level temporarily granted by another process */
    unsigned int priority_points; /* when a thread changes priority this variable is
                                     loaded with the value 2^priority. One point is deducted
@@ -200,7 +201,8 @@ struct thread
    tss_descr tss; /* the x86 task-state block */
    int_registers_block regs; /* saved state of a thread */
 
-   thread *queue_prev, *queue_next; /* run-queue double-linked list */
+   mp_thread_queue *queue; /* the run-queue the thread exists in */
+   thread *queue_prev, *queue_next; /* the run-queue's double-linked list */
    thread *hash_prev, *hash_next; /* pointers through thread hash table */
 };
 
@@ -248,7 +250,7 @@ struct process
       be sent down through layers (replies can be sent up) to avoid
       deadlocks; processes can only manipulate those in layers above
       them or their own children. The layer list:
-      0 = reserved for the kernel (which has no processes/threads)
+      0 = reserved for the kernel (trusted)
       1 = reserved for init (which becomes the sytem executive)
       2 = reserved for hardware-specific drivers (trusted)
       3 = reserved for hardware-independent managers (trusted)

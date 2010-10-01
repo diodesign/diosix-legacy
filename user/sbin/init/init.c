@@ -51,29 +51,16 @@ void do_listen(void)
 void main(void)
 {
    diosix_msg_info msg;
-   unsigned int loop;
    unsigned int child;
    unsigned int message = 0;
    
-   child = diosix_fork();
-   while(1)
-   {
-      /* only the parent calls yield(), child just spins waiting to be pre-empted */
-      if(child) diosix_yield();
-      __asm__ __volatile__ ("pause");
-   }
-   
-   /* create processes to idle away */
-   for(loop = 0; loop < 10; loop++)
-   {
-      child = diosix_fork();
-      if(child == 0) while(1) diosix_yield();
-   }
-   
    /* create new process to receive */
    child = diosix_fork();
-   if(child == 0) do_listen(); /* child does the listening */
    
+   while(1);
+   
+   if(child == 0) do_listen(); /* child does the listening */
+
    /* send the message to the child */
    while(1)
    {

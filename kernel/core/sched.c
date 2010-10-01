@@ -67,6 +67,9 @@ unsigned char sched_determine_priority(thread *target)
    /* sanitise the priority in case something's gone wrong */
    if(priority > SCHED_PRIORITY_MAX) priority = SCHED_PRIORITY_MAX;
 
+   SCHED_DEBUG("[sched:%i] determined thread %i of process %i (%p) has priority %i (curr %i granted %i)\n",
+               CPU_ID, target->tid, target->proc->pid, target, priority, target->priority, target->priority_granted);
+   
    return priority;
 }
 
@@ -118,7 +121,7 @@ void sched_priority_calc(thread *tocalc, sched_priority_request request)
    {
       /* set the base priority points for a thread in its priority level */
       case priority_reset:
-         tocalc->priority = SCHED_PRIORITY_BASE_POINTS(priority);
+         tocalc->priority_points = SCHED_PRIORITY_BASE_POINTS(priority);
          break;
          
       /* add a scheduling point */
@@ -172,7 +175,7 @@ void sched_priority_calc(thread *tocalc, sched_priority_request request)
          
       default:
          KOOPS_DEBUG("[sched:%i] sched_priority_calc: unknown request %i for thread %p\n",
-                     CPU_ID, (unsigned int)request, tocalc);
+                     CPU_ID, request, tocalc);
    }
    
    unlock_gate(&(tocalc->lock), LOCK_WRITE);
@@ -460,37 +463,9 @@ void sched_pick(int_registers_block *regs)
    thread *now, *next;
 
    mp_core *cpu = &cpu_table[CPU_ID];
-   mp_thread_queue *cpu_queue;
    
-#ifdef SCHED_DEBUG
-   {
-      cpu_queue = &(cpu->queues[cpu->lowest_queue_filled]);
-      thread *t = cpu_queue->queue_head;
-      if(!t)
-      {
-         SCHED_DEBUG("[sched:%i] queue empty for priority %i!\n", CPU_ID, cpu->lowest_queue_filled);
-      }
-      else
-      {
-         SCHED_DEBUG("[sched:%i] picking from cpu %i queue: start[t%i p%i] ",
-                     CPU_ID, CPU_ID, t->tid, t->proc->pid);
-         while(t)
-         {
-            SCHED_DEBUG("(t%i p%i) ", t->tid, t->proc->pid);
-            t = t->queue_next;
-         }
-         if(cpu_queue->queue_tail)
-         {
-            SCHED_DEBUG("end[t%i p%i]\n", cpu_queue->queue_tail->tid, cpu_queue->queue_tail->proc->pid);
-         }
-         else 
-         {
-            SCHED_DEBUG("end[NULL]\n");
-         }
-      }
-   }
-#endif   
-
+   SCHED_DEBUG_QUEUES;
+   
    /* this is the state of play */
    lock_gate(&(cpu->lock), LOCK_READ);
    now = cpu->current;
@@ -576,6 +551,7 @@ void sched_move_to_end(unsigned char cpu, thread *toqueue)
 
    toqueue->state     = inrunqueue;
    toqueue->timeslice = SCHED_TIMESLICE;
+   toqueue->queue     = cpu_queue;
    
    unlock_gate(&(cpu_table[cpu].lock), LOCK_WRITE);
    unlock_gate(&(toqueue->lock), LOCK_WRITE);
@@ -633,6 +609,7 @@ void sched_add(unsigned char cpu, thread *torun)
    torun->state     = inrunqueue;
    torun->timeslice = SCHED_TIMESLICE;
    torun->cpu       = cpu;
+   torun->queue     = cpu_queue;
    
    /* take a note of the highest priority level ready to run */
    cpu_queue = &(cpu_table[cpu].queues[cpu_table[cpu].lowest_queue_filled]);
@@ -655,13 +632,20 @@ void sched_remove(thread *victim, thread_state state)
 {
    unsigned int cpu = victim->cpu;
    mp_thread_queue *cpu_queue;
-   unsigned char priority;
    
    lock_gate(&(cpu_table[cpu].lock), LOCK_WRITE);
    lock_gate(&(victim->lock), LOCK_WRITE);
    
-   priority = sched_determine_priority(victim);   
-   cpu_queue = &(cpu_table[cpu].queues[priority]);
+   cpu_queue = victim->queue;
+   if(!cpu_queue)
+   {
+      KOOPS_DEBUG("[sched:%i] OMGWTF sched_remove: tried to remove thread %i of process %i (%p) from non-existent queue\n",
+                  CPU_ID, victim->tid, victim->proc->pid, victim);
+      
+      unlock_gate(&(victim->lock), LOCK_WRITE);   
+      unlock_gate(&(cpu_table[cpu].lock), LOCK_WRITE);
+      return;
+   }
    
    /* remove it from the queue */
    if(victim->queue_next)
@@ -686,7 +670,7 @@ void sched_remove(thread *victim, thread_state state)
    victim->state = state;
    
    /* determine the highest priority run queue that's non-empty */
-   if(cpu_table[cpu].lowest_queue_filled >= priority)
+   if(cpu_table[cpu].lowest_queue_filled >= victim->queue->priority)
    {
       unsigned int loop;
       for(loop = 0; loop < SCHED_PRIORITY_LEVELS; loop++)
@@ -697,11 +681,13 @@ void sched_remove(thread *victim, thread_state state)
          }
    }
    
+   SCHED_DEBUG("[sched:%i] removed thread %i (%p) of process %i from cpu %i queue, priority %i\n",
+               CPU_ID, victim->tid, victim, victim->proc->pid, cpu, victim->queue->priority);
+   
+   victim->queue = NULL; /* thread no longer queued */
+   
    unlock_gate(&(victim->lock), LOCK_WRITE);   
    unlock_gate(&(cpu_table[cpu].lock), LOCK_WRITE);
-   
-   SCHED_DEBUG("[sched:%i] removed thread %i (%p) of process %i from cpu %i queue, priority %i\n",
-           CPU_ID, victim->tid, victim, victim->proc->pid, cpu, victim->priority);
 }
 
 /* sched_pick_queue
@@ -775,10 +761,10 @@ unsigned char sched_pick_queue(unsigned char hint)
 /* sched_pre_initalise
    Perform initialisation prior to any sched_*() calls */
 kresult sched_pre_initalise(void)
-{
+{   
    /* initialise lock */
    vmm_memset(&sched_lock, 0, sizeof(rw_gate));
-
+   
    return success;
 }
 
@@ -792,3 +778,54 @@ void sched_initialise(void)
       should spawn system managers and continue the boot process */
    lowlevel_kickstart();
 }
+
+#ifdef SCHED_DEBUG
+/* sched_list_queues (aka SCHED_DEBUG_QUEUES)
+   Output the state of cpus' run queues via kernel debug */
+void sched_list_queues(void)
+{
+   unsigned int cpu_loop, priority_loop;
+   mp_thread_queue *cpu_queue;
+   thread *t;
+   
+   SCHED_DEBUG("[sched:%i] ========================\n", CPU_ID);
+   
+   for(cpu_loop = 0; cpu_loop < mp_cpus; cpu_loop++)
+   {      
+      for(priority_loop = 0; priority_loop < SCHED_PRIORITY_LEVELS; priority_loop++)
+      {
+         cpu_queue = &(cpu_table[cpu_loop].queues[priority_loop]);
+         t = cpu_queue->queue_head;
+         
+         if(t)
+         {
+            SCHED_DEBUG("[sched:%i] Run queue: cpu %i priority %i (lowest %i)\n",
+                        CPU_ID, cpu_loop, priority_loop, cpu_table[cpu_loop].lowest_queue_filled);
+            SCHED_DEBUG("[sched:%i]            start[t%i p%i] ",
+                        CPU_ID, t->tid, t->proc->pid);
+            while(t)
+            {
+               SCHED_DEBUG("(t%i p%i pri%i gpri%i pts%i) ",
+                           t->tid, t->proc->pid, t->priority, t->priority_granted, t->priority_points);
+               t = t->queue_next;
+            }
+            
+            if(cpu_queue->queue_tail)
+            {
+               SCHED_DEBUG("end[t%i p%i]\n", cpu_queue->queue_tail->tid, cpu_queue->queue_tail->proc->pid);
+            }
+            else 
+            {
+               SCHED_DEBUG("end[NULL]\n");
+            }
+         }
+      }
+      
+      if((cpu_loop + 1) < mp_cpus)
+      {
+         SCHED_DEBUG("[sched:%i] ------------------------\n", CPU_ID);
+      }
+   }
+   SCHED_DEBUG("[sched:%i] ========================\n", CPU_ID);
+}
+#endif   
