@@ -70,7 +70,8 @@ void main(void)
       msg.recv_max_size = sizeof(unsigned int);
       
       /* send message any listening thread, block if successfully
-         foudn a receiver */      
-      diosix_msg_send(&msg);
+         foudn a receiver */ 
+      if(diosix_msg_send(&msg))
+         diosix_yield();
    }
 }

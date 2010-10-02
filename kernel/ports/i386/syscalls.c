@@ -224,7 +224,7 @@ void syscall_do_msg_send(int_registers_block *regs)
    /* do the actual sending */
    send_result = msg_send(current, msg);
    
-   if(!send_result)
+   if(send_result == success)
    {
       /* reward the thread for multitasking */
       sched_priority_calc(current, priority_reward);
@@ -241,9 +241,11 @@ void syscall_do_msg_send(int_registers_block *regs)
                   
          syscall_do_msg_recv(regs); /* will update eax when it returns */      
       }
+      else
+         regs->eax = send_result; /* let the sender know what happened */
    }
    else
-      regs->eax = send_result;
+      regs->eax = send_result; /* let the sender know what happened */
 }
 
 /* syscall:msg_recv - receive a message or block until a message is received
