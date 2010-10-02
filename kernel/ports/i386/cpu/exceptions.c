@@ -171,14 +171,14 @@ void exception_handler(int_registers_block regs)
          XPT_DEBUG("[xpt:%i] unhandled exception %x/%x received!\n",
                    CPU_ID, regs.intnum, regs.errcode);
    }
-      
+   
    /* there might be a thread of a higher-priority waiting to be run or the current process
       may not exist - so prod the scheduler to switch to another thread if need be -
       but only if we're returning to usermode, ie: don't try to switch out if we just
       handled a kernel->kernel exception */
    if(regs.eip < KERNEL_SPACE_BASE)
       sched_pick(&regs);
-   
+
    XPT_DEBUG("[xpt:%i] OUT: ds %x edi %x esi %x ebp %x esp %x ebx %x edx %x ecx %x eax %x\n"
              "      intnum %x errcode %x eip %x cs %x eflags %x useresp %x ss %x\n",
              CPU_ID, regs.ds, regs.edi, regs.esi, regs.ebp, regs.esp, regs.ebx, regs.edx, regs.ecx, regs.eax,

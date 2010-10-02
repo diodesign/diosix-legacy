@@ -90,7 +90,7 @@ void debug_assert(char *exp, char *file, char *basefile, unsigned int line)
 */
 void debug_panic(const char *str)
 {
-   dprintf("*** PANIC: %s -- halting\n", str);
+   dprintf("*** PANIC: %s -- halting core\n", str);
    
    x86_disable_interrupts();
    while(1);

@@ -84,7 +84,7 @@ thread *sched_get_next_to_run(unsigned char cpuid)
    
    lock_gate(&(cpu->lock), LOCK_READ);
    cpu_queue = &(cpu->queues[cpu->lowest_queue_filled]);
-   torun = cpu_queue->queue_head;
+   torun = (volatile thread *)(cpu_queue->queue_head);
    unlock_gate(&(cpu->lock), LOCK_READ);
    
    return torun;
@@ -460,7 +460,7 @@ void sched_tick(int_registers_block *regs)
 */
 void sched_pick(int_registers_block *regs)
 {
-   thread *now, *next;
+   thread *now, *next = NULL;
 
    mp_core *cpu = &cpu_table[CPU_ID];
    
@@ -472,13 +472,22 @@ void sched_pick(int_registers_block *regs)
    unlock_gate(&(cpu->lock), LOCK_READ);
    
    /* see if there's another thread to run */
-   next = sched_get_next_to_run(CPU_ID);
-   if(!next) return;
+   while(!next)
+   {
+      next = sched_get_next_to_run(CPU_ID);
+      
+      /* if there's nothing to run and the current thread is
+         marked as running then continue with the current 
+         thread */
+      if(!next && now)
+         if(now->state == running) return;
+   }
 
    /* keep with the currently running thread if it's
-      the highest priority thread queued */
+      the highest priority thread allowed to run */
    if(next == now) return; /* easy quick switch back to where we were */
-   if(next->priority > now->priority) return;
+   if((next->priority > now->priority) &&
+      (now->state == running)) return;
    
    /* update thread states */
    lock_gate(&(now->lock), LOCK_WRITE);

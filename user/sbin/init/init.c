@@ -37,13 +37,11 @@ void do_listen(void)
       if(diosix_msg_receive(&msg) == success)
       {
          buffer++;
-         do
-         {
-            msg.flags = DIOSIX_MSG_GENERIC;
-            msg.send = &buffer;
-            msg.send_size = sizeof(unsigned int);
-            err = diosix_msg_reply(&msg);
-         } while(err != success);
+
+         msg.flags = DIOSIX_MSG_GENERIC;
+         msg.send = &buffer;
+         msg.send_size = sizeof(unsigned int);
+         err = diosix_msg_reply(&msg);
       }
    }
 }
@@ -56,9 +54,7 @@ void main(void)
    
    /* create new process to receive */
    child = diosix_fork();
-   
-   while(1);
-   
+
    if(child == 0) do_listen(); /* child does the listening */
 
    /* send the message to the child */
@@ -73,10 +69,8 @@ void main(void)
       msg.recv = &message;
       msg.recv_max_size = sizeof(unsigned int);
       
-      /* send message any listening thread */      
-      if(diosix_msg_send(&msg) == success)
-         message++;
-      else
-         diosix_yield(); /* give the child a chance to listen */
+      /* send message any listening thread, block if successfully
+         foudn a receiver */      
+      diosix_msg_send(&msg);
    }
 }

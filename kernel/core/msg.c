@@ -68,7 +68,8 @@ kresult msg_test_receiver(thread *sender, thread *target, diosix_msg_info *msg)
    /* is this message waiting on a reply from this thread? */
    if((target->state == waitingforreply) &&
       (msg->flags & DIOSIX_MSG_REPLY) &&
-      (target->replysource == sender))
+      (target->replysource == sender) &&
+      target->msg)
       goto msg_test_receiver_success;
    
    /* is the target thread willing to accept the message type? */
@@ -295,7 +296,7 @@ kresult msg_send(thread *sender, diosix_msg_info *msg)
       sched_priority_calc(receiver, priority_check);
    }
    else
-   {      
+   {  
       /* if the sent message wasn't a reply, block sending thread to wait for a reply */
       sched_remove(sender, waitingforreply);
       
@@ -319,10 +320,10 @@ kresult msg_send(thread *sender, diosix_msg_info *msg)
 
    unlock_gate(&(sender->lock), LOCK_READ);
    unlock_gate(&(receiver->lock), LOCK_READ);
-   
+
    /* wake up the receiving thread */
    sched_add(receiver->cpu, receiver);
-
+   
    MSG_DEBUG("[msg:%x] thread %i of process %i sent message %x (%i bytes first word %x) to thread %i of process %i\n",
              CPU_ID, sender->tid, sender->proc->pid, msg->send, msg->send_size, *((unsigned int *)msg->send),
              receiver->tid, receiver->proc->pid);

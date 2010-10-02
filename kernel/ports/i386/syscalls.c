@@ -224,20 +224,25 @@ void syscall_do_msg_send(int_registers_block *regs)
    /* do the actual sending */
    send_result = msg_send(current, msg);
    
-   /* reward the thread for multitasking */
-   if(!send_result) sched_priority_calc(cpu_table[CPU_ID].current, priority_reward);
-   
-   /* should we wait for a follow-up message if this was a reply? */
-   if(!send_result && (msg->flags & DIOSIX_MSG_REPLY) && (msg->flags & DIOSIX_MSG_RECVONREPLY))
+   if(!send_result)
    {
-      /* clear message flags to perform a recv */
-      msg->flags &= DIOSIX_MSG_TYPEMASK;
-      
-      /* zero the send info and preserve everything else */
-      msg->send_size = 0;
-      msg->send = NULL;
-      
-      syscall_do_msg_recv(regs); /* will update eax when it returns */      
+      /* reward the thread for multitasking */
+      sched_priority_calc(current, priority_reward);
+   
+      /* should we wait for a follow-up message if this was a reply? */
+      if((msg->flags & DIOSIX_MSG_REPLY) && (msg->flags & DIOSIX_MSG_RECVONREPLY))
+      {         
+         /* clear message flags to perform a recv */
+         msg->flags &= DIOSIX_MSG_TYPEMASK;
+         
+         /* zero the send info and preserve everything else */
+         msg->send_size = 0;
+         msg->send = NULL;
+         
+         dprintf("*** tid %i pid %i waiting for follow-up message\n", current->tid, current->proc->pid);
+         
+         syscall_do_msg_recv(regs); /* will update eax when it returns */      
+      }
    }
    else
       regs->eax = send_result;
