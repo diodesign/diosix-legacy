@@ -238,9 +238,7 @@ void syscall_do_msg_send(int_registers_block *regs)
          /* zero the send info and preserve everything else */
          msg->send_size = 0;
          msg->send = NULL;
-         
-         dprintf("*** tid %i pid %i waiting for follow-up message\n", current->tid, current->proc->pid);
-         
+                  
          syscall_do_msg_recv(regs); /* will update eax when it returns */      
       }
    }
