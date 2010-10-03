@@ -65,6 +65,10 @@ kresult msg_test_receiver(thread *sender, thread *target, diosix_msg_info *msg)
       goto msg_test_receiver_failure;
    }
    
+   /* has the target thread given us a sane message block to access? */
+   if(pg_preempt_fault(target, (unsigned int)(target->msg), sizeof(diosix_msg_info), VMA_WRITEABLE))
+      goto msg_test_receiver_failure;
+   
    /* is this message waiting on a reply from this thread? */
    if((target->state == waitingforreply) &&
       (msg->flags & DIOSIX_MSG_REPLY) &&
@@ -180,13 +184,14 @@ kresult msg_copy(thread *receiver, void *data, unsigned int size, unsigned int *
    lock_gate(&(receiver->lock), LOCK_READ);
    
    /* don't forget that within the context of the sending thread we can't access the
-    receiver's msg structure unless we go via a kernel mapping.. */
+      receiver's msg structure unless we go via a kernel mapping - it'll also sanity
+      check the addresses for us */
    if(pg_user2kernel((unsigned int *)&rmsg, (unsigned int)(receiver->msg), receiver->proc))
    {
       unlock_gate(&(receiver->lock), LOCK_READ);
-      return e_failure;
+      return e_bad_target_address;
    }
-   
+
    recv = (unsigned int)rmsg->recv;
    recv_base = recv + (*(offset));
    
@@ -202,12 +207,12 @@ kresult msg_copy(thread *receiver, void *data, unsigned int size, unsigned int *
    
    /* hand it over to the vmm to copy process-to-process - it'll sanity check the addresses */
    if(vmm_memcpyuser((void *)recv_base, receiver->proc, data, sender->proc, size))
-   {
+   {      
       unlock_gate(&(sender->lock), LOCK_READ);
       unlock_gate(&(receiver->lock), LOCK_READ);
-      return e_failure;
+      return e_bad_address;
    }
-   
+
    /* update offset */
    *(offset) += size;
    
@@ -241,6 +246,17 @@ kresult msg_send(thread *sender, diosix_msg_info *msg)
    
    if(!receiver) return e_no_receiver;
    
+   /* protect us from changes to the receiver's memory structure */
+   lock_gate(&(receiver->proc->lock), LOCK_READ);
+   
+   /* sanatise the receiver's msg buffer we're about to use - msg_find_receiver()
+      double-checked it was ok to use the msg block */
+   if(pg_preempt_fault(receiver, (unsigned int)(receiver->msg->recv), receiver->msg->recv_max_size, VMA_WRITEABLE))
+   {
+      unlock_gate(&(receiver->proc->lock), LOCK_READ); /* give up the process lock */
+      return e_bad_target_address; /* bail out now if the receiver's screwed */
+   }
+   
    /* copy the message data */
    if(msg->flags & DIOSIX_MSG_MULTIPART)
    {
@@ -250,8 +266,11 @@ kresult msg_send(thread *sender, diosix_msg_info *msg)
       diosix_msg_multipart *parts = msg->send;
       
       /* check that the multipart pointer isn't bogus */
-      if(((unsigned int)parts + (msg->send_size * sizeof(diosix_msg_multipart))) >= KERNEL_SPACE_BASE)
+      if((unsigned int)parts + MEM_CLIP(parts, msg->send_size * sizeof(diosix_msg_multipart)) >= KERNEL_SPACE_BASE)
+      {
+         unlock_gate(&(receiver->proc->lock), LOCK_READ); /* give up the process lock */
          return e_bad_address;
+      }
       
       /* do the multipart copy */
       for(loop = 0; loop < msg->send_size; loop++)
@@ -263,11 +282,12 @@ kresult msg_send(thread *sender, diosix_msg_info *msg)
    else
       /* do a simple message copy */
       err = msg_copy(receiver, msg->send, msg->send_size, &bytes_copied, sender);
-   
-   if(err) return err;
-   
-   /* protect us from changes to the receiver's metadata */
-   lock_gate(&(receiver->lock), LOCK_READ);
+      
+   if(err)
+   {
+      unlock_gate(&(receiver->proc->lock), LOCK_READ); /* give up the process lock */
+      return err;
+   }
    
    /* update the sender's and receiver's message block*/
    msg->pid = receiver->proc->pid;
@@ -278,6 +298,7 @@ kresult msg_send(thread *sender, diosix_msg_info *msg)
    if(pg_user2kernel((unsigned int *)&rmsg, (unsigned int)(receiver->msg), receiver->proc))
    {
       unlock_gate(&(receiver->lock), LOCK_READ);
+      unlock_gate(&(receiver->proc->lock), LOCK_READ); /* give up the process lock */
       return e_failure;
    }
 
@@ -320,6 +341,7 @@ kresult msg_send(thread *sender, diosix_msg_info *msg)
 
    unlock_gate(&(sender->lock), LOCK_READ);
    unlock_gate(&(receiver->lock), LOCK_READ);
+   unlock_gate(&(receiver->proc->lock), LOCK_READ); /* give up the process lock */
 
    /* wake up the receiving thread */
    sched_add(receiver->cpu, receiver);
@@ -341,7 +363,7 @@ kresult msg_recv(thread *receiver, diosix_msg_info *msg)
 {
    /* basic sanity checks */
    if(!receiver || !msg) return e_bad_address;
-   if(((unsigned int)msg + sizeof(diosix_msg_info)) >= KERNEL_SPACE_BASE)
+   if((unsigned int)msg + MEM_CLIP(msg, sizeof(diosix_msg_info)) >= KERNEL_SPACE_BASE)
       return e_bad_address;
    if(!(msg->recv) || !(msg->recv_max_size)) return e_bad_address;
    

@@ -48,7 +48,7 @@ void exception_handler(int_registers_block regs)
    XPT_DEBUG("[xpt:%i] IN: ds %x edi %x esi %x ebp %x esp %x ebx %x edx %x ecx %x eax %x\n"
              "        intnum %x errcode %x eip %x cs %x eflags %x useresp %x ss %x\n",
             CPU_ID, regs.ds, regs.edi, regs.esi, regs.ebp, regs.esp, regs.ebx, regs.edx, regs.ecx, regs.eax,
-            regs.intnum, regs.errcode, regs.eip, regs.cs, regs.eflags, regs.useresp, regs.ss);
+            regs.intnum & 0xff, regs.errcode, regs.eip, regs.cs, regs.eflags, regs.useresp, regs.ss);
    
    regs.intnum &= 0xff; /* just interested in the low byte */
    
@@ -60,7 +60,6 @@ void exception_handler(int_registers_block regs)
                    CPU_ID, regs.errcode, regs.errcode & ((1 << 16) - 1));
 
          proc_kill(cpu_table[CPU_ID].current->proc->pid, cpu_table[CPU_ID].current->proc);
-         regs.eip = 0; /* force a sched_pick() call */
          break;
          
       case INT_GPF: /* GENERAL PROTECTION FAULT */
@@ -96,9 +95,9 @@ void exception_handler(int_registers_block regs)
          
       case INT_PF: /* PAGE FAULT */
          if(pg_fault(&regs))
-         /* something went wrong, so default action is to kill
-            the process - pg_fault() doesn't return if the kernel
-            hits an unhandled page fault */
+         /* something went wrong in the user thread, so default action is to kill
+            the process - pg_fault() doesn't return if the kernel hits an unhandled
+            kernel page fault */
          {
             /* kill the process if it in the middle of trying to fix-up a page fault */
             if(cpu_table[CPU_ID].current->proc->signalsinprogress & (1 << SIGSEGV))
@@ -174,9 +173,8 @@ void exception_handler(int_registers_block regs)
    
    /* there might be a thread of a higher-priority waiting to be run or the current process
       may not exist - so prod the scheduler to switch to another thread if need be -
-      but only if we're returning to usermode, ie: don't try to switch out if we just
-      handled a kernel->kernel exception */
-   if(regs.eip < KERNEL_SPACE_BASE)
+      but don't try to switch out if we just did a kernel->kernel exception */
+   if((regs.eip < KERNEL_SPACE_BASE) || (cpu_table[CPU_ID].current->state != running))
       sched_pick(&regs);
 
    XPT_DEBUG("[xpt:%i] OUT: ds %x edi %x esi %x ebp %x esp %x ebx %x edx %x ecx %x eax %x\n"

@@ -31,7 +31,7 @@ void do_listen(void)
       msg.tid = DIOSIX_MSG_ANY_THREAD;
       msg.pid = DIOSIX_MSG_ANY_PROCESS;
       msg.flags = DIOSIX_MSG_ANY_TYPE;
-      msg.recv = &buffer;
+      msg.recv = (unsigned int *)1; /* &buffer; */
       msg.recv_max_size = sizeof(unsigned int);
 
       if(diosix_msg_receive(&msg) == success)

@@ -35,6 +35,7 @@ extern unsigned int KernelBootStackBase, APStack;
 #define KERNEL_SIZE          (KERNEL_END - KERNEL_START)
 #define KERNEL_SPACE_BASE    (0xC0000000)
 #define KERNEL_PHYSICAL_BASE (0x00400000)
+#define KERNEL_PHYSICAL_TOP  (0xffffffff)
 #define KERNEL_VIRTUAL_BASE  (KERNEL_SPACE_BASE + KERNEL_PHYSICAL_BASE)
 #define KERNEL_VIRTUAL_END   (KERNEL_VIRTUAL_BASE + KERNEL_SIZE)
 #define KERNEL_PHYSICAL_END  (KERNEL_PHYSICAL_BASE + KERNEL_SIZE)
@@ -57,6 +58,9 @@ extern unsigned int KernelBootStackBase, APStack;
 #define MEM_HIGH_PG          (2)
 #define MEM_ANY_PG           (1)
 #define MEM_LOW_PG           (0)
+
+/* MEM_CLIP(base, size) - return size clipped to base+size =< KERNEL_PHYSICAL_TOP */
+#define MEM_CLIP(a, b)       ( (unsigned int)(b) > (KERNEL_PHYSICAL_TOP - (unsigned int)(a)) ? (KERNEL_PHYSICAL_TOP - (unsigned int)(a)) : (b) )
 
 /* vmm magic */
 #define KHEAP_FREE           (0xdeaddead)
@@ -157,6 +161,8 @@ kresult pg_destroy_process(process *victim);
 kresult pg_add_4K_mapping(unsigned int **pgdir, unsigned int virtual, unsigned int physical, unsigned int flags);
 kresult pg_add_4M_mapping(unsigned int **pgdir, unsigned int virtual, unsigned int physical, unsigned int flags);
 kresult pg_fault(int_registers_block *regs);
+kresult pg_preempt_fault(thread *test, unsigned int virtualaddr, unsigned int size, unsigned char flags);
+kresult pg_do_fault(thread *target, unsigned int addr, unsigned int cpuflags);
 void pg_postmortem(int_registers_block *regs);
 kresult pg_user2phys(unsigned int *paddr, unsigned int **pgdir, unsigned int vaddr);
 kresult pg_user2kernel(unsigned int *kaddr, unsigned int uaddr, process *proc);

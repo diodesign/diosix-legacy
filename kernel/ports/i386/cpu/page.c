@@ -19,30 +19,27 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #include <portdefs.h>
 
 process *userspace_page_handler = NULL;
-unsigned char page_fatal_flag = 0;
+unsigned char page_fatal_flag = 0; /* set to 1 when handling a fatal kernel fault, to avoid infinite loops */
 
-/* pg_fault
-   Handle an incoming page fault
-   => regs = faulting thread's state
-   <= success if the fault was handled or a failure code if it couldn't be
+/* pg_do_fault
+   Do the actual hard work of fixing up a thread after a page fault, or is about to cause a page fault
+   => target = thread that caused the fault
+      faultaddr = virtual address of the fault
+      cpuflags = Intel-specific fault reason flags
+   <= success or an error code if the fault could not be handled
 */
-kresult pg_fault(int_registers_block *regs)
+kresult pg_do_fault(thread *target, unsigned int faultaddr, unsigned int cpuflags)
 {
-   unsigned int *pgtable, pgentry, faultaddr = x86_read_cr2();
+   unsigned int *pgtable, pgentry, errflags;
    unsigned int pgdir_index = (faultaddr >> PG_DIR_BASE) & PG_INDEX_MASK;
    unsigned int pgtable_index = (faultaddr >> PG_TBL_BASE) & PG_INDEX_MASK;
-   unsigned char errflags;
    
-   /* give up if we're in early system initialisation */
-   if(!cpu_table) goto pf_fault_bad;
-   if(!(cpu_table[CPU_ID].current)) goto pf_fault_bad;
-   
-   process *proc = cpu_table[CPU_ID].current->proc;
+   process *proc = target->proc;
    
    /* give up if the user process has tried to access kernel memory */
-   if((faultaddr >= KERNEL_SPACE_BASE) && (regs->errcode & PG_FAULT_U))
-      goto pf_fault_bad;
-
+   if((faultaddr >= KERNEL_SPACE_BASE) && (cpuflags & PG_FAULT_U))
+      return e_bad_address;
+   
    /* look up the entry for this faulting address in the user page tables */
    pgtable = (unsigned int *)((unsigned int)proc->pgdir[pgdir_index] & PG_4K_MASK);
    if(pgtable)
@@ -52,13 +49,13 @@ kresult pg_fault(int_registers_block *regs)
    }
    else
       pgentry = 0;
-
+   
    /* inspect the page table flags */
    if(pgentry & PG_EXTERNAL)
       goto pg_fault_external;
    
    /* convert x86 page fault flags into generic vmm flags */
-   if(regs->errcode & PG_FAULT_W)
+   if(cpuflags & PG_FAULT_W)
       errflags = VMA_WRITEABLE;
    else
       errflags = VMA_READABLE;
@@ -71,98 +68,175 @@ kresult pg_fault(int_registers_block *regs)
    switch(vmm_fault(proc, faultaddr, errflags))
    {
       case newpage:
-         { 
-            unsigned int new_phys;
-            
-            /* grab a new (blank) physical page */
-            if(vmm_req_phys_pg((void **)&new_phys, 1))
-               return e_failure; /* bail out if we can't get a phys page */
-            
-            /* map this new physical page in, remembering to set write access */
-            pg_add_4K_mapping(proc->pgdir, faultaddr & PG_4K_MASK,
-                              new_phys, PG_PRESENT | PG_RW | PG_PRIVLVL);
-            
-            /* tell the processor to reload the page tables */
-            x86_load_cr3(KERNEL_LOG2PHYS(proc->pgdir));
-            
-            PAGE_DEBUG("[page:%i] mapped new page for process %i: virtual %x -> physical %x\n",
+      { 
+         unsigned int new_phys;
+         
+         /* grab a new (blank) physical page */
+         if(vmm_req_phys_pg((void **)&new_phys, 1))
+            return e_failure; /* bail out if we can't get a phys page */
+         
+         /* map this new physical page in, remembering to set write access */
+         pg_add_4K_mapping(proc->pgdir, faultaddr & PG_4K_MASK,
+                           new_phys, PG_PRESENT | PG_RW | PG_PRIVLVL);
+         
+         /* tell the processor to reload the page tables */
+         x86_load_cr3(KERNEL_LOG2PHYS(proc->pgdir));
+         
+         PAGE_DEBUG("[page:%i] mapped new page for process %i: virtual %x -> physical %x\n",
                     CPU_ID, proc->pid, faultaddr & PG_4K_MASK, new_phys);
-         }
+      }
          return success;
          
       case clonepage:
-         {
-            unsigned int new_phys, new_virt, source_virt;
-            
-            /* grab a new (blank) physical page */
-            if(vmm_req_phys_pg((void **)&new_phys, 1))
-               return e_failure; /* bail out if we can't get a phys page */
-            
-            /* copy physical page to another via kernel virtual addresses */
-            new_virt = (unsigned int)KERNEL_PHYS2LOG(new_phys);
-            source_virt = (unsigned int)KERNEL_PHYS2LOG(pgentry & PG_4K_MASK);
-            vmm_memcpy((unsigned int *)new_virt, (unsigned int *)source_virt, MEM_PGSIZE);
-            
-            /* map this new physical page in, remembering to set write access */
-            pg_add_4K_mapping(proc->pgdir, faultaddr & PG_4K_MASK,
-                              new_phys, PG_PRESENT | PG_RW | PG_PRIVLVL);
-            
-            /* tell the processor to reload the page tables */
-            x86_load_cr3(KERNEL_LOG2PHYS(proc->pgdir));
-            
-            PAGE_DEBUG("[page:%i] cloned page for process %i: virtual %x -> physical %x\n",
+      {
+         unsigned int new_phys, new_virt, source_virt;
+         
+         /* grab a new (blank) physical page */
+         if(vmm_req_phys_pg((void **)&new_phys, 1))
+            return e_failure; /* bail out if we can't get a phys page */
+         
+         /* copy physical page to another via kernel virtual addresses */
+         new_virt = (unsigned int)KERNEL_PHYS2LOG(new_phys);
+         source_virt = (unsigned int)KERNEL_PHYS2LOG(pgentry & PG_4K_MASK);
+         vmm_memcpy((unsigned int *)new_virt, (unsigned int *)source_virt, MEM_PGSIZE);
+         
+         /* map this new physical page in, remembering to set write access */
+         pg_add_4K_mapping(proc->pgdir, faultaddr & PG_4K_MASK,
+                           new_phys, PG_PRESENT | PG_RW | PG_PRIVLVL);
+         
+         /* tell the processor to reload the page tables */
+         x86_load_cr3(KERNEL_LOG2PHYS(proc->pgdir));
+         
+         PAGE_DEBUG("[page:%i] cloned page for process %i: virtual %x -> physical %x\n",
                     CPU_ID, proc->pid, faultaddr & PG_4K_MASK, new_phys);
-         }
+      }
          return success;
          
       case makewriteable:
-         {            
-            /* it's safe to just set write access on this page */
-            pg_add_4K_mapping(proc->pgdir, faultaddr & PG_4K_MASK,
-                              pgentry & PG_4K_MASK, PG_PRESENT | PG_RW | PG_PRIVLVL);
-            
-            /* tell the processor to reload the page tables */
-            x86_load_cr3(KERNEL_LOG2PHYS(proc->pgdir));
-            
-            PAGE_DEBUG("[page:%i] made page writeable for process %i: virtual %x -> physical %x\n",
+      {            
+         /* it's safe to just set write access on this page */
+         pg_add_4K_mapping(proc->pgdir, faultaddr & PG_4K_MASK,
+                           pgentry & PG_4K_MASK, PG_PRESENT | PG_RW | PG_PRIVLVL);
+         
+         /* tell the processor to reload the page tables */
+         x86_load_cr3(KERNEL_LOG2PHYS(proc->pgdir));
+         
+         PAGE_DEBUG("[page:%i] made page writeable for process %i: virtual %x -> physical %x\n",
                     CPU_ID, proc->pid, faultaddr & PG_4K_MASK, pgentry & PG_4K_MASK);
-         }
+      }
          return success;
-
+         
       case external:
          goto pg_fault_external;
          
       case badaccess:
          PAGE_DEBUG("[page:%i] can't handle fault at %x for process %i\n",
-                 CPU_ID, faultaddr, proc->pid);
-         
-      default:
-         goto pf_fault_bad;
+                    CPU_ID, faultaddr, proc->pid);
    }
+
+   /* fall through to indicating a run-time error caused the fault */
+   return e_failure;
    
 pg_fault_external:
    PAGE_DEBUG("[page:%i] delegating fault at %x for process %i to userspace page manager\n",
-           CPU_ID, faultaddr, proc->pid);
+              CPU_ID, faultaddr, proc->pid);
    return e_failure;
+}
+
+/* pg_fault
+   Handle an incoming page fault raised by a cpu
+   => regs = faulting thread's state
+   <= success if the fault was handled or a failure code if it couldn't be
+*/
+kresult pg_fault(int_registers_block *regs)
+{
+   unsigned int faultaddr = x86_read_cr2();
    
+   /* give up if we're in early system initialisation */
+   if(!cpu_table) goto pf_fault_bad;
+   if(!(cpu_table[CPU_ID].current)) goto pf_fault_bad;
+   
+   /* get the fault handled */
+   if(pg_do_fault(cpu_table[CPU_ID].current, faultaddr, regs->errcode) == success)
+      return success; /* job done */
+
 pf_fault_bad:
-   /* give up if the kernel's faulting */
-   if(regs->eip > KERNEL_SPACE_BASE)
+   /* give up completely if the kernel's faulting within its own space */
+   if((regs->eip >= KERNEL_SPACE_BASE) && (faultaddr >= KERNEL_SPACE_BASE))
    {
       /* dump details about the fault */
       if(!page_fatal_flag)
       {
          page_fatal_flag = 1;
          pg_postmortem(regs);
-         pg_dump_pagedir((unsigned int *)(proc->pgdir));
+         pg_dump_pagedir((unsigned int *)(cpu_table[CPU_ID].current->proc->pgdir));
          debug_stacktrace();
       }
-      PAGE_DEBUG("\n*** panic: unhandled serious fault in the kernel. halting.\n");
-      while(1);
-   }   
+      debug_panic("unhandled serious page fault in the kernel");
+      /* shouldn't return */
+   }
    
-   /* or signal that the process has made a run-time error */
+   /* fall through to indicating that the process has made a run-time error */
    return e_failure;
+}
+
+/* pg_preempt_fault
+   The kernel's been supplied an address by a user thread and is about to access it.
+   Sanity check the address and attempt to fix-up the fault now, if possible.
+   => test = pointer to thread to test
+      virtualaddress = thread's supplied virtual address
+      size = range in bytes to test from the address
+      flags = access type flags (VMA_WRITEABLE set to indicate a write or clear for a read)
+   <= success or a failure code
+*/
+kresult pg_preempt_fault(thread *test, unsigned int virtualaddr, unsigned int size, unsigned char flags)
+{
+   kresult err;
+   unsigned int physaddr, virtualloop, virtual_aligned_min, virtual_aligned_max;
+   unsigned int pgdir_index, pgtable_index, *pgtbl;
+   unsigned int **pgdir;
+   unsigned int page_write_flag = 0;
+   
+   /* simple params check - zero page is always invalid */
+   if(!test || !size || !virtualaddr) return e_bad_params;
+   
+   if((virtualaddr + MEM_CLIP(virtualaddr, size)) >= KERNEL_SPACE_BASE)
+      return e_bad_address;
+   
+   virtual_aligned_min = (unsigned int)MEM_PGALIGN(virtualaddr);
+   virtual_aligned_max = (unsigned int)MEM_PGALIGN(virtualaddr + size);
+   
+   pgdir = test->proc->pgdir;
+   
+   if(flags & VMA_WRITEABLE) page_write_flag = PG_FAULT_W;
+   
+   /* run through all the pages in this range of address to check */
+   for(virtualloop = virtual_aligned_min; virtualloop <= virtual_aligned_max; virtualloop += MEM_PGSIZE)
+   {
+      pgdir_index = (virtualloop >> PG_DIR_BASE) & PG_INDEX_MASK;
+      pgtable_index = (virtualloop >> PG_TBL_BASE) & PG_INDEX_MASK;
+
+      /* get the page table entry for this virtual address */
+      pgtbl = (unsigned int *)((unsigned int)pgdir[pgdir_index] & PG_4K_MASK);
+      
+      if(pgtbl)
+      {
+         pgtbl = KERNEL_PHYS2LOG(pgtbl);
+         
+         /* is the page present? */
+         if(!(pgtbl[pgtable_index] & PG_PRESENT))
+            if(pg_do_fault(test, virtualloop, PG_FAULT_U | page_write_flag))
+               return e_bad_address;
+         
+         /* is the page write-protected and we want to do a write? */
+         if((!(pgtbl[pgtable_index] & PG_RW)) && page_write_flag)
+            if(pg_do_fault(test, virtualloop, PG_FAULT_P | PG_FAULT_U | page_write_flag))
+               return e_bad_address;
+      }
+   }
+   
+   /* fall through to returning success */
+   return success;
 }
 
 /* pg_clone_pgdir
@@ -360,14 +434,17 @@ kresult pg_user2phys(unsigned int *paddr, unsigned int **pgdir, unsigned int vir
    if((!pgdir) || (!paddr)) return e_failure;
    
    pgtbl = (unsigned int *)((unsigned int)pgdir[pgdir_index] & PG_4K_MASK);
-   pgtbl = KERNEL_PHYS2LOG(pgtbl);
    
    if(pgtbl)
+   {
+      pgtbl = KERNEL_PHYS2LOG(pgtbl);
+
       if(pgtbl[pgtable_index] & PG_PRESENT)
       {
          *(paddr) = (pgtbl[pgtable_index] & PG_4K_MASK) + (virtual & ~PG_4K_MASK);
          return success;
       }
+   }
 
    return e_not_found;
 }

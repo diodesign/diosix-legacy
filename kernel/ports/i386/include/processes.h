@@ -166,8 +166,7 @@ typedef struct
 } int_registers_block;
 
 #define THREAD_FLAG_INUSERMODE       (1 << 0)
-#define THREAD_FLAG_INMSGCOPY        (1 << 1)
-#define THREAD_FLAG_ISDRIVER         (1 << 2)
+#define THREAD_FLAG_ISDRIVER         (1 << 1)
 
 /* describe each thread */
 struct thread

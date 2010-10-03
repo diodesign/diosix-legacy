@@ -890,10 +890,9 @@ kresult vmm_memcpyuser(void *target, process *tproc,
 {
    /* the goal is to resolve the addresses into kernel 
       virtual addresses */
-   kresult err = e_failure;
    unsigned int ktarget, ksource;
    
-   if(((unsigned int)target + count) >= KERNEL_SPACE_BASE)
+   if((unsigned int)target + MEM_CLIP(target, count) >= KERNEL_SPACE_BASE)
    {
       /* copying into kernel, tproc must be NULL */
       if(tproc) goto vmm_memcpyuser_wtf;
@@ -901,11 +900,11 @@ kresult vmm_memcpyuser(void *target, process *tproc,
    }
    else
    {
-      err = pg_user2kernel(&ktarget, (unsigned int)target, tproc);
-      if(err) goto vmm_memcpyuser_wtf;
+      if(pg_user2kernel(&ktarget, (unsigned int)target, tproc))
+         return e_bad_target_address;
    }
 
-   if(((unsigned int)source + count) >= KERNEL_SPACE_BASE)
+   if((unsigned int)source + MEM_CLIP(source, count) >= KERNEL_SPACE_BASE)
    {
       /* copying from kernel, sproc must be NULL */
       if(sproc) goto vmm_memcpyuser_wtf;
@@ -913,14 +912,15 @@ kresult vmm_memcpyuser(void *target, process *tproc,
    }
    else
    {
-      err = pg_user2kernel(&ksource, (unsigned int)source, sproc);
-      if(err) goto vmm_memcpyuser_wtf;
+      if(pg_user2kernel(&ksource, (unsigned int)source, sproc))
+         return e_bad_source_address;
    }
    
    /* perform the copy with sane virtual addresses */
    vmm_memcpy((void *)ktarget, (void *)ksource, count);
    return success;
    
+   /* flag up a broken attempt to use this function */
 vmm_memcpyuser_wtf:
    KOOPS_DEBUG("[vmm:%i] OMGWTF: vmm_memcpyuser has bad params!\n"
                "                target = %p (proc %p)\n"
@@ -928,7 +928,7 @@ vmm_memcpyuser_wtf:
                "                copying: %i bytes\n",
                CPU_ID, target, tproc, source, sproc, count);
    debug_stacktrace();
-   return err;
+   return e_bad_params;
 }
 
 /* -------------------------------------------------------------------------

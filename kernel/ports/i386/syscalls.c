@@ -219,7 +219,8 @@ void syscall_do_msg_send(int_registers_block *regs)
            cpu_table[CPU_ID].current->tid);
 
    /* sanitise the input data while we're here */
-   if(!msg || ((unsigned int)msg >= KERNEL_SPACE_BASE)) SYSCALL_RETURN(e_bad_address);
+   if(!msg || ((unsigned int)msg + MEM_CLIP(msg, sizeof(diosix_msg_info)) >= KERNEL_SPACE_BASE))
+      SYSCALL_RETURN(e_bad_address);
    
    /* do the actual sending */
    send_result = msg_send(current, msg);
@@ -242,10 +243,10 @@ void syscall_do_msg_send(int_registers_block *regs)
          syscall_do_msg_recv(regs); /* will update eax when it returns */      
       }
       else
-         regs->eax = send_result; /* let the sender know what happened */
+         SYSCALL_RETURN(send_result); /* let the sender know what happened */
    }
    else
-      regs->eax = send_result; /* let the sender know what happened */
+      SYSCALL_RETURN(send_result); /* let the sender know what happened */
 }
 
 /* syscall:msg_recv - receive a message or block until a message is received
@@ -265,5 +266,5 @@ void syscall_do_msg_recv(int_registers_block *regs)
    if(!msg || ((unsigned int)msg >= KERNEL_SPACE_BASE)) SYSCALL_RETURN(e_bad_address);
    
    /* do the actual receiving */
-   regs->eax = msg_recv(current, msg);
+   SYSCALL_RETURN(msg_recv(current, msg));
 }

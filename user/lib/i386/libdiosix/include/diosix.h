@@ -43,6 +43,8 @@ typedef enum
    e_payload_missing,
    e_payload_unexpected,
    e_bad_address,
+   e_bad_source_address,
+   e_bad_target_address,
    e_bad_magic,
    e_bad_arch,
    e_bad_exec,
