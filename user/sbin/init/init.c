@@ -20,8 +20,8 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 void do_listen(void)
 {
-   diosix_msg_info msg;
    unsigned int buffer;
+   diosix_msg_info msg;
    kresult err;
    
    /* listen and reply */
@@ -31,7 +31,7 @@ void do_listen(void)
       msg.tid = DIOSIX_MSG_ANY_THREAD;
       msg.pid = DIOSIX_MSG_ANY_PROCESS;
       msg.flags = DIOSIX_MSG_ANY_TYPE;
-      msg.recv = (unsigned int *)1; /* &buffer; */
+      msg.recv = &buffer;
       msg.recv_max_size = sizeof(unsigned int);
 
       if(diosix_msg_receive(&msg) == success)
@@ -56,7 +56,7 @@ void main(void)
    child = diosix_fork();
 
    if(child == 0) do_listen(); /* child does the listening */
-
+   
    /* send the message to the child */
    while(1)
    {

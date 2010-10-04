@@ -49,9 +49,9 @@ kresult msg_test_receiver(thread *sender, thread *target, diosix_msg_info *msg)
                   CPU_ID, sender, target, msg);
       return e_failure;
    }
-   
+
    MSG_DEBUG("[msg:%i] testing receiver %p (tid %i pid %i buffer %p) for sender %p (tid %i pid %i msg %p)\n",
-             CPU_ID, target, target->tid, target->proc->pid, target->msg, sender, sender->tid, sender->proc->pid, msg);
+             CPU_ID, target, target->tid, target->proc->pid, target->msg->recv, sender, sender->tid, sender->proc->pid, msg);
    
    /* protect us from changes to the target's metadata */
    lock_gate(&(target->lock), LOCK_READ);
@@ -146,6 +146,7 @@ thread *msg_find_receiver(thread *sender, diosix_msg_info *msg)
       for(loop = 0; loop < THREAD_HASH_BUCKETS; loop++)
       {
          recv = proc->threads[loop];
+
          while(recv)
          {
             if(msg_test_receiver(sender, recv, msg) == success)
@@ -235,7 +236,7 @@ kresult msg_send(thread *sender, diosix_msg_info *msg)
 {
    thread *receiver;
    kresult err;
-   unsigned int bytes_copied = 0, priority;
+   unsigned int bytes_copied = 0;
    diosix_msg_info *rmsg;
 
    /* sanity check the msg data */
@@ -243,19 +244,41 @@ kresult msg_send(thread *sender, diosix_msg_info *msg)
    
    /* identify the receiver */
    receiver = msg_find_receiver(sender, msg);
-   
    if(!receiver) return e_no_receiver;
-   
+
    /* protect us from changes to the receiver's memory structure */
    lock_gate(&(receiver->proc->lock), LOCK_READ);
+   lock_gate(&(receiver->lock), LOCK_WRITE);
    
-   /* sanatise the receiver's msg buffer we're about to use - msg_find_receiver()
+   /* get the receiver thread's msg block - msg_find_receiver()
       double-checked it was ok to use the msg block */
-   if(pg_preempt_fault(receiver, (unsigned int)(receiver->msg->recv), receiver->msg->recv_max_size, VMA_WRITEABLE))
+   if(pg_user2kernel((void *)&rmsg, (unsigned int)receiver->msg, receiver->proc))
    {
+      unlock_gate(&(receiver->lock), LOCK_WRITE);
       unlock_gate(&(receiver->proc->lock), LOCK_READ); /* give up the process lock */
+      
+      /* TODO: take action against the at-fault receiver process */
+      MSG_DEBUG("[msg:%i] receiver %p (tid %i pid %i) tried to use invalid address %p for its receive block\n",
+                CPU_ID, receiver, receiver->tid, receiver->proc->pid, receiver->msg);
+      
+      return e_bad_target_address; /* this shouldn't really happen */
+   }
+
+   /* sanatise the receiver's msg buffer we're about to use */
+   if(pg_preempt_fault(receiver, (unsigned int)(rmsg->recv), rmsg->recv_max_size, VMA_WRITEABLE))
+   {
+      unlock_gate(&(receiver->lock), LOCK_WRITE);
+      unlock_gate(&(receiver->proc->lock), LOCK_READ); /* give up the process lock */
+      
+      /* TODO: take action against the at-fault receiver process */
+      MSG_DEBUG("[msg:%i] receiver %p (tid %i pid %i) tried to use invalid address %p for its receive buffer\n",
+                CPU_ID, receiver, receiver->tid, receiver->proc->pid, rmsg->recv);
+      
       return e_bad_target_address; /* bail out now if the receiver's screwed */
    }
+   
+   /* protect us from changes to the sender thread */
+   lock_gate(&(sender->lock), LOCK_WRITE);
    
    /* copy the message data */
    if(msg->flags & DIOSIX_MSG_MULTIPART)
@@ -268,6 +291,8 @@ kresult msg_send(thread *sender, diosix_msg_info *msg)
       /* check that the multipart pointer isn't bogus */
       if((unsigned int)parts + MEM_CLIP(parts, msg->send_size * sizeof(diosix_msg_multipart)) >= KERNEL_SPACE_BASE)
       {
+         unlock_gate(&(sender->lock), LOCK_WRITE);
+         unlock_gate(&(receiver->lock), LOCK_WRITE);
          unlock_gate(&(receiver->proc->lock), LOCK_READ); /* give up the process lock */
          return e_bad_address;
       }
@@ -285,6 +310,8 @@ kresult msg_send(thread *sender, diosix_msg_info *msg)
       
    if(err)
    {
+      unlock_gate(&(sender->lock), LOCK_WRITE);
+      unlock_gate(&(receiver->lock), LOCK_WRITE);
       unlock_gate(&(receiver->proc->lock), LOCK_READ); /* give up the process lock */
       return err;
    }
@@ -292,18 +319,6 @@ kresult msg_send(thread *sender, diosix_msg_info *msg)
    /* update the sender's and receiver's message block*/
    msg->pid = receiver->proc->pid;
    msg->tid = receiver->tid;
-   
-   /* don't forget that within the context of the sending thread we can't access the
-    receiver's msg structure unless we go via a kernel mapping.. */
-   if(pg_user2kernel((unsigned int *)&rmsg, (unsigned int)(receiver->msg), receiver->proc))
-   {
-      unlock_gate(&(receiver->lock), LOCK_READ);
-      unlock_gate(&(receiver->proc->lock), LOCK_READ); /* give up the process lock */
-      return e_failure;
-   }
-
-   /* protect us from changes to the sender's metadata */
-   lock_gate(&(sender->lock), LOCK_READ);
    
    rmsg->recv_size = bytes_copied;
    rmsg->pid = sender->proc->pid;
@@ -320,15 +335,10 @@ kresult msg_send(thread *sender, diosix_msg_info *msg)
    {  
       /* if the sent message wasn't a reply, block sending thread to wait for a reply */
       sched_remove(sender, waitingforreply);
-      
-      lock_gate(&(sender->lock), LOCK_WRITE);
-
       sender->replysource = receiver;
       
       /* take a copy of the message block ptr */
       sender->msg = msg;
-
-      unlock_gate(&(sender->lock), LOCK_WRITE);
       
       /* bump the receiver's priority up if the sender has a higher priority to
          avoid priority inversion */
@@ -339,8 +349,8 @@ kresult msg_send(thread *sender, diosix_msg_info *msg)
       sched_priority_calc(receiver, priority_check);
    }
 
-   unlock_gate(&(sender->lock), LOCK_READ);
-   unlock_gate(&(receiver->lock), LOCK_READ);
+   unlock_gate(&(sender->lock), LOCK_WRITE);
+   unlock_gate(&(receiver->lock), LOCK_WRITE);
    unlock_gate(&(receiver->proc->lock), LOCK_READ); /* give up the process lock */
 
    /* wake up the receiving thread */
@@ -374,8 +384,9 @@ kresult msg_recv(thread *receiver, diosix_msg_info *msg)
 
    /* remove receiver from the queue until a message comes in */
    sched_remove(receiver, waitingformsg);
-   
-   MSG_DEBUG("[msg:%i] tid %i pid %i now receiving (%p)\n", CPU_ID, receiver->tid, receiver->proc->pid, msg);
+
+   MSG_DEBUG("[msg:%i] tid %i pid %i now receiving (%p buffer %p)\n",
+             CPU_ID, receiver->tid, receiver->proc->pid, msg, receiver->msg->recv);
 
    return success;
 }

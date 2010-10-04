@@ -191,8 +191,7 @@ pf_fault_bad:
 */
 kresult pg_preempt_fault(thread *test, unsigned int virtualaddr, unsigned int size, unsigned char flags)
 {
-   kresult err;
-   unsigned int physaddr, virtualloop, virtual_aligned_min, virtual_aligned_max;
+   unsigned int virtualloop, virtual_aligned_min, virtual_aligned_max;
    unsigned int pgdir_index, pgtable_index, *pgtbl;
    unsigned int **pgdir;
    unsigned int page_write_flag = 0;

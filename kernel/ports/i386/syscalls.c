@@ -225,28 +225,38 @@ void syscall_do_msg_send(int_registers_block *regs)
    /* do the actual sending */
    send_result = msg_send(current, msg);
    
-   if(send_result == success)
-   {
-      /* reward the thread for multitasking */
-      sched_priority_calc(current, priority_reward);
+   SYSCALL_DEBUG("[sys:%i] SYSCALL_MSG_SEND(%x) msg_send() returned code %i\n",
+                 CPU_ID, regs->eax, send_result);
    
-      /* should we wait for a follow-up message if this was a reply? */
-      if((msg->flags & DIOSIX_MSG_REPLY) && (msg->flags & DIOSIX_MSG_RECVONREPLY))
-      {         
-         /* clear message flags to perform a recv */
-         msg->flags &= DIOSIX_MSG_TYPEMASK;
+   switch(send_result)
+   {
+      case success:
+         /* reward the thread for multitasking */
+         sched_priority_calc(current, priority_reward);
          
-         /* zero the send info and preserve everything else */
-         msg->send_size = 0;
-         msg->send = NULL;
-                  
-         syscall_do_msg_recv(regs); /* will update eax when it returns */      
-      }
-      else
-         SYSCALL_RETURN(send_result); /* let the sender know what happened */
+         /* should we wait for a follow-up message if this was a reply? */
+         if((msg->flags & DIOSIX_MSG_REPLY) && (msg->flags & DIOSIX_MSG_RECVONREPLY))
+         {         
+            /* clear message flags to perform a recv */
+            msg->flags &= DIOSIX_MSG_TYPEMASK;
+            
+            /* zero the send info and preserve everything else */
+            msg->send_size = 0;
+            msg->send = NULL;
+            
+            syscall_do_msg_recv(regs); /* will update eax when it returns */      
+         }
+         else
+            SYSCALL_RETURN(success); /* let the sender know what happened */
+         
+      /* can't write into the receiver's buffer */
+      case e_bad_target_address:
+         SYSCALL_RETURN(e_no_receiver);
+         
+      default:
+         /* fall through to returning msg_send()'s error code */
+         SYSCALL_RETURN(send_result);
    }
-   else
-      SYSCALL_RETURN(send_result); /* let the sender know what happened */
 }
 
 /* syscall:msg_recv - receive a message or block until a message is received
