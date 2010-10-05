@@ -80,14 +80,14 @@ thread *sched_get_next_to_run(unsigned char cpuid)
 {
    mp_core *cpu = &cpu_table[cpuid];
    mp_thread_queue *cpu_queue;
-   thread *torun;
+   volatile thread *torun;
    
    lock_gate(&(cpu->lock), LOCK_READ);
    cpu_queue = &(cpu->queues[cpu->lowest_queue_filled]);
    torun = (volatile thread *)(cpu_queue->queue_head);
    unlock_gate(&(cpu->lock), LOCK_READ);
    
-   return torun;
+   return (thread *)torun;
 }
 
 /* sched_priority_calc
@@ -99,7 +99,7 @@ thread *sched_get_next_to_run(unsigned char cpuid)
 */
 void sched_priority_calc(thread *tocalc, sched_priority_request request)
 {
-   unsigned int priority;
+   unsigned int priority, priority_low_limit, priority_high_limit;
    
    /* sanatise input */
    if(!tocalc)
@@ -117,6 +117,17 @@ void sched_priority_calc(thread *tocalc, sched_priority_request request)
    /* get the correct priority level to use */
    priority = sched_determine_priority(tocalc);
    
+   /* determine the actual low and high limits */
+   if(tocalc->proc->priority_low > SCHED_PRIORITY_MIN)
+      priority_low_limit = tocalc->proc->priority_low;
+   else
+      priority_low_limit = SCHED_PRIORITY_MIN;
+   
+   if(tocalc->proc->priority_high < SCHED_PRIORITY_MAX)
+      priority_high_limit = tocalc->proc->priority_high;
+   else
+      priority_high_limit = SCHED_PRIORITY_MAX;
+   
    switch(request)
    {
       /* set the base priority points for a thread in its priority level */
@@ -132,7 +143,7 @@ void sched_priority_calc(thread *tocalc, sched_priority_request request)
          /* if we exceed (2 * (2 ^ priority)) then enhance the priority level (by reducing it) */
          if(tocalc->priority_points == SCHED_PRIORITY_MAX_POINTS(priority))
          {
-            if(tocalc->priority > SCHED_PRIORITY_MIN)
+            if(tocalc->priority > priority_low_limit)
             {
                tocalc->priority--;
                tocalc->priority_points = SCHED_PRIORITY_BASE_POINTS(priority);
@@ -148,7 +159,7 @@ void sched_priority_calc(thread *tocalc, sched_priority_request request)
          /* if we drop to zero then diminish the priority level (by increasing it) */
          if(tocalc->priority_points == 0)
          {
-            if(tocalc->priority < SCHED_PRIORITY_MAX_POINTS(priority))
+            if(tocalc->priority < priority_high_limit)
             {
                tocalc->priority++;
                tocalc->priority_points = SCHED_PRIORITY_BASE_POINTS(priority);
@@ -160,10 +171,12 @@ void sched_priority_calc(thread *tocalc, sched_priority_request request)
       case priority_check:
          if(tocalc->priority_points > SCHED_PRIORITY_MAX_POINTS(priority))
             tocalc->priority_points = SCHED_PRIORITY_MAX_POINTS(priority);
-         if(tocalc->priority > SCHED_PRIORITY_MAX)
-            tocalc->priority = SCHED_PRIORITY_MAX;
-         if(tocalc->priority < SCHED_PRIORITY_MIN)
-            tocalc->priority = SCHED_PRIORITY_MIN;
+         if(tocalc->proc->priority_low > tocalc->proc->priority_high)
+            priority_low_limit = priority_high_limit = tocalc->proc->priority_low = tocalc->proc->priority_high;
+         if(tocalc->priority > priority_high_limit)
+            tocalc->priority = priority_high_limit;
+         if(tocalc->priority < priority_low_limit)
+            tocalc->priority = priority_low_limit;
          if(tocalc->priority_granted != SCHED_PRIORITY_INVALID)
          {
             if(tocalc->priority_granted > SCHED_PRIORITY_MAX)
