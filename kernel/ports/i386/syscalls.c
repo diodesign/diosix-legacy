@@ -142,7 +142,7 @@ void syscall_do_thread_fork(int_registers_block *regs)
    /* create new thread and mark it as ready to run in usermode */
    new = thread_new(current->proc);
    if(!new) SYSCALL_RETURN(POSIX_GENERIC_FAILURE);
-   new->flags |= THREAD_FLAG_INUSERMODE;
+   new->flags |= (current->flags & (THREAD_FLAG_INUSERMODE | THREAD_FLAG_ISDRIVER));
    
    /* copy the state of the caller thread into the state of the new thread */
    vmm_memcpy(&(new->regs), regs, sizeof(int_registers_block));
@@ -277,4 +277,137 @@ void syscall_do_msg_recv(int_registers_block *regs)
    
    /* do the actual receiving */
    SYSCALL_RETURN(msg_recv(current, msg));
+}
+
+/* syscall:privs - alter the privs/rights of a process
+   => eax = DIOSIX_PRIV_LAYER_UP: move up a privilege layer
+            DIOSIX_RIGHTS_CLEAR:
+              => ebx = set a bit to remove the corresponding PROC_FLAGS rights flag
+            DIOSIX_IORIGHTS_REMOVE: remove *all* the process's IO port access
+            DIOSIX_IORIGHTS_CLEAR: remove selected IO port access from a process
+              => ebx = index (in 32bit words) into 8bit x (2^16) bitmap
+                 ecx = word to apply to bitmap. Set bits to remove corresponding port access
+   <= eax = 0 for success or an error code
+*/
+void syscall_do_privs(int_registers_block *regs)
+{
+   thread *current = cpu_table[CPU_ID].current;
+   
+   SYSCALL_DEBUG("[sys:%i] SYSCALL_PRIVS(%i) called by process %i (thread %i)\n",
+                 CPU_ID, regs->eax, current->proc->pid, current->tid);
+   
+   switch(regs->eax)
+   {
+      case DIOSIX_PRIV_LAYER_UP:
+         SYSCALL_RETURN(proc_layer_up(current->proc));
+         
+      case DIOSIX_RIGHTS_CLEAR:
+         SYSCALL_RETURN(proc_clear_rights(current->proc, regs->ebx));
+         
+      case DIOSIX_IORIGHTS_REMOVE:
+         SYSCALL_RETURN(x86_ioports_clear_all(current->proc));
+         
+      case DIOSIX_IORIGHTS_CLEAR:
+         SYSCALL_RETURN(x86_ioports_clear(current->proc, regs->ebx, regs->ecx));
+   }
+   
+   /* fall through to returning an error code */
+   SYSCALL_RETURN(e_bad_params);
+}
+
+/* syscall:driver - perform driver management operations (layer 1 threads only)
+   => eax = DIOSIX_DRIVER_REGISTER: register this thread as a driver capable
+                                    of receiving interrupts, mapping phys ram
+                                    and access selected IO ports.
+            DIOSIX_DRIVER_DEREGISTER: deregister a thread as a driver.
+   <= eax = 0 for success or an error code
+*/
+void syscall_do_driver(int_registers_block *regs)
+{
+   thread *current = cpu_table[CPU_ID].current;
+   kresult err;
+   
+   SYSCALL_DEBUG("[sys:%i] SYSCALL_DRIVER(%i) called by process %i (thread %i)\n",
+                 CPU_ID, regs->eax, current->proc->pid, current->tid);
+   
+   /* bail out now if the thread isn't sufficiently privileged */
+   if(current->proc->layer != LAYER_DRIVERS) SYSCALL_RETURN(e_no_rights);
+   if(!(current->proc->flags & PROC_FLAG_CANBEDRIVER)) SYSCALL_RETURN(e_no_rights);
+   
+   switch(regs->eax)
+   {
+      case DIOSIX_DRIVER_REGISTER:
+         if(!(current->flags & THREAD_FLAG_ISDRIVER))
+         {
+            err = x86_ioports_enable(current);
+            if(err) SYSCALL_RETURN(err);
+            
+            current->flags |= THREAD_FLAG_ISDRIVER;
+            SYSCALL_RETURN(success);
+         }
+         
+      case DIOSIX_DRIVER_DEREGISTER:
+         if(current->flags & THREAD_FLAG_ISDRIVER)
+         {
+            err = x86_ioports_disable(current);
+            if(err) SYSCALL_RETURN(err);
+
+            current->flags &= (~THREAD_FLAG_ISDRIVER);
+            SYSCALL_RETURN(success);
+         }
+   }
+   
+   /* fall through to returning an error code */
+   SYSCALL_RETURN(e_bad_params);
+}
+
+/* syscall:info - read information about a thread/process/system
+   => eax = DIOSIX_THREAD_INFO: read info about the currently running thread
+            DIOSIX_PROCESS_INFO: read info about the currently running process
+            DIOSIX_KERNEL_INFO: read info about the currently running kernel
+      ebx = pointer to empty diosix_thread_info/diosix_process_info/diosix_kernel_info
+            structure for kernel to fill in
+   <= eax = 0 for succes or an error code
+*/
+void syscall_do_info(int_registers_block *regs)
+{
+   diosix_info_block *block = (diosix_info_block *)(regs->ebx);
+   thread *current = cpu_table[CPU_ID].current;
+   
+   SYSCALL_DEBUG("[sys:%i] SYSCALL_INFO(%i) called by process %i (thread %i)\n",
+                 CPU_ID, regs->eax, current->proc->pid, current->tid);
+
+   /* sanity check pointer for badness */
+   if(!block || (regs->ebx + MEM_CLIP(block, sizeof(diosix_info_block))) > KERNEL_SPACE_BASE)
+      SYSCALL_RETURN(e_bad_address);
+   
+   /* fill out the block, a bad pointer will page fault in the caller's virtual space */
+   switch(regs->eax)
+   {
+      case DIOSIX_THREAD_INFO:
+         block->data.t.tid      = current->tid;
+         block->data.t.cpu      = current->cpu;
+         block->data.t.priority = current->priority;
+         SYSCALL_RETURN(success);
+         
+      case DIOSIX_PROCESS_INFO:
+         block->data.p.pid       = current->proc->pid;
+         block->data.p.parentpid = current->proc->parentpid;
+         block->data.p.flags     = current->proc->flags;
+         block->data.p.privlayer = current->proc->layer;
+         SYSCALL_RETURN(success);
+         
+      /* these are defined externally in the makefile */
+      case DIOSIX_KERNEL_INFO:
+      {
+         vmm_memcpy(&(block->data.k.identifier), KERNEL_IDENTIFIER, vmm_nullbufferlen(KERNEL_IDENTIFIER));
+         block->data.k.release_major       = KERNEL_RELEASE_MAJOR;
+         block->data.k.release_minor       = KERNEL_RELEASE_MINOR;
+         block->data.k.kernel_api_revision = KERNEL_API_REVISION;
+         SYSCALL_RETURN(success);
+      }
+   }
+   
+   /* fall through to returning an error code */
+   SYSCALL_RETURN(e_bad_params);
 }

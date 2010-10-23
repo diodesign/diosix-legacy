@@ -676,7 +676,6 @@ kresult vmm_ensure_pgs(unsigned int size, int type)
 kresult vmm_initialise(multiboot_info_t *mbd)
 {
    mb_memory_map_t *region;
-   void *heap_init;
    unsigned int pg_stack_size, *pg_stack_top;
 
    /* initialise the smp lock */
@@ -837,6 +836,25 @@ kresult vmm_initialise(multiboot_info_t *mbd)
    pg_init(); /* non-portable code */
    
    return 0;
+}
+
+/* vmm_nullbufferlen
+   Return the length of a NULL-terminated buffer in a number of bytes
+   => buffer = pointer to NULL-terminated buffer
+   <= returns size in bytes or possibly 0 if an error occured
+*/
+unsigned int vmm_nullbufferlen(char *buffer)
+{
+   char *search = buffer;
+   
+   /* sanity check - perhaps a better way of raising an error should be found */
+   if(!search) return 0;
+   
+   /* search for the NULL byte */
+   while(*search)
+      search++;
+   
+   return (unsigned int)search - (unsigned int)buffer;
 }
 
 /* vmm_memset

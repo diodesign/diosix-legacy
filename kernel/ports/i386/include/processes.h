@@ -194,18 +194,26 @@ struct thread
     or reading the thread's structure */
    rw_gate lock;
 
-   /* thread registers */
-   unsigned int stackbase; /* where this thread's user stack should start */
-   unsigned int kstackbase, kstackblk; /* kernel stack ptrs */
-   tss_descr tss; /* the x86 task-state block */
-   int_registers_block regs; /* saved state of a thread */
-
    mp_thread_queue *queue; /* the run-queue the thread exists in */
    thread *queue_prev, *queue_next; /* the run-queue's double-linked list */
    thread *hash_prev, *hash_next; /* pointers through thread hash table */
+   
+   /* thread registers */
+   unsigned int stackbase; /* where this thread's user stack should start */
+   unsigned int kstackbase, kstackblk; /* kernel stack ptrs */
+   
+   /* x86 specific stuff */
+   int_registers_block regs; /* saved state of a thread */
+   tss_descr tss; /* the x86 task-state block - MUST BE THE LAST ITEM */
 };
 
-#define PROC_FLAG_RUNLOCKED   (1)
+/* process status flags (scheduling) */
+#define PROC_FLAG_RUNLOCKED   (1 << 0)
+
+/* process status flags (rights) */
+#define PROC_FLAG_CANMSGASUSR (1 << 1) /* can send messages as a user process */
+#define PROC_FLAG_CANBEDRIVER (1 << 2) /* can register as a driver process */
+#define PROC_RIGHTS_MASK      (PROC_FLAG_CANMSGASUSR | PROC_FLAG_CANBEDRIVER)
 
 /* describe each process */
 struct process
@@ -245,25 +253,34 @@ struct process
    /* processes are ordered by layers - these are not to be confused
       with x86-style ring levels. The microkernel leaves fine-grained
       access control to userland to fight it out, and only recognises
-      processes by their layer and syscall rights. Messages can only
+      processes by their layer. Messages can only
       be sent down through layers (replies can be sent up) to avoid
       deadlocks; processes can only manipulate those in layers above
       them or their own children. The layer list:
-      0 = reserved for the kernel (trusted)
-      1 = reserved for init (which becomes the sytem executive)
-      2 = reserved for hardware-specific drivers (trusted)
-      3 = reserved for hardware-independent managers (trusted)
-      4 = user processes (untrusted) */
-   unsigned int rights; /* bitmap of allowed restricted syscalls */
+      0 = reserved for init (which becomes the sytem executive)
+      1 = reserved for hardware-specific drivers (eg: hard disc driver)
+      2 = reserved for hardware-independent drivers (eg: ext2 filesystem)
+      3 = reserved for service managers (eg: the VFS)
+      4 = reserved for lower services (eg: the page swapper/demand loader)
+      5 = reserved for upper services (eg: executable loader)
+      6 = reserved for the security layer (which checks permisisons to access trusted processes)
+      7 = reserved for user programs */
    unsigned char layer; /* this process's layer */
+   
+   /* x86 IO port access - a pointer to a 2^16-bit bitmap where each bit corresponds 
+      to an IO port. A set bit indicates access is denied. A NULL pointer here means
+      the process has no IO port access */
+   unsigned int *ioport_bitmap;
    
    /* signal management */
    unsigned int signalsaccepted, signalsinprogress;
    thread *signalhandler; /* direct signals to this thread */
 };
 
-#define LAYER_EXECUTIVE  (1)
-#define RIGHTS_EXECUTIVE (0)
+#define LAYER_MAX        (255)
+#define LAYER_EXECUTIVE  (0)
+#define LAYER_DRIVERS    (1)
+#define FLAGS_EXECUTIVE  (PROC_FLAG_CANMSGASUSR | PROC_FLAG_CANBEDRIVER)
 
 /* processes, threads and scheduling */
 extern process *proc_sys_executive;
@@ -283,6 +300,8 @@ kresult proc_initialise(void);
 process *proc_new(process *current, thread *caller);
 process *proc_find_proc(unsigned int pid);
 kresult proc_kill(unsigned int victimpid, process *slayer);
+kresult proc_layer_up(process *proc);
+kresult proc_clear_rights(process *proc, unsigned int bits);
 thread *thread_new(process *proc);
 kresult thread_new_hash(process *proc);
 thread *thread_duplicate(process *proc, thread *source);

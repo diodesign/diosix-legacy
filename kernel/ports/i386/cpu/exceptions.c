@@ -133,7 +133,7 @@ void exception_handler(int_registers_block regs)
                syscall_do_kill(&regs);
                break;
                
-            case SYSCALL_YIELD:
+            case SYSCALL_THREAD_YIELD:
                syscall_do_yield(&regs);
                break; /* we will poke the scheduler below */
                
@@ -157,6 +157,17 @@ void exception_handler(int_registers_block regs)
                syscall_do_msg_recv(&regs);
                break;
       
+            case SYSCALL_PRIVS:
+               syscall_do_privs(&regs);
+               break;
+               
+            case SYSCALL_INFO:
+               syscall_do_info(&regs);
+               break;
+               
+            case SYSCALL_DRIVER:
+               syscall_do_driver(&regs);
+               break;
 
             default:
                XPT_DEBUG("[xpt:%i] unknown syscall %x by thread %i in process %i\n",

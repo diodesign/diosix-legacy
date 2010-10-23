@@ -236,6 +236,124 @@ void x86_outportb(unsigned port, unsigned val)
                         : "a"(val), "d"(port));
 }
 
+/* x86_ioports_clear_all
+   Remove a process's right to use IO ports
+   => p = process to lose access
+   <= 0 for success or an error code
+*/
+kresult x86_ioports_clear_all(process *p)
+{
+   /* sanity check */
+   if(!p) return e_failure;
+   
+   lock_gate(&(p->lock), LOCK_WRITE);
+
+   /* free the IO bitmap */
+   if(p->ioport_bitmap)
+   {
+      vmm_free(p->ioport_bitmap);
+      p->ioport_bitmap = NULL;
+   }
+   
+   unlock_gate(&(p->lock), LOCK_WRITE);
+   return success;
+}
+
+/* x86_ioports_clear
+   Set particular bits in a process's IO port bitmap. A set bit 
+   indicates no access for the corresponding IO port.
+   => p = process to manipulate
+      index = 32-bit word number into the bitmap
+      value = bits to set in the indexed word
+   <= 0 for success or an error code
+*/
+kresult x86_ioports_clear(process *p, unsigned int index, unsigned int value)
+{
+   /* sanity check */
+   if(!p || !(p->ioport_bitmap) || index > X86_IOPORT_MAXWORDS)
+      return e_failure;
+   
+   lock_gate(&(p->lock), LOCK_WRITE);
+   
+   p->ioport_bitmap[index] |= value;
+   
+   unlock_gate(&(p->lock), LOCK_WRITE);
+   return success;
+}
+
+/* x86_ioports_clone
+   Copy a process's IO port bitmap to another
+   => target = process to update
+      source = process to take the bitmap from
+   <= 0 for success or an error code
+*/
+kresult x86_ioports_clone(process *target, process *source)
+{
+   /* sanity checks */
+   if(!target || !source || !(source->ioport_bitmap))
+      return e_failure;
+   
+   lock_gate(&(target->lock), LOCK_WRITE);
+   
+   /* allocate an io port bitmap if necessary */
+   if(!(target->ioport_bitmap))
+   {
+      kresult err = vmm_malloc((void **)&(target->ioport_bitmap), X86_IOPORT_MAXWORDS * sizeof(unsigned int));
+      if(err)
+      {
+         unlock_gate(&(target->lock), LOCK_WRITE);
+         return err;
+      }
+   }
+   
+   /* do the actual cloning */
+   lock_gate(&(source->lock), LOCK_READ);
+   vmm_memcpy(target->ioport_bitmap, source->ioport_bitmap, X86_IOPORT_MAXWORDS * sizeof(unsigned int));
+   
+   /* don't forget to release locks */
+   unlock_gate(&(source->lock), LOCK_READ);
+   unlock_gate(&(target->lock), LOCK_WRITE);
+   return success;
+}
+
+/* x86_ioports_new
+   Create a new IO port bitmap with all bits cleared
+   => p = process to create the bitmap for
+   <= 0 for success or an error code
+*/
+kresult x86_ioports_new(process *p)
+{
+   kresult err;
+   
+   /* sanity check */
+   if(!p || p->ioport_bitmap) return e_failure;
+   
+   lock_gate(&(p->lock), LOCK_WRITE);
+
+   err = vmm_malloc((void **)&(p->ioport_bitmap), X86_IOPORT_MAXWORDS * sizeof(unsigned int));
+   if(err)
+   {
+      unlock_gate(&(p->lock), LOCK_WRITE);
+      return err;
+   }
+   
+   /* clear the bitmap */
+   vmm_memset(p->ioport_bitmap, 0, X86_IOPORT_MAXWORDS * sizeof(unsigned int));
+   
+   unlock_gate(&(p->lock), LOCK_WRITE);
+   return success;
+}
+
+kresult x86_ioports_enable(thread *t)
+{
+   return success;
+}
+
+kresult x86_ioports_disable(thread *t)
+{
+   return success;
+}
+
 // ------------------- performance monitoring support ----------------------
 /* x86_read_cyclecount
    <= returns the CPU's current cycle counter value
@@ -651,4 +769,14 @@ void lowlevel_proc_preinit(void)
 void lowlevel_kickstart(void)
 {
    x86_kickstart();
+}
+
+void lowlevel_ioports_clone(process *new, process *current)
+{
+   x86_ioports_clone(new, current);
+}
+
+void lowlevel_ioports_new(process *new)
+{
+   x86_ioports_new(new);
 }

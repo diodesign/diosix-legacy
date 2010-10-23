@@ -29,6 +29,60 @@ unsigned int proc_count = 0;
 /* provide locking around critical sections */
 rw_gate proc_lock;
 
+/* proc_layer_up
+   Increase a process's privilege layer so that it becomes less privileged
+   => proc = pointer to process structure to update
+   <= 0 for success or an error code
+*/
+kresult proc_layer_up(process *proc)
+{
+   kresult result = success;
+   
+   /* check pointer for sanity */
+   if(!proc) return e_failure;
+   
+   lock_gate(&(proc->lock), LOCK_WRITE);
+   
+   /* enforce maximum processlayer */
+   if(proc->layer >= LAYER_MAX)
+   {
+      result = e_max_layer;
+      goto proc_layer_up_return;
+   }
+   
+   /* ok, let's do this */
+   proc->layer++;
+      
+proc_layer_up_return:
+   unlock_gate(&(proc->lock), LOCK_WRITE);
+   return result;
+}
+
+/* proc_clear_rights
+   Clear rights bits from a process. A bit set in the mask byte will clear the
+   corresponding bit in the process's flag byte, thus removing that right from
+   the process.
+   => proc = pointer process's structure
+      bits = word to apply to the process's flag byte
+   <= 0 for success or an error code
+*/
+kresult proc_clear_rights(process *proc, unsigned int bits)
+{   
+   /* check pointer for sanity */
+   if(!proc) return e_failure;
+   
+   lock_gate(&(proc->lock), LOCK_WRITE);
+   
+   /* ok, let's do this - first, mask off non-rights bits */
+   bits &= PROC_RIGHTS_MASK;
+   
+   /* now clear bits in the flag byte where there are set bits in the given word */
+   proc->flags &= (~bits);
+   
+   unlock_gate(&(proc->lock), LOCK_WRITE);
+   return success;
+}
+
 /* proc_find_proc
    <= return a pointer to a process that matches the given pid, or NULL for failure */
 process *proc_find_proc(unsigned int pid)
@@ -249,9 +303,12 @@ process *proc_new(process *current, thread *caller)
       new->flags         = current->flags;
       new->cpu           = current->cpu;
       new->layer         = current->layer;
-      new->rights        = current->rights;
       new->priority_low  = current->priority_low;
       new->priority_high = current->priority_high;
+      
+      /* sort out io port access map stuff */
+      if(current->ioport_bitmap && (current->flags & PROC_FLAG_CANBEDRIVER))
+         lowlevel_ioports_clone(new, current);
       
       if(proc_attach_child(current, new))
       {
@@ -292,6 +349,9 @@ process *proc_new(process *current, thread *caller)
        create a new thread for execution */
       new->next_tid = FIRST_TID;
       newthread = thread_new(new);
+      
+      /* create a blank io port access bitmap */
+      lowlevel_ioports_new(new);
    }
    
    /* add the new process to the pid hash table */
@@ -509,8 +569,8 @@ kresult proc_initialise(void)
          }
          
          /* kernel payload binaries start in the executive layer */
-         new->layer  = LAYER_EXECUTIVE;
-         new->rights = RIGHTS_EXECUTIVE;
+         new->layer = LAYER_EXECUTIVE;
+         new->flags |= FLAGS_EXECUTIVE;
          proc_sys_executive = new;
          
          /* set the entry program counter and get ready to run it */

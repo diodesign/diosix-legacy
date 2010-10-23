@@ -72,6 +72,6 @@ void main(void)
       /* send message any listening thread, block if successfully
          foudn a receiver */ 
       if(diosix_msg_send(&msg))
-         diosix_yield();
+         diosix_thread_yield();
    }
 }

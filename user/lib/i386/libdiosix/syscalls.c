@@ -54,13 +54,13 @@ unsigned int diosix_kill(unsigned int pid)
    return retval;
 }
 
-void diosix_yield(void)
+/* --------------- threading basics -------------------- */
+
+void diosix_thread_yield(void)
 /* give up the processor now for another thread */
 {
-   __asm__ __volatile__("int $0x90" : : "d" (SYSCALL_YIELD));
+   __asm__ __volatile__("int $0x90" : : "d" (SYSCALL_THREAD_YIELD));
 }
-
-/* --------------- threading basics -------------------- */
 
 unsigned int diosix_thread_exit(unsigned int code)
 /* end execution of this thread with the given
@@ -122,3 +122,38 @@ unsigned int diosix_msg_reply(diosix_msg_info *info)
    info->flags |= DIOSIX_MSG_REPLY;
    return diosix_msg_send(info);
 }
+
+/* --------------- rights and privileges basics -------------------- */
+unsigned int diosix_priv_layer_up(void)
+/* move up the privilege stack: the higher a process the less privileged it is */
+{
+   unsigned int retval;
+   __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (DIOSIX_PRIV_LAYER_UP), "d" (SYSCALL_PRIVS));
+   return retval;  
+}
+
+unsigned int diosix_iorights_clear(unsigned int bits)
+/* give up the right to use IO ports */
+{
+   unsigned int retval;
+   __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (DIOSIX_IORIGHTS_CLEAR), "b" (bits), "d" (SYSCALL_PRIVS));
+   return retval;
+}
+
+/* --------------- get information out of the kernel ---------------- */
+unsigned int diosix_whoami(diosix_thread_info *block)
+/* get info about this thread and its process */
+{
+   unsigned int retval;
+   __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (block), "b" (DIOSIX_THREAD_INFO), "d" (SYSCALL_INFO));  
+   return retval;
+}
+
+unsigned int diosix_get_sys_info(diosix_system_info *block);
+/* get information about this kernel and the system it's running on */
+{
+   unsigned int retval;
+   __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (block), "b" (DIOSIX_SYSTEM_INFO), "d" (SYSCALL_INFO));  
+   return retval;
+}
+

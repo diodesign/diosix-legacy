@@ -49,7 +49,8 @@ typedef enum
    e_bad_arch,
    e_bad_exec,
    e_bad_params,
-   e_vma_exists
+   e_vma_exists,
+   e_max_layer
 } kresult;
 
 #define POSIX_GENERIC_FAILURE   ((unsigned int)(-1))
@@ -58,12 +59,15 @@ typedef enum
 #define SYSCALL_EXIT          (0)
 #define SYSCALL_FORK          (1)
 #define SYSCALL_KILL          (2)
-#define SYSCALL_YIELD         (3)
+#define SYSCALL_THREAD_YIELD  (3)
 #define SYSCALL_THREAD_EXIT   (4)
 #define SYSCALL_THREAD_FORK   (5)
 #define SYSCALL_THREAD_KILL   (6)
 #define SYSCALL_MSG_SEND      (7)
 #define SYSCALL_MSG_RECV      (8)
+#define SYSCALL_PRIVS         (9)
+#define SYSCALL_INFO          (10)
+#define SYSCALL_DRIVER        (11)
 
 /* message passing - control flags bits high */
 #define DIOSIX_MSG_REPLY       (1 << 31)
@@ -91,16 +95,64 @@ typedef struct
 /* message passing - describe an outgoing message and params for the reply */
 typedef struct
 {
-   unsigned int pid;         /* process pid sending to/receiving from, or 0 for any */
-   unsigned int tid;         /* threasd tid sending to/receiving from, or 0 for any */
+   unsigned int pid;        /* process pid sending to/receiving from, or 0 for any */
+   unsigned int tid;        /* threasd tid sending to/receiving from, or 0 for any */
    unsigned int flags;      /* status flags and type for this message */
 
-   unsigned int send_size;   /* size in bytes of the send message data, or number of multipart entries to send */
-   void *send;               /* pointer to the send message data as a block or multipart */
+   unsigned int send_size;  /* size in bytes of the send message data, or number of multipart entries to send */
+   void *send;              /* pointer to the send message data as a block or multipart */
    
    unsigned int recv_max_size; /* max size in bytes the reply/recv can be, or 0 for sending a reply */
    unsigned int recv_size; /* actual number of bytes in the reply/recv, or 0 for sending a reply */
-   void *recv;               /* pointer to buffer for the reply/recv data */
+   void *recv;             /* pointer to buffer for the reply/recv data */
 } diosix_msg_info;
+
+/* reason codes for priv/rights management */
+#define DIOSIX_PRIV_LAYER_UP   (0)
+#define DIOSIX_RIGHTS_CLEAR    (1)
+#define DIOSIX_IORIGHTS_REMOVE (2)
+#define DIOSIX_IORIGHTS_CLEAR  (3)
+
+/* reason codes for requesting info from the kernel */
+#define DIOSIX_THREAD_INFO  (0)
+#define DIOSIX_PROCESS_INFO (1)
+#define DIOSIX_KERNEL_INFO  (2)
+
+/* reason codes for driver management */
+#define DIOSIX_DRIVER_REGISTER   (0)
+#define DIOSIX_DRIVER_DEREGISTER (1)
+
+/* thread information block */
+typedef struct
+{
+   /* describe this thread */
+   unsigned int tid, cpu;
+   unsigned char priority;
+} diosix_thread_info;
+   
+typedef struct
+{
+   /* describe the owning process */
+   unsigned int pid, parentpid;
+   unsigned char flags, privlayer;
+} diosix_process_info;
+
+typedef struct
+{
+   /* all about the kernel build */
+   char identifier[64];
+   unsigned char release_major, release_minor;
+   unsigned char kernel_api_revision;
+} diosix_kernel_info;
+
+typedef struct
+{
+   union
+   {
+      diosix_thread_info  t;
+      diosix_process_info p;
+      diosix_kernel_info  k;
+   } data;
+} diosix_info_block;
 
 #endif

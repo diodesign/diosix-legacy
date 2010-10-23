@@ -34,8 +34,17 @@ void serial_initialise(void);
 #define X86_CMOS_ADDR_PORT    (0x70)
 #define X86_CMOS_DATA_PORT    (0x71)
 
+/* IO port access */
+#define X86_IOPORT_MAXWORDS   ((2^16) / 32) /* number of 32bit words in an IO port access bitmap */
+
 unsigned x86_inportb(unsigned short port);
 void x86_outportb(unsigned port, unsigned val);
+kresult x86_ioports_clear_all(process *p);
+kresult x86_ioports_clear(process *p, unsigned int index, unsigned int value);
+kresult x86_ioports_clone(process *target, process *source);
+kresult x86_ioports_new(process *p);
+kresult x86_ioports_enable(thread *t);
+kresult x86_ioports_disable(thread *t);
 void x86_cmos_write(unsigned char addr, unsigned char value);
 void x86_pic_remap(unsigned int offset1, unsigned int offset2);
 void x86_pic_reset(unsigned char pic);
@@ -55,6 +64,8 @@ unsigned long long x86_read_cyclecount(void);
 void lowlevel_thread_switch(thread *now, thread *next, int_registers_block *regs);
 void lowlevel_proc_preinit(void);
 void lowlevel_kickstart(void);
+void lowlevel_ioports_clone(process *new, process *current);
+void lowlevel_ioports_new(process *new);
 unsigned int x86_test_and_set(unsigned int value, volatile unsigned int *lock); /* defined in start.s */
 
 #endif

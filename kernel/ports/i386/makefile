@@ -5,9 +5,15 @@
 #
 #
 
-.SUFFIXES: .s .c
+# define the build version
+VERSION		= -DKERNEL_IDENTIFIER="\"diosix-hyatt pre-Release1.0\"" \
+			-DKERNEL_RELEASE_MAJOR=0 -DKERNEL_RELEASE_MINOR=1 \
+			-DKERNEL_API_REVISION=1
 
+# set where the compiler is
 PREFIX = /Users/chris/Documents/Code/cross/i386-elf/bin/bin/i386-elf-
+
+.SUFFIXES: .s .c
 
 CCbin = $(PREFIX)gcc
 LDbin = $(PREFIX)ld 
@@ -30,14 +36,14 @@ LDSCRIPT	= diosix.ld
 NASM		= nasm -f elf -i$(INCDIR)/
 FLAGS		= -g -std=c99 -Wall -nostdlib -nostartfiles \
 			-nostdinc -fno-builtin -nodefaultlibs \
-			-fomit-frame-pointer
+			-fomit-frame-pointer 
 
 # all flags possible
 # DEBUGFLAGS	= -DDEBUG -DMSG_DEBUG -DBUS_DEBUG -DPROC_DEBUG -DSCHED_DEBUG -DTHREAD_DEBUG -DVMM_DEBUG -DXPT_DEBUG -DINT_DEBUG -DIRQ_DEBUG -DMP_DEBUG -DPAGE_DEBUG -DKSYM_DEBUG -DIOAPIC_DEBUG -DLAPIC_DEBUG -DLOCK_DEBUG -DLOLVL_DEBUG -DPIC_DEBUG -DSYSCALL_DEBUG -DPERFORMANCE_DEBUG
 
 DEBUGFLAGS	= -DDEBUG -DSYSCALL_DEBUG -DMSG_DEBUG
 
-CC		= $(CCbin) $(SVNDEF) $(FLAGS) -I$(INCDIR) -I$(COREDIR) -I$(LIBDIOSIXDIR)/include $(DEBUGFLAGS)
+CC		= $(CCbin) $(SVNDEF) $(FLAGS) -I$(INCDIR) -I$(COREDIR) -I$(LIBDIOSIXDIR)/include $(DEBUGFLAGS) $(VERSION)
 LD		= $(CCbin) $(FLAGS) -Xlinker --script=$(LDSCRIPT) -Xlinker
 
 

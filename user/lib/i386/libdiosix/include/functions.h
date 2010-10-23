@@ -26,7 +26,7 @@ int diosix_fork(void);
 unsigned int diosix_kill(unsigned int pid);
 
 /* multitasking support */
-void diosix_yield(void);
+void diosix_thread_yield(void);
 
 /* thread management */
 unsigned int diosix_thread_exit(unsigned int code);
@@ -37,5 +37,13 @@ unsigned int diosix_thread_kill(unsigned int tid);
 unsigned int diosix_msg_send(diosix_msg_info *info);
 unsigned int diosix_msg_receive(diosix_msg_info *info);
 unsigned int diosix_msg_reply(diosix_msg_info *info);
+
+/* rights and privilege layer management */
+unsigned int diosix_priv_layer_up(void);
+unsigned int diosix_priv_rights_clear(unsigned int bits);
+
+/* get information */
+unsigned int diosix_whoami(diosix_thread_info *block);
+unsigned int diosix_whatisthis(diosix_sys_info *block);
 
 #endif

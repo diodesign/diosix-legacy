@@ -108,6 +108,7 @@ kresult vmm_free(void *addr);
 kresult vmm_malloc(void **addr, unsigned int size);
 kresult vmm_trim(kheap_block *block);
 void vmm_heap_add_to_free(kheap_block *block);
+unsigned int vmm_nullbufferlen(char *buffer);
 void vmm_memset(void *addr, unsigned char value, unsigned int count);
 void vmm_memcpy(void *target, void *source, unsigned int count);
 kresult vmm_memcpyuser(void *target, process *tproc, void *source, process *sproc, unsigned int count);
