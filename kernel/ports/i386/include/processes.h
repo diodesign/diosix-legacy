@@ -167,6 +167,7 @@ typedef struct
 
 #define THREAD_FLAG_INUSERMODE       (1 << 0)
 #define THREAD_FLAG_ISDRIVER         (1 << 1)
+#define THREAD_FLAG_HASIOBITMAP      (1 << 2)
 
 /* describe each thread */
 struct thread
@@ -204,7 +205,7 @@ struct thread
    
    /* x86 specific stuff */
    int_registers_block regs; /* saved state of a thread */
-   tss_descr tss; /* the x86 task-state block - MUST BE THE LAST ITEM */
+   tss_descr *tss; /* pointer to the x86 task-state block */
 };
 
 /* process status flags (scheduling) */

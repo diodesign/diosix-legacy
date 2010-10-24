@@ -37,19 +37,30 @@ void syscall_do_exit(int_registers_block *regs)
 void syscall_do_fork(int_registers_block *regs)
 {
    process *new;
+   thread *source = cpu_table[CPU_ID].current;
    
    SYSCALL_DEBUG("[sys:%i] SYSCALL_FORK called by process %i (%p) (thread %i)\n",
-            CPU_ID, cpu_table[CPU_ID].current->proc->pid, cpu_table[CPU_ID].current->proc,
-            cpu_table[CPU_ID].current->tid);
+            CPU_ID, source->proc->pid, source->proc, source->tid);
    
-   new = proc_new(cpu_table[CPU_ID].current->proc, cpu_table[CPU_ID].current);
+   new = proc_new(source->proc, source);
    
    /* return the right info */
    if(!new) SYSCALL_RETURN(POSIX_GENERIC_FAILURE); /* POSIX_GENERIC_FAILURE == -1 */
+   
+   process *current = source->proc;
+   
+   /* sort out io port access map stuff */
+   if(current->ioport_bitmap && (current->flags & PROC_FLAG_CANBEDRIVER))
+      x86_ioports_clone(new, current);
 
-   thread *tnew;
-
-   tnew = thread_find_thread(new, cpu_table[CPU_ID].current->tid);
+   thread *tnew = thread_find_thread(new, source->tid);
+   
+   /* sort out the io bitmap stuff for the thread */
+   if(source->flags & THREAD_FLAG_ISDRIVER)
+   {
+      new->flags |= THREAD_FLAG_ISDRIVER;
+      x86_ioports_enable(new);
+   }
    
    /* don't forget to init the tss for the new thread in the new process and duplicate the 
       state of the current thread */
@@ -141,11 +152,22 @@ void syscall_do_thread_fork(int_registers_block *regs)
 
    /* create new thread and mark it as ready to run in usermode */
    new = thread_new(current->proc);
-   if(!new) SYSCALL_RETURN(POSIX_GENERIC_FAILURE);
-   new->flags |= (current->flags & (THREAD_FLAG_INUSERMODE | THREAD_FLAG_ISDRIVER));
    
+   if(!new) SYSCALL_RETURN(POSIX_GENERIC_FAILURE);
+   
+   new->flags |= THREAD_FLAG_INUSERMODE;
+   
+   /* sort out the io bitmap stuff */
+   if(current->flags & THREAD_FLAG_ISDRIVER)
+   {
+      new->flags |= THREAD_FLAG_ISDRIVER;
+      x86_ioports_enable(new);
+   }
+
    /* copy the state of the caller thread into the state of the new thread */
    vmm_memcpy(&(new->regs), regs, sizeof(int_registers_block));
+   
+   /* new threads start with an IO bitmap if the calling thread has one */
    x86_init_tss(new);
 
    /* fix up the stack pointer and duplicate the stack  - only fix up the
@@ -343,6 +365,8 @@ void syscall_do_driver(int_registers_block *regs)
             if(err) SYSCALL_RETURN(err);
             
             current->flags |= THREAD_FLAG_ISDRIVER;
+            
+            SYSCALL_DEBUG("[sys:%i] thread registered as a driver\n", CPU_ID);
             SYSCALL_RETURN(success);
          }
          
@@ -353,6 +377,8 @@ void syscall_do_driver(int_registers_block *regs)
             if(err) SYSCALL_RETURN(err);
 
             current->flags &= (~THREAD_FLAG_ISDRIVER);
+            
+            SYSCALL_DEBUG("[sys:%i] thread deregistered as a driver\n", CPU_ID);
             SYSCALL_RETURN(success);
          }
    }

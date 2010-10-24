@@ -41,9 +41,16 @@ unsigned int diosix_msg_reply(diosix_msg_info *info);
 /* rights and privilege layer management */
 unsigned int diosix_priv_layer_up(void);
 unsigned int diosix_priv_rights_clear(unsigned int bits);
+unsigned int diosix_iorights_remove(void);
+unsigned int diosix_iorights_clear(unsigned int index, unsigned int bits);
+
+/* manage drivers */
+unsigned int diosix_driver_register(void);
+unsigned int diosix_driver_deregister(void);
 
 /* get information */
-unsigned int diosix_whoami(diosix_thread_info *block);
-unsigned int diosix_whatisthis(diosix_sys_info *block);
+unsigned int diosix_get_thread_info(diosix_thread_info *block);
+unsigned int diosix_get_process_info(diosix_process_info *block);
+unsigned int diosix_get_kernel_info(diosix_kernel_info *block);
 
 #endif

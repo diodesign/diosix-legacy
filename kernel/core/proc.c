@@ -306,10 +306,6 @@ process *proc_new(process *current, thread *caller)
       new->priority_low  = current->priority_low;
       new->priority_high = current->priority_high;
       
-      /* sort out io port access map stuff */
-      if(current->ioport_bitmap && (current->flags & PROC_FLAG_CANBEDRIVER))
-         lowlevel_ioports_clone(new, current);
-      
       if(proc_attach_child(current, new))
       {
          unlock_gate(&(current->lock), LOCK_WRITE);
@@ -349,9 +345,6 @@ process *proc_new(process *current, thread *caller)
        create a new thread for execution */
       new->next_tid = FIRST_TID;
       newthread = thread_new(new);
-      
-      /* create a blank io port access bitmap */
-      lowlevel_ioports_new(new);
    }
    
    /* add the new process to the pid hash table */
@@ -571,6 +564,10 @@ kresult proc_initialise(void)
          /* kernel payload binaries start in the executive layer */
          new->layer = LAYER_EXECUTIVE;
          new->flags |= FLAGS_EXECUTIVE;
+         
+         /* create a blank io port access bitmap for the process */
+         lowlevel_ioports_new(new);
+         
          proc_sys_executive = new;
          
          /* set the entry program counter and get ready to run it */

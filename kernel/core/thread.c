@@ -100,7 +100,7 @@ thread *thread_duplicate(process *proc, thread *source)
    /* fill in the blanks */
    new->proc             = proc;
    new->tid              = source->tid;
-   new->flags            = source->flags & (THREAD_FLAG_INUSERMODE | THREAD_FLAG_ISDRIVER);
+   new->flags            = source->flags;
    
    new->timeslice        = source->timeslice;
    new->priority         = source->priority;

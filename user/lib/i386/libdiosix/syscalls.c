@@ -33,7 +33,7 @@ unsigned int diosix_exit(unsigned int code)
    __asm__ __volatile__("int $0x90" : : "d" (SYSCALL_EXIT));
    
    /* execution shouldn't reach here */
-   while(1) diosix_yield();
+   while(1) diosix_thread_yield();
 }
 
 int diosix_fork(void)
@@ -73,7 +73,7 @@ unsigned int diosix_thread_exit(unsigned int code)
    __asm__ __volatile__("int $0x90" : : "d" (SYSCALL_THREAD_EXIT));
    
    /* execution shouldn't reach here */
-   while(1) diosix_yield();
+   while(1) diosix_thread_yield();
 }
 
 int diosix_thread_fork(void)
@@ -123,7 +123,7 @@ unsigned int diosix_msg_reply(diosix_msg_info *info)
    return diosix_msg_send(info);
 }
 
-/* --------------- rights and privileges basics -------------------- */
+/* -------------- process rights and privileges basics ------------ */
 unsigned int diosix_priv_layer_up(void)
 /* move up the privilege stack: the higher a process the less privileged it is */
 {
@@ -132,28 +132,70 @@ unsigned int diosix_priv_layer_up(void)
    return retval;  
 }
 
-unsigned int diosix_iorights_clear(unsigned int bits)
-/* give up the right to use IO ports */
+unsigned int diosix_rights_clear(unsigned int bits)
+/* give up previously afforded process rights */
 {
    unsigned int retval;
-   __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (DIOSIX_IORIGHTS_CLEAR), "b" (bits), "d" (SYSCALL_PRIVS));
+   __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (DIOSIX_RIGHTS_CLEAR), "b" (bits), "d" (SYSCALL_PRIVS));
    return retval;
 }
 
+unsigned int diosix_iorights_remove(void)
+/* remove the previously afforded process right to access IO ports entirely */
+{
+   unsigned int retval;
+   __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (DIOSIX_IORIGHTS_REMOVE), "d" (SYSCALL_PRIVS));
+   return retval;
+}
+
+unsigned int diosix_iorights_clear(unsigned int index, unsigned int bits)
+/* remove selected IO port rights for the process */
+{
+   unsigned int retval;
+   __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (DIOSIX_IORIGHTS_CLEAR), "b" (index), "c" (bits), "d" (SYSCALL_PRIVS));
+   return retval;
+}
+
+/* --------------------------- driver management -------------------- */
+unsigned int diosix_driver_register(void)
+/* remove the previously afforded process right to access IO ports entirely */
+{
+   unsigned int retval;
+   __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (DIOSIX_DRIVER_REGISTER), "d" (SYSCALL_DRIVER));
+   return retval;
+}
+
+unsigned int diosix_driver_deregister(void)
+/* remove the previously afforded process right to access IO ports entirely */
+{
+   unsigned int retval;
+   __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (DIOSIX_DRIVER_DEREGISTER), "d" (SYSCALL_DRIVER));
+   return retval;
+}
+
+
 /* --------------- get information out of the kernel ---------------- */
-unsigned int diosix_whoami(diosix_thread_info *block)
-/* get info about this thread and its process */
+unsigned int diosix_get_thread_info(diosix_thread_info *block)
+/* get info about this thread */
 {
    unsigned int retval;
    __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (block), "b" (DIOSIX_THREAD_INFO), "d" (SYSCALL_INFO));  
    return retval;
 }
 
-unsigned int diosix_get_sys_info(diosix_system_info *block);
+unsigned int diosix_get_process_info(diosix_process_info *block)
+/* get info about this thread */
+{
+   unsigned int retval;
+   __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (block), "b" (DIOSIX_PROCESS_INFO), "d" (SYSCALL_INFO));  
+   return retval;
+}
+
+unsigned int diosix_get_kernel_info(diosix_kernel_info *block)
 /* get information about this kernel and the system it's running on */
 {
    unsigned int retval;
-   __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (block), "b" (DIOSIX_SYSTEM_INFO), "d" (SYSCALL_INFO));  
+   __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (block), "b" (DIOSIX_KERNEL_INFO), "d" (SYSCALL_INFO));  
    return retval;
 }
 

@@ -44,7 +44,7 @@ void debug_stacktrace(void)
    {
       /* we're running threads, so find the current thread's kernel
          stack base */
-      base = (unsigned int *)cpu_table[CPU_ID].current->tss.esp0;
+      base = (unsigned int *)cpu_table[CPU_ID].current->tss->esp0;
       tid = cpu_table[CPU_ID].current->tid;
       pid = cpu_table[CPU_ID].current->proc->pid;
    }

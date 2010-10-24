@@ -35,7 +35,8 @@ void serial_initialise(void);
 #define X86_CMOS_DATA_PORT    (0x71)
 
 /* IO port access */
-#define X86_IOPORT_MAXWORDS   ((2^16) / 32) /* number of 32bit words in an IO port access bitmap */
+#define X86_IOPORT_MAXWORDS   (2048) /* number of 32bit words in (2^16)-bit IO port access bitmap */
+#define X86_IOPORT_BITMAPSIZE (X86_IOPORT_MAXWORDS * sizeof(unsigned int))
 
 unsigned x86_inportb(unsigned short port);
 void x86_outportb(unsigned port, unsigned val);
@@ -56,8 +57,8 @@ void x86_load_gdtr(unsigned int ptr); /* defined in start.s */
 void x86_timer_init(unsigned char freq);
 void x86_enable_interrupts(void);
 void x86_disable_interrupts(void);
-void x86_change_tss(gdtptr_descr *cpugdt, gdt_entry *gdt, tss_descr *tss);
-void x86_init_tss(thread *toinit);
+void x86_change_tss(gdtptr_descr *cpugdt, gdt_entry *gdt, tss_descr *tss, unsigned char flags);
+kresult x86_init_tss(thread *toinit);
 void x86_start_ap(void);
 void x86_start_ap_end(void);
 unsigned long long x86_read_cyclecount(void);

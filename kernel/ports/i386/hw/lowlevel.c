@@ -248,7 +248,7 @@ kresult x86_ioports_clear_all(process *p)
    
    lock_gate(&(p->lock), LOCK_WRITE);
 
-   /* free the IO bitmap */
+   /* free the process's IO bitmap */
    if(p->ioport_bitmap)
    {
       vmm_free(p->ioport_bitmap);
@@ -298,7 +298,7 @@ kresult x86_ioports_clone(process *target, process *source)
    /* allocate an io port bitmap if necessary */
    if(!(target->ioport_bitmap))
    {
-      kresult err = vmm_malloc((void **)&(target->ioport_bitmap), X86_IOPORT_MAXWORDS * sizeof(unsigned int));
+      kresult err = vmm_malloc((void **)&(target->ioport_bitmap), X86_IOPORT_BITMAPSIZE);
       if(err)
       {
          unlock_gate(&(target->lock), LOCK_WRITE);
@@ -308,7 +308,7 @@ kresult x86_ioports_clone(process *target, process *source)
    
    /* do the actual cloning */
    lock_gate(&(source->lock), LOCK_READ);
-   vmm_memcpy(target->ioport_bitmap, source->ioport_bitmap, X86_IOPORT_MAXWORDS * sizeof(unsigned int));
+   vmm_memcpy(target->ioport_bitmap, source->ioport_bitmap, X86_IOPORT_BITMAPSIZE);
    
    /* don't forget to release locks */
    unlock_gate(&(source->lock), LOCK_READ);
@@ -330,7 +330,7 @@ kresult x86_ioports_new(process *p)
    
    lock_gate(&(p->lock), LOCK_WRITE);
 
-   err = vmm_malloc((void **)&(p->ioport_bitmap), X86_IOPORT_MAXWORDS * sizeof(unsigned int));
+   err = vmm_malloc((void **)&(p->ioport_bitmap), X86_IOPORT_BITMAPSIZE);
    if(err)
    {
       unlock_gate(&(p->lock), LOCK_WRITE);
@@ -338,19 +338,83 @@ kresult x86_ioports_new(process *p)
    }
    
    /* clear the bitmap */
-   vmm_memset(p->ioport_bitmap, 0, X86_IOPORT_MAXWORDS * sizeof(unsigned int));
+   vmm_memset(p->ioport_bitmap, 0, X86_IOPORT_BITMAPSIZE);
    
    unlock_gate(&(p->lock), LOCK_WRITE);
    return success;
 }
 
+/* x86_ioports_enable
+   Enable a thread in a driver process to begin using IO ports allowed for the process.
+   => t = thread to operate on
+   <= 0 for success or an error code
+*/
 kresult x86_ioports_enable(thread *t)
 {
+   tss_descr *tss;
+   
+   /* sanity check */
+   if(!t) return e_bad_params;
+   
+   /* give up if this process isn't allowed to be a driver or if a process
+      has given up all its IO port rights */
+   if(!(t->proc->flags & PROC_FLAG_CANBEDRIVER)) return e_no_rights;
+   if(!(t->proc->ioport_bitmap)) return e_no_rights;
+   
+   /* give up if this thread is already enabled */
+   if(t->flags & THREAD_FLAG_HASIOBITMAP) return e_failure;
+   
+   lock_gate(&(t->lock), LOCK_WRITE);
+   
+   t->flags |= THREAD_FLAG_HASIOBITMAP;
+   
+   /* recreate this thread's TSS */
+   tss = t->tss;
+   if(x86_init_tss(t))
+   {
+      unlock_gate(&(t->lock), LOCK_WRITE);
+      return e_failure;
+   }
+   
+   /* tell the CPU we've moved the TSS if need be */
+   if(tss != t->tss)
+      x86_change_tss(&(cpu_table[CPU_ID].gdtptr),
+                     cpu_table[CPU_ID].tssentry, t->tss,
+                     THREAD_FLAG_HASIOBITMAP);
+   
+   unlock_gate(&(t->lock), LOCK_WRITE);
    return success;
 }
 
+/* x86_ioports_disable
+   Disable a thread's IO bitmap and thus block it from accessing IO ports
+   => t = thread to operate on
+   <= 0 for success or an error code
+*/
 kresult x86_ioports_disable(thread *t)
 {
+   tss_descr *tss;
+   
+   /* sanity check */
+   if(!t) return e_bad_params;
+   
+   /* give up if this thread wasn't enabled as a driver */
+   if(!(t->flags & THREAD_FLAG_HASIOBITMAP)) return e_failure;
+
+   lock_gate(&(t->lock), LOCK_WRITE);
+   
+   t->flags &= (~THREAD_FLAG_HASIOBITMAP);
+   
+   /* recreate this thread's TSS */
+   tss = t->tss;
+   x86_init_tss(t);
+   
+   /* tell the CPU we've moved the TSS if need be */
+   if(tss != t->tss)
+      x86_change_tss(&(cpu_table[CPU_ID].gdtptr),
+                     cpu_table[CPU_ID].tssentry, t->tss, 0);
+   
+   unlock_gate(&(t->lock), LOCK_WRITE);
    return success;
 }
 
@@ -441,8 +505,8 @@ unsigned int x86_read_cr2(void)
 }
 
 /* x86_proc_preinit
- Perform any port-specific pre-initialisation before we start the operating system.
- Assuming microkernel virtual memory model is now active */
+   Perform any port-specific pre-initialisation before we start the operating system.
+   Assuming microkernel virtual memory model is now active */
 void x86_proc_preinit(void)
 {
    /* grab a copy of the GDT pointers for the boot cpu */
@@ -450,7 +514,7 @@ void x86_proc_preinit(void)
    cpu_table[CPU_ID].gdtptr.ptr = (unsigned int)&KernelGDT;
    cpu_table[CPU_ID].tssentry = (gdt_entry *)&TSS_Selector;
    
-   BOOT_DEBUG(PORT_BANNER "\n[x86] i386 port initialised\n");
+   BOOT_DEBUG(PORT_BANNER "\n[x86] i386 port initialised, boot processor is %i\n", CPU_ID);
 }
 
 /* x86_thread_switch
@@ -487,14 +551,47 @@ void x86_thread_switch(thread *now, thread *next, int_registers_block *regs)
    
    /* inform the CPU that things have changed */   
    new_tss->esp0 = next->kstackbase;
-   x86_change_tss(&(cpu_table[CPU_ID].gdtptr), cpu_table[CPU_ID].tssentry, new_tss);
+   x86_change_tss(&(cpu_table[CPU_ID].gdtptr),
+                  cpu_table[CPU_ID].tssentry, new_tss,
+                  next->flags & THREAD_FLAG_HASIOBITMAP);
 }
 
 /* x86_init_tss
-   Configure a thread's TSS for the first (and only) time */
-void x86_init_tss(thread *toinit)
+   Configure a thread's TSS, creating one if need be and 
+   ensuring an IO port bitmap is present if required.
+   => toinit = thread to initialise a TSS for
+   <= 0 for success or an error code if a failure occurred
+*/
+kresult x86_init_tss(thread *toinit)
 {
-   tss_descr *tss = (tss_descr *)&(toinit->tss);
+   tss_descr *tss;
+   unsigned int size_req;
+   
+   /* quick sanity check */
+   if(!toinit) return e_bad_params;
+   
+   /* free the TSS if one's already allocated */
+   if(toinit->tss)
+      if(vmm_free(toinit->tss))
+         return e_failure;
+
+   /* calculate size of TSS, it may need space for an IO bitmap after */
+   size_req = sizeof(tss_descr);
+
+   if((toinit->flags & THREAD_FLAG_HASIOBITMAP) && (toinit->proc->ioport_bitmap))
+      size_req += X86_IOPORT_BITMAPSIZE;
+         
+   /* allocate a new TSS */
+   if(vmm_malloc((void **)&(toinit->tss), size_req))
+      return e_failure;
+   
+   /* copy in the process's IO map into the TSS if required, the IO
+      map will be located at the end of the tss_descr structure */
+   if(size_req > sizeof(tss_descr))
+      vmm_memcpy((void *)((unsigned int)(toinit->tss) + sizeof(tss_descr)),
+                 toinit->proc->ioport_bitmap, X86_IOPORT_BITMAPSIZE);
+   
+   tss = toinit->tss;
    
    /* initialise the correct registers */
    /* kernel data seg is 0x10, code seg is 0x18, ORd 0x3 for ring-3 access */
@@ -502,6 +599,43 @@ void x86_init_tss(thread *toinit)
    tss->cs  = 0x18 | 0x03;
    tss->ss0 = 0x10; /* kernel stack seg (aka data seg) for the IRQ handler */
    tss->esp0 = toinit->kstackbase;
+   tss->iomap_base = sizeof(tss_descr);
+   
+   LOLVL_DEBUG("[x86:%i] initialised TSS size %i for thread %p tid %i pid %i\n",
+               CPU_ID, size_req, toinit, toinit->tid, toinit->proc->pid);
+   
+   return success;
+}
+
+/* x86_change_tss
+   Tell the processor about a new TSS.
+   => cpugdt = pointer to the cpu's GDTR
+      gdt = pointer to the TSS entry in the cpu's GDT
+      tss = pointer to the new TSS structure
+      flags = THREAD_FLAG_HASIOBITMAP: The TSS has an IO bitmap in it.
+*/
+void x86_change_tss(gdtptr_descr *cpugdt, gdt_entry *gdt, tss_descr *tss, unsigned char flags)
+{
+   unsigned int base = (unsigned int)tss;
+   unsigned int limit = sizeof(tss_descr);
+   
+   /* calculate the correct size of the TSS */
+   if(flags & THREAD_FLAG_HASIOBITMAP)
+      limit += X86_IOPORT_BITMAPSIZE;
+   
+   LOLVL_DEBUG("[x86:%i] changing TSS: gdtptr %p (gdt base %x size %i bytes) entry %p tss %p limit %i\n",
+               CPU_ID, cpugdt, cpugdt->ptr, cpugdt->size, gdt, tss, limit);
+   
+   gdt->base_low    = (base & 0xFFFF);
+   gdt->base_middle = (base >> 16) & 0xFF;
+   gdt->base_high   = (base >> 24) & 0xFF;
+   gdt->limit_low   = (limit & 0xFFFF);
+   gdt->granularity = ((limit >> 16) & 0x0F) | 0x40; /* 32bit mode */
+   gdt->access      = 0x89; /* flags: present, executable, accessed */
+   
+   /* inform the cpu of changes */
+   x86_load_gdtr((unsigned int)cpugdt);
+   x86_load_tss();
 }
 
 /* x86_warm_kickstart
@@ -510,7 +644,7 @@ void x86_warm_kickstart(void)
 {
    thread *next = sched_get_next_to_run(CPU_ID);
    int_registers_block *regs = &(next->regs);
-   tss_descr *next_tss = (tss_descr *)&(next->tss);
+   tss_descr *next_tss = next->tss;
    
    LOLVL_DEBUG("[x86:%i] resuming warm thread %i (%p) of process %i (%p) (regs %p) (ds/ss %x cs %x ss0 %x esp0 %x)\n",
            CPU_ID, next->tid, next, next->proc->pid, next->proc, regs,
@@ -525,7 +659,9 @@ void x86_warm_kickstart(void)
    
    /* inform the CPU that things have changed */   
    next_tss->esp0 = next->kstackbase;
-   x86_change_tss(&(cpu_table[CPU_ID].gdtptr), cpu_table[CPU_ID].tssentry, next_tss);
+   x86_change_tss(&(cpu_table[CPU_ID].gdtptr),
+                  cpu_table[CPU_ID].tssentry, next_tss,
+                  next->flags & THREAD_FLAG_HASIOBITMAP);
    
    /* this seems to be the only sensible place to set this state variable */
    cpu_table[CPU_ID].current = next;
@@ -564,7 +700,6 @@ void x86_kickstart(void)
 {
    thread *torun = NULL;
    process *proc;
-   tss_descr *tss;
    unsigned int usresp;
    
    /* loop waiting for a thread to become ready to run */
@@ -578,16 +713,17 @@ void x86_kickstart(void)
       return;
    }
    
-   tss = (tss_descr *)&(torun->tss);
    proc = torun->proc;
    
-   LOLVL_DEBUG("[x86:%i] kickstarting cold thread %i (%p) of process %i (%p) stackbase %x kstackbase %x tss %x at EIP %x\n",
-           CPU_ID, torun->tid, torun, proc->pid, proc, torun->stackbase, torun->kstackbase, &(torun->tss), proc->entry);
+   LOLVL_DEBUG("[x86:%i] kickstarting cold thread %i (%p) of process %i (%p) stackbase %x kstackbase %x at EIP %x\n",
+           CPU_ID, torun->tid, torun, proc->pid, proc, torun->stackbase, torun->kstackbase, proc->entry);
    
    /* get page tables loaded, TSS initialised and GDT updated */
    x86_load_cr3(KERNEL_LOG2PHYS(proc->pgdir));
    x86_init_tss(torun);
-   x86_change_tss(&(cpu_table[CPU_ID].gdtptr), cpu_table[CPU_ID].tssentry, tss);
+   x86_change_tss(&(cpu_table[CPU_ID].gdtptr),
+                  cpu_table[CPU_ID].tssentry, torun->tss,
+                  torun->flags & THREAD_FLAG_HASIOBITMAP);
    
    /* keep the scheduler happy */
    torun->state = running;
@@ -624,28 +760,6 @@ void x86_kickstart(void)
      iret;" : : "b" (usresp), "c" (proc->entry));
    
    /* execution shouldn't really return to here */
-}
-
-/* x86_change_tss
-   Update the given tss and point to it from the given gdt entry */
-void x86_change_tss(gdtptr_descr *cpugdt, gdt_entry *gdt, tss_descr *tss)
-{
-   unsigned int base = (unsigned int)tss;
-   unsigned int limit = sizeof(tss_descr);
-   
-   LOLVL_DEBUG("[x86:%i] changing TSS: gdtptr %p (gdt base %x size %i bytes) entry %p tss %p\n",
-           CPU_ID, cpugdt, cpugdt->ptr, cpugdt->size, gdt, tss);
-   
-   gdt->base_low    = (base & 0xFFFF);
-   gdt->base_middle = (base >> 16) & 0xFF;
-   gdt->base_high   = (base >> 24) & 0xFF;
-   gdt->limit_low   = (limit & 0xFFFF);
-   gdt->granularity = ((limit >> 16) & 0x0F) | 0x40; /* 32bit mode */
-   gdt->access      = 0x89; /* flags: present, executable, accessed */
-
-   /* inform the cpu of changes */
-   x86_load_gdtr((unsigned int)cpugdt);
-   x86_load_tss();
 }
 
 // ----------------------- interrupt management ----------------------------

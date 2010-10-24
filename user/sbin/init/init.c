@@ -18,11 +18,42 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #include <diosix.h>
 #include <functions.h>
 
+#define SERIAL_HW   (0x3f8)
+
+unsigned readportb(unsigned short port)
+{
+   unsigned char ret_val;
+   
+   __asm__ __volatile__("inb %1,%0"
+                        : "=a"(ret_val)
+                        : "d"(port));
+   return ret_val;
+}
+
+void writeportb(unsigned port, unsigned val)
+{
+   __asm__ __volatile__("outb %b0,%w1"
+                        :
+                        : "a"(val), "d"(port));
+}
+
+void writetoserial(unsigned char c)
+{
+   /* loop waiting for bit 5 of the line status register to set, indicating
+    data can be written */
+   while((readportb(SERIAL_HW + 5) & 0x20) == 0) __asm__ __volatile("pause");
+   writeportb(SERIAL_HW + 0, c);
+}
+
 void do_listen(void)
 {
    unsigned int buffer;
    diosix_msg_info msg;
    kresult err;
+   
+   /* move into driver layer and get access to IO ports */
+   diosix_priv_layer_up();
+   diosix_driver_register();
    
    /* listen and reply */
    while(1)
@@ -42,6 +73,9 @@ void do_listen(void)
          msg.send = &buffer;
          msg.send_size = sizeof(unsigned int);
          err = diosix_msg_reply(&msg);
+         
+         /* use an IO port */
+         writetoserial('X');
       }
    }
 }
@@ -56,6 +90,10 @@ void main(void)
    child = diosix_fork();
 
    if(child == 0) do_listen(); /* child does the listening */
+   
+   /* move up the priv stack to layer 2 so we can send messages */
+   diosix_priv_layer_up();
+   diosix_priv_layer_up();
    
    /* send the message to the child */
    while(1)
