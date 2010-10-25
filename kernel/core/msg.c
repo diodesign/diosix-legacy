@@ -41,6 +41,7 @@ kresult msg_send_signal(process *target, unsigned int signum, unsigned int sigco
 kresult msg_test_receiver(thread *sender, thread *target, diosix_msg_info *msg)
 {
    diosix_msg_info *tmsg;
+   unsigned char layer;
    
    /* sanity check */
    if(!sender || !target || !msg)
@@ -53,9 +54,17 @@ kresult msg_test_receiver(thread *sender, thread *target, diosix_msg_info *msg)
    /* protect us from changes to the target's metadata */
    lock_gate(&(target->lock), LOCK_READ);
    
+   /* calculate layer - if DIOSIX_MSG_SENDASUSR is set then the message is
+      being sent as an unprivileged user program */
+   if((sender->proc->flags & PROC_FLAG_CANMSGASUSR) &&
+      (msg->flags & DIOSIX_MSG_SENDASUSR))
+      layer = LAYER_MAX;
+   else
+      layer = sender->proc->layer;
+   
    /* threads can only recieve messages if they are in a layer below the sender - unless it's a 
       reply. we check below whether this is a legit reply */
-   if((target->proc->layer >= sender->proc->layer) && !(msg->flags & DIOSIX_MSG_REPLY))
+   if((target->proc->layer >= layer) && !(msg->flags & DIOSIX_MSG_REPLY))
    {
       MSG_DEBUG("[msg:%i] recv layer %i not below sender layer %i and message isn't a reply (%i)\n",
                 CPU_ID, target->proc->layer, sender->proc->layer, msg->flags);

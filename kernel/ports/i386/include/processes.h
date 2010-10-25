@@ -70,14 +70,7 @@ typedef struct process process;
 typedef struct thread thread;
 typedef struct mp_thread_queue mp_thread_queue; /* in cpu.h */
 
-/* vmm_area flags */
-#define VMA_READABLE    (0 << 0)
-#define VMA_WRITEABLE   (1 << 0)
-#define VMA_MEMSOURCE   (1 << 1) /* on fault, map in a physical page if set, or bump the userspace manager if not */
-                                 /* this is overridden by page bit 9 */
-#define VMA_HASPHYS     (1 << 7) /* hint to the vmm that a page has physical memory assigned to it */
-
-/* a process memory area - arranged as a tree */
+/* a process memory area - arranged as a tree. flags are defined in <diosix.h> */
 typedef struct
 {
    unsigned int flags;       /* control aspects of this memory area */
@@ -214,7 +207,8 @@ struct thread
 /* process status flags (rights) */
 #define PROC_FLAG_CANMSGASUSR (1 << 1) /* can send messages as a user process */
 #define PROC_FLAG_CANBEDRIVER (1 << 2) /* can register as a driver process */
-#define PROC_RIGHTS_MASK      (PROC_FLAG_CANMSGASUSR | PROC_FLAG_CANBEDRIVER)
+#define PROC_FLAG_CANMAPPHYS  (1 << 3) /* is allowed to map physical memory into its virtual space */
+#define PROC_RIGHTS_MASK      (PROC_FLAG_CANMSGASUSR | PROC_FLAG_CANBEDRIVER | PROC_FLAG_CANMAPPHYS)
 
 /* describe each process */
 struct process
@@ -281,7 +275,7 @@ struct process
 #define LAYER_MAX        (255)
 #define LAYER_EXECUTIVE  (0)
 #define LAYER_DRIVERS    (1)
-#define FLAGS_EXECUTIVE  (PROC_FLAG_CANMSGASUSR | PROC_FLAG_CANBEDRIVER)
+#define FLAGS_EXECUTIVE  (PROC_FLAG_CANMSGASUSR | PROC_FLAG_CANBEDRIVER | PROC_FLAG_CANMAPPHYS)
 
 /* processes, threads and scheduling */
 extern process *proc_sys_executive;

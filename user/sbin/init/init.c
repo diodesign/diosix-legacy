@@ -37,23 +37,22 @@ void writeportb(unsigned port, unsigned val)
                         : "a"(val), "d"(port));
 }
 
-void writetoserial(unsigned char c)
-{
-   /* loop waiting for bit 5 of the line status register to set, indicating
-    data can be written */
-   while((readportb(SERIAL_HW + 5) & 0x20) == 0) __asm__ __volatile("pause");
-   writeportb(SERIAL_HW + 0, c);
-}
-
 void do_listen(void)
 {
    unsigned int buffer;
    diosix_msg_info msg;
-   kresult err;
+   diosix_phys_request req;
    
    /* move into driver layer and get access to IO ports */
    diosix_priv_layer_up();
    diosix_driver_register();
+   
+   /* map in the text buffer */
+   req.paddr = (void *)0xb8000; /* text mode screen buffer */
+   req.vaddr = (void *)0xb8000; /* identity map it */
+   req.size = 4096;
+   req.flags = VMA_WRITEABLE | VMA_NOCACHE;
+   diosix_driver_map_phys(&req);
    
    /* listen and reply */
    while(1)
@@ -72,10 +71,10 @@ void do_listen(void)
          msg.flags = DIOSIX_MSG_GENERIC;
          msg.send = &buffer;
          msg.send_size = sizeof(unsigned int);
-         err = diosix_msg_reply(&msg);
+         diosix_msg_reply(&msg);
          
-         /* use an IO port */
-         writetoserial('X');
+         /* write out a character to the screen */
+         *((unsigned char *)0xb8000) = (buffer % 128);
       }
    }
 }

@@ -59,7 +59,7 @@ void syscall_do_fork(int_registers_block *regs)
    if(source->flags & THREAD_FLAG_ISDRIVER)
    {
       new->flags |= THREAD_FLAG_ISDRIVER;
-      x86_ioports_enable(new);
+      x86_ioports_enable(tnew);
    }
    
    /* don't forget to init the tss for the new thread in the new process and duplicate the 
@@ -381,6 +381,79 @@ void syscall_do_driver(int_registers_block *regs)
             SYSCALL_DEBUG("[sys:%i] thread deregistered as a driver\n", CPU_ID);
             SYSCALL_RETURN(success);
          }
+         
+      case DIOSIX_DRIVER_MAP_PHYS:
+         if((current->flags & THREAD_FLAG_ISDRIVER) &&
+            (current->proc->flags & PROC_FLAG_CANMAPPHYS))
+         {
+            unsigned int flags, pgflags, pgloop;
+            diosix_phys_request *req = (diosix_phys_request *)regs->ebx; 
+            
+            /* sanity checks */
+            if(!req) SYSCALL_RETURN(e_bad_params);
+            if((unsigned int)req + MEM_CLIP(req, sizeof(diosix_phys_request)) >= KERNEL_SPACE_BASE)
+               SYSCALL_RETURN(e_bad_params);
+            if((unsigned int)req->vaddr + MEM_CLIP(req->vaddr, req->size) >= KERNEL_SPACE_BASE)
+               SYSCALL_RETURN(e_bad_params);
+            if(req->paddr >= req->paddr + req->size)
+               SYSCALL_RETURN(e_bad_params);
+            if(!(req->vaddr) || !(req->size)) SYSCALL_RETURN(e_bad_params);
+            
+            /* check the alignments */
+            if(!(MEM_IS_PG_ALIGNED(req->paddr)) ||
+               !(MEM_IS_PG_ALIGNED(req->vaddr)) ||
+               !(MEM_IS_PG_ALIGNED(req->size)))
+               SYSCALL_RETURN(e_bad_params);
+
+            /* protect the kernel's physical critical section */
+            if((unsigned int)req->paddr >= KERNEL_CRITICAL_BASE && (unsigned int)req->paddr < KERNEL_CRITICAL_END)
+               SYSCALL_RETURN(e_bad_params);
+            if((unsigned int)req->paddr < KERNEL_CRITICAL_BASE && ((unsigned int)req->paddr + req->size) > KERNEL_CRITICAL_BASE)
+               SYSCALL_RETURN(e_bad_params);
+            
+            /* check there's no conflict in mapping this area in */
+            if(vmm_find_vma(current->proc, (unsigned int)req->vaddr))
+               SYSCALL_RETURN(e_vma_exists);
+            if(vmm_find_vma(current->proc, (unsigned int)req->vaddr + req->size))
+               SYSCALL_RETURN(e_vma_exists);
+            
+            /* sanatise the settings flags */
+            flags = req->flags & (VMA_WRITEABLE | VMA_NOCACHE);
+            
+            lock_gate(&(current->proc->lock), LOCK_WRITE);
+            
+            /* phew - let's create a new virtual memory area for the physical mapping */
+            if(vmm_add_vma(current->proc, (unsigned int)req->vaddr, req->size, flags, 0))
+            {
+               unlock_gate(&(current->proc->lock), LOCK_WRITE);
+               SYSCALL_RETURN(e_failure);
+            }
+            
+            /* build page flags */
+            pgflags = PG_PRESENT | PG_PRIVLVL;
+            if(flags & VMA_WRITEABLE) pgflags |= PG_RW;
+            if(flags & VMA_NOCACHE) pgflags |= PG_CACHEDIS;
+            
+            /* loop through the pages to map in, adding page table entries */
+            for(pgloop = 0; pgloop < req->size; pgloop += MEM_PGSIZE)
+            {
+               if(pg_add_4K_mapping(current->proc->pgdir,
+                                    (unsigned int)req->vaddr + pgloop,
+                                    (unsigned int)req->paddr + pgloop,
+                                    pgflags))
+               {
+                  unlock_gate(&(current->proc->lock), LOCK_WRITE);
+                  SYSCALL_RETURN(e_failure);
+               }
+            }
+            
+            unlock_gate(&(current->proc->lock), LOCK_WRITE);
+            SYSCALL_DEBUG("[sys:%i] successfully mapped physical %p to logical %p size %i bytes\n",
+                          CPU_ID, req->paddr, req->vaddr, req->size);
+            SYSCALL_RETURN(success);
+            
+         }
+         else SYSCALL_RETURN(e_no_rights);
    }
    
    /* fall through to returning an error code */

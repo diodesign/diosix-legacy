@@ -47,6 +47,8 @@ unsigned int diosix_iorights_clear(unsigned int index, unsigned int bits);
 /* manage drivers */
 unsigned int diosix_driver_register(void);
 unsigned int diosix_driver_deregister(void);
+unsigned int diosix_driver_unmap_phys(diosix_phys_request *block);
+unsigned int diosix_driver_map_phys(diosix_phys_request *block);
 
 /* get information */
 unsigned int diosix_get_thread_info(diosix_thread_info *block);

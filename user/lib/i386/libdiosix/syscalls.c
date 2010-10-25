@@ -173,6 +173,21 @@ unsigned int diosix_driver_deregister(void)
    return retval;
 }
 
+unsigned int diosix_driver_map_phys(diosix_phys_request *block)
+/* map some physical memory into process space, for driver threads with PROC_FLAG_CANMAPPHYS set only */
+{
+   unsigned int retval;
+   __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (DIOSIX_DRIVER_MAP_PHYS), "b" (block), "d" (SYSCALL_DRIVER));
+   return retval;
+}
+
+unsigned int diosix_driver_unmap_phys(diosix_phys_request *block)
+/* unmap some physical memory into process space, for driver threads with PROC_FLAG_CANMAPPHYS set only */
+{
+   unsigned int retval;
+   __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (DIOSIX_DRIVER_UNMAP_PHYS), "b" (block), "d" (SYSCALL_DRIVER));
+   return retval;
+}
 
 /* --------------- get information out of the kernel ---------------- */
 unsigned int diosix_get_thread_info(diosix_thread_info *block)

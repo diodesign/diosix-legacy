@@ -73,6 +73,7 @@ typedef enum
 #define DIOSIX_MSG_REPLY       (1 << 31)
 #define DIOSIX_MSG_MULTIPART   (1 << 30)
 #define DIOSIX_MSG_RECVONREPLY (1 << 29)
+#define DIOSIX_MSG_SENDASUSR   (1 << 28)
 /* simple type bits low (bits 0-11) */
 #define DIOSIX_MSG_GENERIC     (1)
 #define DIOSIX_MSG_SIGNAL      (2)
@@ -121,6 +122,25 @@ typedef struct
 /* reason codes for driver management */
 #define DIOSIX_DRIVER_REGISTER   (0)
 #define DIOSIX_DRIVER_DEREGISTER (1)
+#define DIOSIX_DRIVER_MAP_PHYS   (2)
+#define DIOSIX_DRIVER_UNMAP_PHYS (3)
+
+/* vmm_area flags */
+#define VMA_READABLE    (0 << 0)
+#define VMA_WRITEABLE   (1 << 0)
+#define VMA_MEMSOURCE   (1 << 1) /* on fault, map in a physical page if set, or bump the userspace manager if not */
+                                 /* this is overridden by page bit 9 */
+#define VMA_NOCACHE     (1 << 2) /* disable caching on pages in this area */
+#define VMA_HASPHYS     (1 << 7) /* hint to the vmm that a page has physical memory assigned to it */
+
+/* describe a physical memory request */
+typedef struct
+{
+   void *paddr; /* the physical base address to map, must be page aligned */
+   void *vaddr;  /* the virtual base address to map into, must be page aligned */
+   unsigned int size;   /* number of bytes to map in, must be in whole number of pages */
+   unsigned char flags; /* set the type of mapping */
+} diosix_phys_request;
 
 /* thread information block */
 typedef struct

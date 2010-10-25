@@ -61,6 +61,8 @@ extern unsigned int KernelBootStackBase, APStack;
 
 /* MEM_CLIP(base, size) - return size clipped to base+size =< KERNEL_PHYSICAL_TOP */
 #define MEM_CLIP(a, b)       ( (unsigned int)(b) > (KERNEL_PHYSICAL_TOP - (unsigned int)(a)) ? (KERNEL_PHYSICAL_TOP - (unsigned int)(a)) : (b) )
+/* MEM_IS_PG_ALIGNED(a) - return 1 for a page-aligned address or 0 for not */
+#define MEM_IS_PG_ALIGNED(a) ( ((unsigned int)(a) & PG_4K_MASK) == (unsigned int)(a) ? 1 : 0 )
 
 /* vmm magic */
 #define KHEAP_FREE           (0xdeaddead)

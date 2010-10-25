@@ -1111,6 +1111,10 @@ kresult vmm_add_vma(process *proc, unsigned int base, unsigned int size,
                     unsigned char flags, unsigned int cookie)
 {
    vmm_area *new;
+   
+   /* sanity check - no zero page or zero size mappings */
+   if(!base || !size) return e_bad_params;
+   
    kresult err = vmm_malloc((void **)&new, sizeof(vmm_area));
    if(err) return err;
    vmm_memset(new, 0, sizeof(vmm_area)); /* zero the area */
