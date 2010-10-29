@@ -525,7 +525,7 @@ void x86_proc_preinit(void)
 */
 void x86_thread_switch(thread *now, thread *next, int_registers_block *regs)
 {
-   tss_descr *new_tss = (tss_descr *)&(next->tss);
+   tss_descr *new_tss = next->tss;
    
    LOLVL_DEBUG("[x86:%i] switching thread %p for %p (regs %p) (ds/ss %x cs %x ss0 %x esp0 %x)\n",
            CPU_ID, now, next, regs, new_tss->ss, new_tss->cs, new_tss->ss0, new_tss->esp0);
@@ -549,7 +549,7 @@ void x86_thread_switch(thread *now, thread *next, int_registers_block *regs)
    if(now->proc->pgdir != next->proc->pgdir)
       x86_load_cr3(KERNEL_LOG2PHYS(next->proc->pgdir));
    
-   /* inform the CPU that things have changed */   
+   /* inform the CPU that things have changed */
    new_tss->esp0 = next->kstackbase;
    x86_change_tss(&(cpu_table[CPU_ID].gdtptr),
                   cpu_table[CPU_ID].tssentry, new_tss,
@@ -590,8 +590,9 @@ kresult x86_init_tss(thread *toinit)
    if(size_req > sizeof(tss_descr))
       vmm_memcpy((void *)((unsigned int)(toinit->tss) + sizeof(tss_descr)),
                  toinit->proc->ioport_bitmap, X86_IOPORT_BITMAPSIZE);
-   
+
    tss = toinit->tss;
+   vmm_memset(tss, 0, sizeof(tss_descr)); /* let's not forget to zero the TSS */
    
    /* initialise the correct registers */
    /* kernel data seg is 0x10, code seg is 0x18, ORd 0x3 for ring-3 access */
@@ -601,8 +602,8 @@ kresult x86_init_tss(thread *toinit)
    tss->esp0 = toinit->kstackbase;
    tss->iomap_base = sizeof(tss_descr);
    
-   LOLVL_DEBUG("[x86:%i] initialised TSS size %i for thread %p tid %i pid %i\n",
-               CPU_ID, size_req, toinit, toinit->tid, toinit->proc->pid);
+   LOLVL_DEBUG("[x86:%i] initialised TSS %p size %i for thread %p tid %i pid %i\n",
+               CPU_ID, tss, size_req, toinit, toinit->tid, toinit->proc->pid);
    
    return success;
 }

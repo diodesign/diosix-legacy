@@ -84,23 +84,19 @@ void main(void)
    diosix_msg_info msg;
    unsigned int child;
    unsigned int message = 0;
-   
+
    /* create new process to receive */
    child = diosix_fork();
-
+   
    if(child == 0) do_listen(); /* child does the listening */
-   
-   /* move up the priv stack to layer 2 so we can send messages */
-   diosix_priv_layer_up();
-   diosix_priv_layer_up();
-   
+      
    /* send the message to the child */
    while(1)
    {
       /* set up message block */
       msg.tid = DIOSIX_MSG_ANY_THREAD;
       msg.pid = child;
-      msg.flags = DIOSIX_MSG_GENERIC;
+      msg.flags = DIOSIX_MSG_GENERIC | DIOSIX_MSG_SENDASUSR;
       msg.send = &message;
       msg.send_size = sizeof(unsigned int);
       msg.recv = &message;
