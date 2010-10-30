@@ -177,5 +177,7 @@ extern mp_core *cpu_table;
 kresult mp_initialise(void); /* if this fails then the machine is probably toast */
 kresult mp_post_initialise(void);
 void mp_catch_ap(void);
+void mp_interrupt_process(process *proc, unsigned char interrupt);
+void mp_interrupt_thread(thread *target, unsigned char interrupt);
 
 #endif

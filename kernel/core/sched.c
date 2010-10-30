@@ -689,7 +689,10 @@ void sched_remove(thread *victim, thread_state state)
       sched_dec_queued_threads();
    }
 
-   victim->state = state;
+   /* warn another processor that its thread has been removed */
+   if(victim->state == running) mp_interrupt_thread(victim, INT_IPI_RESCHED);
+
+   victim->state = state; /* update the state; it might be dying or just blocked */
    
    /* determine the highest priority run queue that's non-empty */
    if(cpu_table[cpu].lowest_queue_filled >= victim->queue->priority)
@@ -702,7 +705,7 @@ void sched_remove(thread *victim, thread_state state)
             break;
          }
    }
-   
+
    SCHED_DEBUG("[sched:%i] removed thread %i (%p) of process %i from cpu %i queue, priority %i\n",
                CPU_ID, victim->tid, victim, victim->proc->pid, cpu, victim->queue->priority);
    

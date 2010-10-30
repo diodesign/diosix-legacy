@@ -447,10 +447,13 @@ void syscall_do_driver(int_registers_block *regs)
                }
             }
             
-            /* tell the processor to reload the process's page tables */
+            /* tell the processor to reload the process's page tables 
+               and warn other cores running this driver process */
             x86_load_cr3(KERNEL_LOG2PHYS(current->proc->pgdir));
+            mp_interrupt_process(current->proc, INT_IPI_FLUSHTLB);
             
             unlock_gate(&(current->proc->lock), LOCK_WRITE);
+            
             SYSCALL_DEBUG("[sys:%i] successfully mapped physical %p to logical %p size %i bytes\n",
                           CPU_ID, req->paddr, req->vaddr, req->size);
             SYSCALL_RETURN(success);

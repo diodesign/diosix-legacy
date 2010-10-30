@@ -319,14 +319,24 @@ kresult thread_kill(process *owner, thread *victim)
       
    if(victim)
    {
+      /* bail out if we're trying to kill a thread outside of the
+         process */
       if(victim->proc != owner) return e_failure;
-      
-      /* stop this thread from running and lock it */
-      if(lock_gate(&(victim->lock), LOCK_WRITE | LOCK_SELFDESTRUCT))
-         return e_failure;
       
       /* if we can't lock then assume it's this thread that's dying */
       if(sched_lock_thread(victim)) sched_remove(victim, dead);
+      
+      /* synchronise with the rest of the system - we cannot tear down
+         a thread if it's still running on another core so spin until 
+         it's clear that the thread is no longer being run on the cpu
+         it was last on */
+      lock_gate(&(victim->lock), LOCK_READ);
+      while(cpu_table[victim->cpu].current != victim);
+      unlock_gate(&(victim->lock), LOCK_READ);
+
+      /* stop this thread from running and lock it */
+      if(lock_gate(&(victim->lock), LOCK_WRITE | LOCK_SELFDESTRUCT))
+         return e_failure;
       
       /* free the thread's user stack' physical pages and unset the table entries */
       if(pg_user2phys(&physaddr, owner->pgdir, victim->stackbase - MEM_PGSIZE) == success)
@@ -345,14 +355,14 @@ kresult thread_kill(process *owner, thread *victim)
       }
 
       /* unlink thread from the process's thread hash table */
-     lock_gate(&(owner->lock), LOCK_WRITE);
+      lock_gate(&(owner->lock), LOCK_WRITE);
                  
-     if(victim->hash_next)
+      if(victim->hash_next)
          victim->hash_next->hash_prev = victim->hash_prev;
-     if(victim->hash_prev)
+      if(victim->hash_prev)
          victim->hash_prev->hash_next = victim->hash_next;
-     else
-     /* we were the hash table entry head, so fixup table */
+      else
+      /* we were the hash table entry head, so fixup table */
          owner->threads[victim->tid % THREAD_HASH_BUCKETS] = victim->hash_next;
 
       owner->thread_count--;

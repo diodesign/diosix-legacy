@@ -29,6 +29,61 @@ mp_core *cpu_table = NULL;
 /* set to 1 by an AP to indicate it's reached startup, reset to 0 before attempting to bake an AP */
 volatile unsigned char mp_ap_ready = 0;
 
+/* mp_interrupt_process
+   Send a given interrupt to all cores (but this one) running the given process */
+void mp_interrupt_process(process *proc, unsigned char interrupt)
+{
+   unsigned int this_cpu = CPU_ID;
+   unsigned int loop, count = 0;
+   thread *t;
+   
+   /* sanity check - no bad pointers or uniproc machines */
+   if(mp_cpus < 2 || !proc || !interrupt) return;
+   
+   MP_DEBUG("[mp:%i] sending interrupt %i to process %p (pid %i)\n",
+            CPU_ID, interrupt, proc, proc->pid);
+   
+   lock_gate(&(proc->lock), LOCK_READ);
+   
+   for(loop = 0; loop < THREAD_HASH_BUCKETS; loop++)
+   {
+      t = proc->threads[loop];
+      
+      while(t)
+      {
+         if(t->state == running && t->cpu != this_cpu)
+            lapic_ipi_send(t->cpu, interrupt);
+         
+         count++;
+         t = t->hash_next;
+      }
+      
+      /* bail out if we've seen all the process's threads */
+      if(count >= proc->thread_count) break;
+   }
+   
+   unlock_gate(&(proc->lock), LOCK_READ);
+}
+
+/* mp_interrupt_thread
+   Send a given interrupt to a core (not this one) running the given thread */
+void mp_interrupt_thread(thread *target, unsigned char interrupt)
+{
+   /* sanity check - no bad pointers or uniproc machines */
+   if(mp_cpus < 2 || !target || !interrupt) return;
+   
+   lock_gate(&(target->lock), LOCK_READ);
+
+   if(target->state == running && target->cpu != CPU_ID)
+   {
+      MP_DEBUG("[mp:%i] sending interrupt %i to thread %p (tid %i pid %i)\n",
+               CPU_ID, interrupt, target, target->tid, target->proc->pid);
+      lapic_ipi_send(target->cpu, interrupt);
+   }
+   
+   unlock_gate(&(target->lock), LOCK_READ);
+}
+
 /* mp_catch_ap
    This is the point where an application processor joins the kernel proper */
 void _mp_catch_ap(void)

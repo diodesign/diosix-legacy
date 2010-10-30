@@ -54,6 +54,7 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #define LAPIC_ASSERT       (1 << 14)  /* in the ICR_LO reg */
 #define LAPIC_TRG_LEVEL    (1 << 15)  /* in the ICR_LO reg */
 #define LAPIC_ALLINCSEL    (1 << 19)  /* in the ICR_LO reg */
+#define LAPIC_ALLBUTSEL    ((1 << 19) | (1 << 18)) /* in the ICR_LO reg */
 
 /* IOAPIC register locations */
 #define IOAPIC_REG_SELECT    (0xfec00000)
@@ -103,8 +104,10 @@ void pic_initialise(void);
 
 void lapic_write(volatile unsigned int *addr, unsigned int value);
 void lapic_end_interrupt(void);
-void lapic_ipi_send_startup(unsigned int destination, unsigned char vector);
-void lapic_ipi_send_init(unsigned int destination);
+void lapic_ipi_send(unsigned char destination, unsigned char vector);
+void lapic_ipi_broadcast(unsigned char vector);
+void lapic_ipi_send_startup(unsigned char destination, unsigned char vector);
+void lapic_ipi_send_init(unsigned char destination);
 unsigned int ioapic_read(unsigned char id, unsigned char reg);
 void ioapic_write(unsigned char id, unsigned char reg, unsigned int value);
 kresult ioapic_register_chip(unsigned int id, unsigned int physaddr);
@@ -118,6 +121,12 @@ kresult irq_deregister_driver(unsigned int irq_num, unsigned int type, unsigned 
 #define INT_DOUBLEF        (8)
 #define INT_GPF            (13)
 #define INT_PF             (14)
+
+/* interprocessor interrupts */
+#define INT_IPI_RESCHED    (142) /* pick a new running thread */
+#define INT_IPI_FLUSHTLB   (143) /* reload page directory */
+
+/* syscall interface */
 #define INT_KERNEL_SWI     (144)
 
 #define PIC_MASTER_VECTOR_BASE   (32)

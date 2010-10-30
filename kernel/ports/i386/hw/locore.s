@@ -402,6 +402,10 @@ IRQ       44, 85
 IRQ       45, 86
 IRQ       46, 87
 
+; inter-processor interrupts (142-143)
+ISR_NOERRCODE   142
+ISR_NOERRCODE   143
+
 ; diosix SWI handler at 0x90 (144)
 ISR_NOERRCODE   144
 

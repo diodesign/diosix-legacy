@@ -84,10 +84,36 @@ void lapic_icr_ready(void)
    while((*LAPIC_ICR_LO) & LAPIC_PENDING) __asm__ __volatile__("pause");
 }
 
+/* lapic_ipi_broadcast
+   Broadcast a given interrupt to all other processors in the system */
+void lapic_ipi_broadcast(unsigned char vector)
+{
+   LAPIC_DEBUG("[lapic:%i] sending IPI %i to all cores\n", CPU_ID, vector);
+   
+   lapic_icr_ready(); /* wait for the command reg to be ready */
+   
+   /* write to HI, then LO to send */
+   lapic_write(LAPIC_ICR_HI, 0xff000000); /* destination: all */
+   lapic_write(LAPIC_ICR_LO, LAPIC_ALLBUTSEL | LAPIC_ASSERT | vector);
+}
+
+/* lapic_ipi_send
+   Send a given IPI to a given core */
+void lapic_ipi_send(unsigned char destination, unsigned char vector)
+{
+   LAPIC_DEBUG("[lapic:%i] sending IPI %i to core %i\n", CPU_ID, vector, destination);
+   
+   lapic_icr_ready(); /* wait for the command reg to be ready */
+   
+   /* write to HI, then LO to send */
+   lapic_write(LAPIC_ICR_HI, destination << LAPIC_DEST_SHIFT);
+   lapic_write(LAPIC_ICR_LO, LAPIC_ASSERT | vector);
+}
+
 /* lapic_ipi_send_init
    Send an INIT IPI to the given processor
 */
-void lapic_ipi_send_init(unsigned int destination)
+void lapic_ipi_send_init(unsigned char destination)
 {
    LAPIC_DEBUG("[lapic:%i] sending INIT IPI (%x) to AP %i..\n",
                CPU_ID, LAPIC_TYPE_INIT | LAPIC_TRG_LEVEL | LAPIC_ASSERT, destination);
@@ -105,7 +131,7 @@ void lapic_ipi_send_init(unsigned int destination)
 /* int_ipi_send_startup
    Send a startup IPI to the given processor using the given vector
 */
-void lapic_ipi_send_startup(unsigned int destination, unsigned char vector)
+void lapic_ipi_send_startup(unsigned char destination, unsigned char vector)
 {
    LAPIC_DEBUG("[lapic:%i] sending startup IPI (%x) to AP %i..\n",
                CPU_ID, vector | LAPIC_TYPE_START | LAPIC_ASSERT, destination);

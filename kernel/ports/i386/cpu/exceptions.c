@@ -30,6 +30,9 @@ extern void isr20(); extern void isr21(); extern void isr22(); extern void isr23
 extern void isr24(); extern void isr25(); extern void isr26(); extern void isr27();
 extern void isr28(); extern void isr29(); extern void isr30(); extern void isr31();
 
+/* inter-processor interrupts (142-143) - sent to warn other cores of changes */
+extern void isr142(); extern void isr143();
+
 /* diosix native software interrupt - 0x90 (144) set by KERNEL_SWI_BASE */
 extern void isr144();
 
@@ -116,7 +119,23 @@ void exception_handler(int_registers_block regs)
             }
          }
          break;
+         
+      case INT_IPI_RESCHED: /* IPI: Foreced reschedule */
+         /* wait until another core marks this thread as
+            non-running and then pick another thread */
+         lock_gate(&(cpu_table[CPU_ID].current->lock), LOCK_READ);
+         while(cpu_table[CPU_ID].current->state != running);
+         unlock_gate(&(cpu_table[CPU_ID].current->lock), LOCK_READ);
+         break;
 
+      case INT_IPI_FLUSHTLB: /* IPI: flush TLB/reload page tables */
+         {
+            thread *t = cpu_table[CPU_ID].current;
+            if(t && t->state == running)
+               x86_load_cr3(KERNEL_LOG2PHYS(t->proc->pgdir));
+         }
+         break;
+         
       case INT_KERNEL_SWI: /* KERNEL SYSTEM CALL */
          /* kernel swi number in edx, params in eax-ecx */
          switch(regs.edx)
