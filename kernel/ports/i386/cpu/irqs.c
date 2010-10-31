@@ -64,12 +64,11 @@ void irq_handler(int_registers_block regs)
          case IRQ_DRIVER_PROCESS:
             {
                /* poke the driver process */
-               process *target = proc_find_proc(driver->pid);
-               IRQ_DEBUG("[irq:%i] signalling process %i for IRQ %i (driver %p)\n",
-                         CPU_ID, driver->pid, regs.intnum, driver);
-               if(target)
+               IRQ_DEBUG("[irq:%i] signalling process %i (%p) for IRQ %i (driver %p)\n",
+                         CPU_ID, driver->proc->pid, driver->proc, regs.intnum, driver);
+               if(driver->proc)
                {
-                  msg_send_signal(target, SIGXIRQ, regs.intnum);
+                  msg_send_signal(driver->proc, SIGXIRQ, regs.intnum);
                   handled = 1;
                }
             }
@@ -95,13 +94,12 @@ void irq_handler(int_registers_block regs)
    Locate a registered driver's entry structure 
    => irq_num = IRQ line to search
       type    = required driver type (see irq_register_driver)
-      pid     = process id to match (or 0 for n/a)
+      proc    = process to match (or 0 for n/a)
       func    = in-kernel function to match (or NULL for n/a)
    <= pointer to structure or NULL for no match
 */
 irq_driver_entry *irq_find_driver(unsigned int irq_num, unsigned int type,
-                                  unsigned int pid,
-                                  kresult (*func)(unsigned char intnum, int_registers_block *regs))
+                                  process *proc, kresult (*func)(unsigned char intnum, int_registers_block *regs))
 {
    irq_driver_entry *search;
    
@@ -121,7 +119,7 @@ irq_driver_entry *irq_find_driver(unsigned int irq_num, unsigned int type,
             break;
             
          case IRQ_DRIVER_PROCESS:
-            if(search->pid == pid) goto irq_driver_entry_exit;
+            if(search->proc == proc) goto irq_driver_entry_exit;
             break;
       }
       
@@ -138,13 +136,13 @@ irq_driver_entry_exit:
     Remove a driver from the given IRQ line
     => irq_num  = IRQ line to deattach the driver from
        type     = define the driver type and any other flags, types are:
-                  IRQ_DRIVER_THREAD, IRQ_DRIVER_PROCESS, IRQ_DRIVER_FUNCTION
+                  IRQ_DRIVER_PROCESS, IRQ_DRIVER_FUNCTION
        pid      = process id to match (or 0 for none)
        func     = in-kernel function to match, or NULL for none
     <= 0 for success or else an error code 
 */
 kresult irq_deregister_driver(unsigned int irq_num, unsigned int type,
-                              unsigned int pid, 
+                              process *proc, 
                               kresult (*func)(unsigned char intnum, int_registers_block *regs))
 {
    irq_driver_entry *victim;
@@ -153,7 +151,7 @@ kresult irq_deregister_driver(unsigned int irq_num, unsigned int type,
    if(irq_num >= IRQ_MAX_LINES) return e_bad_params;
    
    /* locate the victim and bail out if we can't find what we're looking for */
-   victim = irq_find_driver(irq_num, type, pid, func);
+   victim = irq_find_driver(irq_num, type, proc, func);
    if(!victim) return e_bad_params;
    
    lock_gate(&irq_lock, LOCK_WRITE);
@@ -167,12 +165,27 @@ kresult irq_deregister_driver(unsigned int irq_num, unsigned int type,
       /* we were the irq line head, so fix up */
       irq_drivers[irq_num] = victim->next;
 
+   /* remove it from the process's linked list */
+   if(victim->proc && (victim->flags & IRQ_DRIVER_PROCESS))
+   {
+      lock_gate(&(victim->proc->lock), LOCK_WRITE);
+      
+      if(victim->proc_next)
+         victim->proc_next->proc_previous = victim->proc_previous;
+      if(victim->proc_previous)
+         victim->proc_previous->proc_next = victim->proc_next;
+      else
+         victim->proc->interrupts = victim->proc_next;         
+      
+      unlock_gate(&(victim->proc->lock), LOCK_WRITE);
+   }
+   
    vmm_free(victim);
    
    unlock_gate(&irq_lock, LOCK_WRITE);
    
-   IRQ_DEBUG("[irq:%i] deregistered driver %p from IRQ %i\n", CPU_ID,
-             victim, irq_num);
+   IRQ_DEBUG("[irq:%i] deregistered driver %p from IRQ %i\n",
+             CPU_ID, victim, irq_num);
    
    return success;
 }
@@ -182,13 +195,12 @@ kresult irq_deregister_driver(unsigned int irq_num, unsigned int type,
    => irq_num  = IRQ line to attach this driver to
       flags    = define the driver type and any other flags, types are:
                  IRQ_DRIVER_PROCESS, IRQ_DRIVER_FUNCTION
-      pid      = process id to send the irq signal to (or 0 for none)
+      proc     = pointer to process to send the irq signal to (or 0 for none)
       func     = in-kernel function to call, or NULL for none
    <= 0 for success or else an error code 
 */
 kresult irq_register_driver(unsigned int irq_num, unsigned int flags,
-                            unsigned int pid,
-                            kresult (*func)(unsigned char intnum, int_registers_block *regs))
+                            process *proc, kresult (*func)(unsigned char intnum, int_registers_block *regs))
 {
    kresult err;
    irq_driver_entry *new, *head;
@@ -206,8 +218,29 @@ kresult irq_register_driver(unsigned int irq_num, unsigned int flags,
    if(flags & IRQ_DRIVER_FUNCTION)
       new->func = func; /* driver is a kernel function */
    else
-      new->pid = pid; /* driver is a userspace process */
+   {
+      /* bail out if something's gone wrong */
+      if(!proc)
+      {
+         vmm_free(new);
+         return e_bad_params;
+      }
+      
+      new->proc = proc; /* driver is a userspace process */
+      
+      lock_gate(&(proc->lock), LOCK_WRITE);
+      
+      /* add the driver to the start of the process's list */
+      new->proc_next = proc->interrupts;
+      if(proc->interrupts)
+         proc->interrupts->proc_previous = new;
+      proc->interrupts = new;
+      
+      unlock_gate(&(proc->lock), LOCK_WRITE);
+   }
+   
    new->flags = flags;
+   new->irq_num = irq_num;
    
    /* protect the data structure during update */
    lock_gate(&irq_lock, LOCK_WRITE);
@@ -225,8 +258,8 @@ kresult irq_register_driver(unsigned int irq_num, unsigned int flags,
    
    unlock_gate(&irq_lock, LOCK_WRITE);
    
-   IRQ_DEBUG("[irq:%i] registered driver %p to IRQ %i (pid %i func %p flags %x)\n", CPU_ID,
-             new, irq_num, pid, func, flags);
+   IRQ_DEBUG("[irq:%i] registered driver %p to IRQ %i (proc %p func %p flags %x)\n", CPU_ID,
+             new, irq_num, proc, func, flags);
    
    return success;
 }

@@ -65,29 +65,32 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #define IOAPIC_MASK          (1 << 16)
 
 /* interrupt support */
-#define IRQ_DRIVER_PROCESS   (1 << 0)   /* this driver is a specific userland thread */
-#define IRQ_DRIVER_FUNCTION  (1 << 1)   /* this driver is an in-kernel function */
-#define IRQ_DRIVER_TYPEMASK  (IRQ_DRIVER_FUNCTION | IRQ_DRIVER_PROCESS)
+#define IRQ_DRIVER_PROCESS  (1 << 0)   /* this driver is a specific userland thread */
+#define IRQ_DRIVER_FUNCTION (1 << 1)   /* this driver is an in-kernel function */
+#define IRQ_DRIVER_TYPEMASK (IRQ_DRIVER_FUNCTION | IRQ_DRIVER_PROCESS)
 
-#define IRQ_DRIVER_MASKED    (1 << 2)   /* this driver is not interested at the moment */
+#define IRQ_DRIVER_IGNORE   (1 << 2)   /* this driver is not interested at the moment */
 
 #define IRQ_MAX_LINES        (256) /* maximum of 256 (0-255) IRQ lines */
 #define MAX_IOAPICS          (4) /* maximum of 4 IOAPICs per system */
 
 /* linked list of registered irq drivers */
-typedef struct irq_driver_entry irq_driver_entry;
 struct irq_driver_entry
 {
    /* describe this irq entry */
    unsigned int flags;
+   unsigned int irq_num;
    
-   /* pid to send signal to */
-   unsigned int pid;
+   /* process to send signal to */
+   process *proc;
    
    /* function to call in kernelspace */
    kresult (*func)(unsigned char intnum, int_registers_block *regs);
    
-   irq_driver_entry *previous, *next; 
+   /* linked list of entries attached to an IRQ */
+   irq_driver_entry *previous, *next;
+   
+   irq_driver_entry *proc_previous, *proc_next;
 };
 
 /* interrupt-related functions */
@@ -111,8 +114,8 @@ void lapic_ipi_send_init(unsigned char destination);
 unsigned int ioapic_read(unsigned char id, unsigned char reg);
 void ioapic_write(unsigned char id, unsigned char reg, unsigned int value);
 kresult ioapic_register_chip(unsigned int id, unsigned int physaddr);
-kresult irq_register_driver(unsigned int irq_num, unsigned int flags, unsigned int pid, kresult (*func)(unsigned char intnum, int_registers_block *regs));
-kresult irq_deregister_driver(unsigned int irq_num, unsigned int type, unsigned int pid, kresult (*func)(unsigned char intnum, int_registers_block *regs));
+kresult irq_register_driver(unsigned int irq_num, unsigned int flags, process *proc, kresult (*func)(unsigned char intnum, int_registers_block *regs));
+kresult irq_deregister_driver(unsigned int irq_num, unsigned int type, process *proc, kresult (*func)(unsigned char intnum, int_registers_block *regs));
 
 #define int_enable   x86_enable_interrupts
 #define int_disable  x86_disable_interrupts

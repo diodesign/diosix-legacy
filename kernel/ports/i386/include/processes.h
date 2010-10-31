@@ -210,6 +210,9 @@ struct thread
 #define PROC_FLAG_CANMAPPHYS  (1 << 3) /* is allowed to map physical memory into its virtual space */
 #define PROC_RIGHTS_MASK      (PROC_FLAG_CANMSGASUSR | PROC_FLAG_CANBEDRIVER | PROC_FLAG_CANMAPPHYS)
 
+/* needed in the process struct */
+typedef struct irq_driver_entry irq_driver_entry;
+
 /* describe each process */
 struct process
 {
@@ -267,9 +270,11 @@ struct process
       the process has no IO port access */
    unsigned int *ioport_bitmap;
    
+   /* linked list of registered driver structures */
+   irq_driver_entry *interrupts;
+   
    /* signal management */
    unsigned int signalsaccepted, signalsinprogress;
-   thread *signalhandler; /* direct signals to this thread */
 };
 
 #define LAYER_MAX        (255)
