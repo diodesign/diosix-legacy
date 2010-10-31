@@ -18,28 +18,81 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #include <diosix.h>
 #include <functions.h>
 
-#define SERIAL_HW   (0x3f8)
+/* values taken from http://wiki.osdev.org/Bochs_Graphics_Adaptor */
 
-unsigned readportb(unsigned short port)
+#define VBE_DISPI_IOPORT_INDEX (0x1ce)
+#define VBE_DISPI_IOPORT_DATA  (0x1cf)
+
+#define VBE_DISPI_INDEX_ID     (0)
+#define VBE_DISPI_INDEX_XRES   (1)
+#define VBE_DISPI_INDEX_YRES   (2)
+#define VBE_DISPI_INDEX_BPP    (3)
+#define VBE_DISPI_INDEX_ENABLE (4)
+#define VBE_DISPI_INDEX_BANK   (5)
+
+#define VBE_DISPI_DISABLED     (0x00)
+#define VBE_DISPI_ENABLED      (0x01)
+#define VBE_DISPI_LFB_ENABLED  (0x40)
+
+#define VBE_DISPI_BPP_4    (0x04)
+#define VBE_DISPI_BPP_8    (0x08)
+#define VBE_DISPI_BPP_15   (0x0F)
+#define VBE_DISPI_BPP_16   (0x10)
+#define VBE_DISPI_BPP_24   (0x18)
+#define VBE_DISPI_BPP_32   (0x20)
+
+#define FB_WIDTH     (800)    /* pixels x max */
+#define FB_HEIGHT    (600)    /* pixels y max */
+#define FB_DEPTH     (VBE_DISPI_BPP_32) /* bits per pixel */
+#define FB_MAX_SIZE  (FB_WIDTH * FB_HEIGHT * (FB_DEPTH >> 3))
+#define FB_PHYS_BASE (0xe0000000)
+#define FB_LOG_BASE  (0x400000)
+
+unsigned short read_port(unsigned short port)
 {
    unsigned char ret_val;
    
-   __asm__ __volatile__("inb %1,%0"
+   __asm__ __volatile__("in %1,%0"
                         : "=a"(ret_val)
                         : "d"(port));
    return ret_val;
 }
 
-void writeportb(unsigned port, unsigned val)
+void write_port(unsigned short port, unsigned short val)
 {
-   __asm__ __volatile__("outb %b0,%w1"
+   __asm__ __volatile__("out %0,%1"
                         :
                         : "a"(val), "d"(port));
+}
+
+unsigned short vbe_read(unsigned short index)
+{
+   write_port(VBE_DISPI_IOPORT_INDEX, index);
+   return read_port(VBE_DISPI_IOPORT_DATA);
+}
+
+void vbe_write(unsigned short index, unsigned short val)
+{
+   write_port(VBE_DISPI_IOPORT_INDEX, index);
+   write_port(VBE_DISPI_IOPORT_DATA, val);
+}
+
+void vbe_set_mode(unsigned short width, unsigned short height, unsigned char bpp)
+{
+   vbe_write(VBE_DISPI_INDEX_ENABLE, VBE_DISPI_DISABLED);
+   
+   vbe_write(VBE_DISPI_INDEX_XRES, width);
+   vbe_write(VBE_DISPI_INDEX_YRES, height);
+   vbe_write(VBE_DISPI_INDEX_BPP, bpp);
+   
+   vbe_write(VBE_DISPI_INDEX_ENABLE,
+             VBE_DISPI_ENABLED | VBE_DISPI_LFB_ENABLED);
 }
 
 void do_listen(void)
 {
    unsigned int buffer;
+   unsigned int *px = 0;
    diosix_msg_info msg;
    diosix_phys_request req;
    
@@ -47,16 +100,18 @@ void do_listen(void)
    diosix_priv_layer_up();
    diosix_driver_register();
    
-   /* map in the text buffer */
-   req.paddr = (void *)0xb8000; /* text mode screen buffer */
-   req.vaddr = (void *)0xb8000; /* identity map it */
-   req.size = 4096;
+   vbe_set_mode(FB_WIDTH, FB_HEIGHT, FB_DEPTH);
+   
+   /* map in the video buffer */
+   req.paddr = (void *)FB_PHYS_BASE; /* VBE frame buffer */
+   req.vaddr = (void *)FB_LOG_BASE;
+   req.size  = DIOSIX_PAGE_ROUNDUP(FB_MAX_SIZE);
    req.flags = VMA_WRITEABLE | VMA_NOCACHE;
    diosix_driver_map_phys(&req);
    
    /* listen and reply */
    while(1)
-   {
+   {      
       /* accept any message from any thread/process */
       msg.tid = DIOSIX_MSG_ANY_THREAD;
       msg.pid = DIOSIX_MSG_ANY_PROCESS;
@@ -66,15 +121,18 @@ void do_listen(void)
 
       if(diosix_msg_receive(&msg) == success)
       {
+         /* write a pixel to the screen */
+         *((unsigned int *)(FB_LOG_BASE + (unsigned int)px)) = buffer & 0xffffff;
+         
          buffer++;
-
+         px++;
+         
+         if((unsigned int)px > FB_MAX_SIZE) px = 0;
+         
          msg.flags = DIOSIX_MSG_GENERIC;
          msg.send = &buffer;
          msg.send_size = sizeof(unsigned int);
          diosix_msg_reply(&msg);
-         
-         /* write out a character to the screen */
-         *((unsigned char *)0xb8000) = (buffer % 128);
       }
    }
 }

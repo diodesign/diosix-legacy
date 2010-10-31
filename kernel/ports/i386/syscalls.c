@@ -342,6 +342,8 @@ void syscall_do_privs(int_registers_block *regs)
                                     of receiving interrupts, mapping phys ram
                                     and access selected IO ports.
             DIOSIX_DRIVER_DEREGISTER: deregister a thread as a driver.
+            DIOSIX_DRIVER_MAP_PHYS: map some physical memory into the driver's virtual space
+               => ebx = pointer to phys map request block
    <= eax = 0 for success or an error code
 */
 void syscall_do_driver(int_registers_block *regs)
@@ -398,25 +400,25 @@ void syscall_do_driver(int_registers_block *regs)
             if(req->paddr >= req->paddr + req->size)
                SYSCALL_RETURN(e_bad_params);
             if(!(req->vaddr) || !(req->size)) SYSCALL_RETURN(e_bad_params);
-            
+                        
             /* check the alignments */
             if(!(MEM_IS_PG_ALIGNED(req->paddr)) ||
                !(MEM_IS_PG_ALIGNED(req->vaddr)) ||
                !(MEM_IS_PG_ALIGNED(req->size)))
                SYSCALL_RETURN(e_bad_params);
-
+            
             /* protect the kernel's physical critical section */
             if((unsigned int)req->paddr >= KERNEL_CRITICAL_BASE && (unsigned int)req->paddr < KERNEL_CRITICAL_END)
                SYSCALL_RETURN(e_bad_params);
             if((unsigned int)req->paddr < KERNEL_CRITICAL_BASE && ((unsigned int)req->paddr + req->size) > KERNEL_CRITICAL_BASE)
                SYSCALL_RETURN(e_bad_params);
-            
+                        
             /* check there's no conflict in mapping this area in */
             if(vmm_find_vma(current->proc, (unsigned int)req->vaddr))
                SYSCALL_RETURN(e_vma_exists);
             if(vmm_find_vma(current->proc, (unsigned int)req->vaddr + req->size))
                SYSCALL_RETURN(e_vma_exists);
-            
+                        
             /* sanatise the settings flags */
             flags = req->flags & (VMA_WRITEABLE | VMA_NOCACHE);
             
@@ -446,7 +448,7 @@ void syscall_do_driver(int_registers_block *regs)
                   SYSCALL_RETURN(e_failure);
                }
             }
-            
+                        
             /* tell the processor to reload the process's page tables 
                and warn other cores running this driver process */
             x86_load_cr3(KERNEL_LOG2PHYS(current->proc->pgdir));

@@ -18,6 +18,10 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #ifndef _FUNCTIONS_H
 #define   _FUNCTIONS_H
 
+/* useful defines */
+
+#define DIOSIX_PAGE_ROUNDUP(a)   ( (unsigned int)(a) ? ((((unsigned int)(a) - 1) >> 12) + 1) << 12 : 0)
+
 /* veneers to syscalls */
 
 /* basic process management */
