@@ -444,6 +444,12 @@ do_proc_kill:
    /* destroy the architecture-specific part of the process */
    vmm_destroy_vmas(victim); /* unlink the vmas */
    pg_destroy_process(victim);
+   while(victim->interrupts) /* strip away any registered irq handlers */
+   {
+      irq_driver_entry *entry = victim->interrupts;
+      irq_deregister_driver(entry->irq_num, entry->flags & IRQ_DRIVER_TYPEMASK,
+                            entry->proc, entry->func);
+   }
    
    /* give up the space held by the process structure */
    vmm_free(victim);
