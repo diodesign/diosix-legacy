@@ -450,7 +450,384 @@ void *vmm_realloc(void *addr, signed int change)
    return NULL;
 }
 
+/* -------------------------------------------------------------------------
+    Memory pool management
+   ------------------------------------------------------------------------- */
 
+/* vmm_create_pool
+   Create a memory pool, which is made up of pre-allocated equal sized blocks
+   that can be allocated and freed very quickly.
+   => block_size = size of each block in the pool in bytes
+      init_count = number of free blocks to initialise the pool with
+   <= pointer to kpool struct, or NULL for failure
+*/
+kpool *vmm_create_pool(unsigned int block_size, unsigned int init_count)
+{
+   kpool *new;
+   unsigned int initsize;
+   
+   /* some sanity checking - non-zero params only */
+   if(!block_size || block_size > KPOOL_MAX_BLOCKSIZE) return NULL;
+   if(!init_count) return NULL;
+   if(init_count > KPOOL_MAX_INITCOUNT) init_count = KPOOL_MAX_INITCOUNT;
+   
+   /* calculate initial size of the pool */
+   initsize = KPOOL_BLOCK_TOTALSIZE(block_size) * init_count;
+   
+   /* allocate a new pool structure and zero it */
+   if(vmm_malloc((void **)&new, sizeof(kpool))) return NULL;
+   vmm_memset((void *)new, 0, sizeof(kpool));
+   
+   /* allocate the pool's heap block and zero it */
+   if(vmm_malloc((void **)&(new->pool), initsize))
+   {
+      vmm_free(new);
+      return NULL;
+   }
+   vmm_memset((void *)new->pool, 0, initsize);
+   
+   /* fill in its details */
+   new->block_size   = block_size;
+   new->total_blocks = init_count;
+   if(vmm_create_free_blocks_in_pool(new, 0, init_count))
+   {
+      /* something's gone very wrong... */
+      vmm_free(new->pool);
+      vmm_free(new);
+      return NULL;
+   }
+   
+   VMM_DEBUG("[vmm:%i] created new pool %p (block size %i initial blocks %i heap %p)\n", CPU_ID,
+             new, new->block_size, new->total_blocks, new->pool);
+   
+   return new;
+}
+
+/* vmm_destroy_pool
+   Destroy a previously created pool, freeing its pool
+   => pool = pointer to pool structrue to teardown
+   <= 0 for success, or an error code
+*/
+kresult vmm_destroy_pool(kpool *pool)
+{
+   /* sanity checks */
+   if(!pool) return e_bad_params;
+   
+   /* mark the lock as invalid */
+   if(lock_gate(&(pool->lock), LOCK_WRITE | LOCK_SELFDESTRUCT))
+      return e_failure;
+   
+   /* pretty easy stuff */
+   if(pool->pool)
+      vmm_free(pool->pool);
+   vmm_free(pool);
+   
+   unlock_gate(&(pool->lock), LOCK_WRITE | LOCK_SELFDESTRUCT);
+   
+   VMM_DEBUG("[vmm:%i] destroyed pool %p\n", CPU_ID, pool);
+   
+   return success;
+}
+
+/* vmm_fixup_moved_pool
+   If a pool's heap moves then all its pointers will need fixing up
+   so that they point into the new heap block.
+   => pool = pool structure to operate on
+      prev = previous base address of the heap
+      new = new base address of the heap
+   <= 0 for success, or an error code
+*/
+kresult vmm_fixup_moved_pool(kpool *pool, void *prev, void *new)
+{
+   kpool_block *block;
+   unsigned int *ptr;
+   signed int offset = (unsigned int)new - (unsigned int)prev;
+   
+   /* sanity checks */
+   if(!pool || !prev || !new) return e_bad_params;
+   
+   /* assumes we have a write lock on the pool */
+   /* fix up the header's pointers */
+   if(pool->head)
+      pool->head = (kpool_block *)((unsigned int)(pool->head) + offset);
+   if(pool->tail)
+      pool->tail = (kpool_block *)((unsigned int)(pool->tail) + offset);
+   if(pool->free)
+      pool->free = (kpool_block *)((unsigned int)(pool->free) + offset);
+
+   /* fix in-use list */
+   block = pool->head;
+   while(block)
+   {
+      ptr = (unsigned int *)&(block->next);
+      if(*ptr) *ptr = *ptr + offset;
+      
+      ptr = (unsigned int *)&(block->previous);
+      if(*ptr) *ptr = *ptr + offset;
+      
+      /* find next block */
+      block = block->next;
+   }
+   
+   /* fix free list */
+   block = pool->free;
+   while(block)
+   {
+      ptr = (unsigned int *)&(block->next);
+      if(*ptr) *ptr = *ptr + offset;
+      
+      ptr = (unsigned int *)&(block->previous);
+      if(*ptr) *ptr = *ptr + offset;
+      
+      /* find next block */
+      block = block->next;
+   }
+   
+   VMM_DEBUG("[vmm:%i] fixed up pool %p (moved %i bytes)\n", CPU_ID,
+             pool, offset);
+   
+   return success;
+}
+
+/* vmm_alloc_pool
+   Get a block from a pool. If there are no free blocks available, 
+   the pool will be automatically expanded to create free blocks.
+   The allocated block is always added to the end of the in-use list,
+   allowing the pool's alloc'd blocks to be used quickly as a queue. 
+   => ptr = pointer to a pointer in which the address of the block will
+            be stored. The address is the first byte in the block.
+      pool = pointer to the pool structure from which to allocate
+   <= 0 for success, or an error code
+*/
+kresult vmm_alloc_pool(void **ptr, kpool *pool)
+{
+   kpool_block *new;
+   
+   /* sanity checks */
+   if(!ptr || !pool) return e_bad_params;
+   
+   lock_gate(&(pool->lock), LOCK_WRITE);
+   
+   /* are there any free blocks? if not, we need more memory... */
+   if(!pool->free_blocks)
+   {
+      void *prev_heap_addr = pool->pool;
+      void *new_heap_addr;
+      
+      unsigned int start_of_free;
+      unsigned int pool_blocks = pool->total_blocks;
+      unsigned int pool_size = KPOOL_BLOCK_TOTALSIZE(pool->block_size) * pool_blocks;
+      
+      /* grow the pool by doubling it in size: increae it by pool_size bytes */
+      new_heap_addr = vmm_realloc((void **)&(pool->pool), pool_size);
+      
+      /* give up if we can't grow the pool */
+      if(!new_heap_addr)
+      {
+         unlock_gate(&(pool->lock), LOCK_WRITE);
+         return e_failure;
+      }
+      
+      /* fix up the pool's pointers if the pool heap moved */
+      if(prev_heap_addr != new_heap_addr)
+         vmm_fixup_moved_pool(pool, prev_heap_addr, new_heap_addr);
+      
+      /* zero the new area and mark it as free */
+      start_of_free = (unsigned int)(pool->pool) + pool_size;
+      vmm_memset((void *)start_of_free, 0, pool_size);
+      pool->total_blocks += pool_blocks;
+      vmm_create_free_blocks_in_pool(pool, pool_blocks, pool_blocks * 2);
+      
+      VMM_DEBUG("[vmm:%i] grew pool %p by %i bytes (heap now at %p)\n", 
+                CPU_ID, pool, pool_size, pool->pool);
+   }
+   
+   /* grab the next free block */
+   new = pool->free;
+   if(new->magic != KPOOL_FREE)
+   {
+      KOOPS_DEBUG("[vmm:%i] OMGWTF! vmm_alloc_pool: block %p in pool %p is "
+                  "in the free list but not marked as free (magic %x)\n",
+                  CPU_ID, new, pool, new->magic);
+      unlock_gate(&(pool->lock), LOCK_WRITE);
+      return e_failure;
+   }
+   
+   /* mark it as in-use */
+   new->magic = KPOOL_INUSE;
+   
+   /* remove it from the free list */
+   pool->free = new->next;
+   if(pool->free) pool->free->previous = NULL;
+   
+   /* add it to the end of the in-use list */
+   if(pool->tail)
+   {
+      new->previous = pool->tail;
+      new->next = NULL;
+      pool->tail->next = new;
+      pool->tail = new;
+   }
+   else
+   {
+      /* we've got no tail */
+      pool->tail = new;
+      pool->head = new;
+      new->next = new->previous = NULL;
+   }
+   
+   /* update pool statistics */
+   pool->inuse_blocks++;
+   pool->free_blocks--;
+   
+   /* write out the pointer */
+   *ptr = (void *)((unsigned int)new + sizeof(kpool_block));
+   
+   unlock_gate(&(pool->lock), LOCK_WRITE);
+   
+   VMM_DEBUG("[vmm:%i] allocated block %x from pool %p\n", 
+             CPU_ID, *ptr, pool);
+   
+   return success;
+}
+
+/* vmm_free_pool
+   Free a previously allocated block within a pool, allowing it to
+   be reused later.
+   => ptr = address of block to free
+      pool = pointer to pool structrue the block belongs to
+   <= 0 for success, or an error code
+*/
+kresult vmm_free_pool(void *ptr, kpool *pool)
+{
+   kpool_block *block;
+   
+   /* sanity checks */
+   if(!ptr || !pool) return e_bad_params;
+   
+   lock_gate(&(pool->lock), LOCK_WRITE);
+   
+   block = (kpool_block *)((unsigned int)ptr - sizeof(kpool_block));
+   if(block->magic != KPOOL_INUSE)
+   {
+      KOOPS_DEBUG("[vmm:%i] OMGWTF vmm_free_pool: tried to free non-inuse block %x "
+                  "in pool %p (magic %x)\n",
+                  CPU_ID, block, pool, block->magic);
+      unlock_gate(&(pool->lock), LOCK_WRITE);
+      return e_bad_params;
+   }
+   
+   /* add to the start of the free list */
+   if(pool->free)
+      pool->free->previous = block;
+   block->next = pool->free;
+   pool->free = block;
+   block->previous = NULL;
+   
+   /* remove it from the in-use list */
+   if(block->previous)
+      block->previous->next = block->next;
+   if(block->next)
+      block->next->previous = block->previous;
+   if(pool->head == block)
+   {
+      pool->head = block->next;
+      if(pool->head) pool->head->previous = NULL;
+   }
+   if(pool->tail == block)
+   {
+      pool->tail = block->previous;
+      if(pool->tail) pool->tail->next = NULL;
+   }
+   
+   /* update pool statistics */
+   pool->inuse_blocks--;
+   pool->free_blocks++;
+ 
+   unlock_gate(&(pool->lock), LOCK_WRITE);
+   
+   VMM_DEBUG("[vmm:%i] freed block %x in pool %p\n", CPU_ID, ptr, pool);
+   
+   return success;
+}
+
+/* vmm_create_free_blocks_in_pool
+   Mark a range of blocks in the pool as free and ready to use
+   and add to the pool's free list.
+   => pool = pointer to pool structure to work on
+      start = index of first block to mark as free, starting from zero
+      end = (index + 1) of the last block to mark as free
+ <= 0 for success, or an error code
+*/
+kresult vmm_create_free_blocks_in_pool(kpool *pool, unsigned int start, unsigned int end)
+{
+   unsigned int loop, addr, total_block_size;
+   kpool_block *block;
+   
+   /* sanity checks */
+   if(!pool) return e_bad_params;
+   if(end > pool->total_blocks || start >= end) return e_bad_params;
+   if(start > pool->total_blocks) return e_bad_params;
+   
+   /* size of block including kpool_block header */
+   total_block_size = KPOOL_BLOCK_TOTALSIZE(pool->block_size);
+   
+   /* start address of the pool */
+   addr = ((unsigned int)pool->pool) + (start * total_block_size);
+   
+   /* loop through blocks */
+   for(loop = start; loop < end; loop++)
+   {
+      block = (kpool_block *)addr;
+      
+      /* fill in block's details - assumes all
+         the struct's field have already been zero'd */
+      block->magic = KPOOL_FREE;
+      block->next = pool->free;
+
+      /* update the pool - assumes pool is locked for update 
+         by the calling function! */
+      pool->free = block;
+      pool->free_blocks++;
+      
+      addr += total_block_size;
+   }
+   
+   VMM_DEBUG("[vmm:%i] initialised free blocks %i to %i in pool %p\n",
+             CPU_ID, start, end, pool);
+   
+   return success;
+}
+
+/* vmm_next_in_pool
+   Return the address of the first byte of the next in-use block in the
+   pool. Useful for building a queue system.
+   => ptr = address of in-use block to use to derive the next in-use block
+            or NULL to get the first block
+      pool = pointer to pool structure
+   <= address of first byte of next in-use block or NULL for failure or
+      end of in-use list
+*/
+void *vmm_next_in_pool(void *ptr, kpool *pool)
+{
+   kpool_block *block;
+   
+   /* sanity checks */
+   if(!pool) return NULL;
+   
+   /* give out the first block if asked for */
+   if(!ptr) return pool->head;
+   
+   block = (kpool_block *)((unsigned int)ptr - sizeof(kpool_block));
+   if(block->magic != KPOOL_INUSE) return NULL;
+   
+   if(block->next)
+      return (void *)((unsigned int)block->next + sizeof(kpool_block));
+   
+   return NULL; /* fall through to no block available */
+}
+
+ 
 /* -------------------------------------------------------------------------
     Physical page management
    ------------------------------------------------------------------------- */

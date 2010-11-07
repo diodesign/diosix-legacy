@@ -106,7 +106,7 @@ void do_listen(void)
    req.paddr = (void *)FB_PHYS_BASE; /* VBE frame buffer */
    req.vaddr = (void *)FB_LOG_BASE;
    req.size  = DIOSIX_PAGE_ROUNDUP(FB_MAX_SIZE);
-   req.flags = VMA_WRITEABLE | VMA_NOCACHE;
+   req.flags = VMA_WRITEABLE | VMA_NOCACHE | VMA_FIXED;
    diosix_driver_map_phys(&req);
    
    /* listen and reply */

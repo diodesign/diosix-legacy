@@ -70,6 +70,13 @@ typedef struct process process;
 typedef struct thread thread;
 typedef struct mp_thread_queue mp_thread_queue; /* in cpu.h */
 
+/* a queued signal block held in the kernel */
+typedef struct
+{
+   diosix_signal signal; /* the signal number */
+   unsigned int sender_pid, sender_tid; /* process & thread IDs of the sender */
+} queued_signal;
+
 /* a process memory area - arranged as a tree. flags are defined in <diosix.h> */
 typedef struct
 {
@@ -213,6 +220,10 @@ struct thread
 /* needed in the process struct */
 typedef struct irq_driver_entry irq_driver_entry;
 
+/* needed in the process struct */
+typedef struct kpool kpool;
+typedef struct kpool_block kpool_block;
+
 /* describe each process */
 struct process
 {
@@ -274,7 +285,10 @@ struct process
    irq_driver_entry *interrupts;
    
    /* signal management */
-   unsigned int signalsaccepted, signalsinprogress;
+   unsigned int unix_signals_accepted; /* mask for the first 32 signals (UNIX-compatible ones) */
+   unsigned int unix_signals_inprogress; /* bitfield for the first 32 signals (UNIX-compatible ones) */
+   kpool *unix_signals; /* queue of UNIX-compatible signals */
+   kpool *user_signals; /* queue of user defined signals */
 };
 
 #define LAYER_MAX        (255)

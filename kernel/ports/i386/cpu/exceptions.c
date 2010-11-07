@@ -82,12 +82,12 @@ void exception_handler(int_registers_block regs)
             /* if this process was already trying to handle a GPF then kill it.
                the kernel's signal code in msg.c will clear this bit when the
                thread next */
-            if(cpu_table[CPU_ID].current->proc->signalsinprogress & (1 << SIGBUS))
+            if(cpu_table[CPU_ID].current->proc->unix_signals_inprogress & (1 << SIGBUS))
                proc_kill(cpu_table[CPU_ID].current->proc->pid, cpu_table[CPU_ID].current->proc);
             else
             {
                /* mark this process as attempting to handle the fault */
-               cpu_table[CPU_ID].current->proc->signalsinprogress |= (1 << SIGBUS);
+               cpu_table[CPU_ID].current->proc->unix_signals_inprogress |= (1 << SIGBUS);
                
                if(msg_send_signal(cpu_table[CPU_ID].current->proc, SIGBUS, 0))
                   /* something went wrong, so default action is shoot to kill */
@@ -103,12 +103,12 @@ void exception_handler(int_registers_block regs)
             kernel page fault */
          {
             /* kill the process if it in the middle of trying to fix-up a page fault */
-            if(cpu_table[CPU_ID].current->proc->signalsinprogress & (1 << SIGSEGV))
+            if(cpu_table[CPU_ID].current->proc->unix_signals_inprogress & (1 << SIGSEGV))
                syscall_do_exit(&regs);
             else
             {
                /* mark this process as attempting to handle the fault */
-               cpu_table[CPU_ID].current->proc->signalsinprogress |= (1 << SIGSEGV);         
+               cpu_table[CPU_ID].current->proc->unix_signals_inprogress |= (1 << SIGSEGV);         
    
                if(msg_send_signal(cpu_table[CPU_ID].current->proc, SIGSEGV, 0))
                {

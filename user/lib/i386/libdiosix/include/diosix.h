@@ -86,6 +86,13 @@ typedef enum
 /* the kernel will refuse to deliver individual messages greater than this size in bytes */
 #define DIOSIX_MSG_MAX_SIZE    (4096 * 4)
 
+/* describe a queued asynchronous message */
+typedef struct
+{
+   unsigned int number; /* the signal number */
+   unsigned int extra;  /* an extra word of information */
+} diosix_signal;
+
 /* message passing - describe an outgoing multipart message */
 typedef struct
 {
@@ -102,6 +109,7 @@ typedef struct
 
    unsigned int send_size;  /* size in bytes of the send message data, or number of multipart entries to send */
    void *send;              /* pointer to the send message data as a block or multipart */
+   diosix_signal signal;    /* signal info block */
    
    unsigned int recv_max_size; /* max size in bytes the reply/recv can be, or 0 for sending a reply */
    unsigned int recv_size; /* actual number of bytes in the reply/recv, or 0 for sending a reply */
@@ -131,6 +139,7 @@ typedef struct
 #define VMA_MEMSOURCE   (1 << 1) /* on fault, map in a physical page if set, or bump the userspace manager if not */
                                  /* this is overridden by page bit 9 */
 #define VMA_NOCACHE     (1 << 2) /* disable caching on pages in this area */
+#define VMA_FIXED       (1 << 3) /* do not swap out physical pages in this VMA */
 #define VMA_HASPHYS     (1 << 7) /* hint to the vmm that a page has physical memory assigned to it */
 
 /* describe a physical memory request */

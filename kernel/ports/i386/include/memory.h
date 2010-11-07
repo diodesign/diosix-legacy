@@ -67,6 +67,8 @@ extern unsigned int KernelBootStackBase, APStack;
 /* vmm magic */
 #define KHEAP_FREE           (0xdeaddead)
 #define KHEAP_INUSE          (0xd105d105)
+#define KPOOL_FREE           (0xd33dd33d)
+#define KPOOL_INUSE          (0xd106d106)
 
 /* heap management */
 /* define the minimum block size in bytes to mitigate fragmentation */
@@ -87,6 +89,33 @@ struct kheap_block
    kheap_block *previous, *next;  /* linked list pointers */
    /* ... data follows ... */
 };
+
+/* describe a kernel pool */
+struct kpool_block
+{
+   unsigned int magic;           /* indicate either free or in use. any other value will indicate corruption */
+   kpool_block *previous, *next; /* double-linked list of blocks in the pool */
+   /* ... data follows ... */
+};
+
+struct kpool
+{
+   rw_gate lock;              /* to serialise updates to the pool */
+   
+   unsigned int block_size;   /* size of each block in the pool, not including the kpool_block header */
+   unsigned int free_blocks;  /* number of free blocks */
+   unsigned int inuse_blocks; /* number of inuse blocks */
+   unsigned int total_blocks; /* number of max vailable blocks */
+   kpool_block *head, *tail;  /* double linked list of inuse blocks */
+   kpool_block *free;         /* double linked list of free blocks */
+
+   void *pool;                /* pointer to pool's heap block */
+};
+
+/* limit pools and their blocks to sensible sizes */
+#define KPOOL_MAX_BLOCKSIZE   (KHEAP_BLOCK_MULTIPLE * 2)
+#define KPOOL_MAX_INITCOUNT   (256)
+#define KPOOL_BLOCK_TOTALSIZE(a) (sizeof(kpool_block) + (unsigned int)a)
 
 /* virtual memory management */
 /* the kernel page management looks to the vmm for help.
@@ -121,6 +150,13 @@ kresult vmm_duplicate_vmas(process *new, process *source);
 kresult vmm_destroy_vmas(process *victim);
 vmm_decision vmm_fault(process *proc, unsigned int addr, unsigned char flags);
 vmm_tree *vmm_find_vma(process *proc, unsigned int addr);
+kpool *vmm_create_pool(unsigned int block_size, unsigned int init_count);
+kresult vmm_destroy_pool(kpool *pool);
+kresult vmm_alloc_pool(void **ptr, kpool *pool);
+kresult vmm_free_pool(void *ptr, kpool *pool);
+void *vmm_next_in_pool(void *ptr, kpool *pool);
+kresult vmm_create_free_blocks_in_pool(kpool *pool, unsigned int start, unsigned int end);
+kresult vmm_fixup_moved_pool(kpool *pool, void *prev, void *new);
 
 /* kernel global variables for managing physical pages */
 extern unsigned int *phys_pg_stack_low_base;

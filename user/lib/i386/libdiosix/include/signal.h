@@ -18,7 +18,7 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #ifndef _SIGNAL_H
 #define   _SIGNAL_H
 
-/* userland UNIX signal numbers */
+/* UNIX-compatible signal numbers */
 #define SIGHUP    (1)
 #define SIGINT    (2)
 #define SIGQUIT   (3)
