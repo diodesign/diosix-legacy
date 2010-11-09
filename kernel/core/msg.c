@@ -149,15 +149,18 @@ thread *msg_find_receiver(thread *sender, diosix_msg_info *msg)
 
          while(recv)
          {
-            if(msg_test_receiver(sender, recv, msg) == success)
-            {
-               unlock_gate(&proc_lock, LOCK_READ);
-               return recv;
-            }
+            /* only check threads that are actually waiting for a msg */
+            if((recv->state == waitingforreply) ||
+               (recv->state == waitingformsg))
+               if(msg_test_receiver(sender, recv, msg) == success)
+               {
+                  unlock_gate(&proc_lock, LOCK_READ);
+                  return recv;
+               }
             recv = recv->hash_next;
          }
       }
-      
+
       unlock_gate(&proc_lock, LOCK_READ);
    }
    
