@@ -189,6 +189,22 @@ unsigned int diosix_driver_unmap_phys(diosix_phys_request *block)
    return retval;
 }
 
+unsigned int diosix_driver_register_irq(unsigned char irq)
+/* tell the kernel to send irq signals to the calling thread */
+{
+   unsigned int retval;
+   __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (DIOSIX_DRIVER_REGISTER_IRQ), "b" (irq), "d" (SYSCALL_DRIVER));
+   return retval;
+}
+
+unsigned int diosix_driver_deregister_irq(unsigned char irq)
+/* tell the kernel to stop sending irq signals to the calling thread */
+{
+   unsigned int retval;
+   __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (DIOSIX_DRIVER_DEREGISTER_IRQ), "b" (irq), "d" (SYSCALL_DRIVER));
+   return retval;
+}
+
 /* --------------- get information out of the kernel ---------------- */
 unsigned int diosix_get_thread_info(diosix_thread_info *block)
 /* get info about this thread */

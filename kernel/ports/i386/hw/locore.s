@@ -350,7 +350,7 @@ ISR_NOERRCODE 31    ; .
 ; basic device interrupts
 ; format is: hardware_irq_number, kernel_irq_number
 IRQ        0, 32    ; 100Hz PIT for the scheduler
-IRQ        1, 33
+IRQ        1, 33    ; ps/2-compatible keyboard interrupt
 IRQ        2, 34
 IRQ        3, 35
 IRQ        4, 36

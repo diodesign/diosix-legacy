@@ -70,10 +70,11 @@ typedef enum
 #define SYSCALL_DRIVER        (11)
 
 /* message passing - control flags bits high */
-#define DIOSIX_MSG_REPLY       (1 << 31)
-#define DIOSIX_MSG_MULTIPART   (1 << 30)
-#define DIOSIX_MSG_RECVONREPLY (1 << 29)
-#define DIOSIX_MSG_SENDASUSR   (1 << 28)
+#define DIOSIX_MSG_REPLY       (1 << 31) /* message is a reply */
+#define DIOSIX_MSG_MULTIPART   (1 << 30) /* message split into multiple blocks */
+#define DIOSIX_MSG_RECVONREPLY (1 << 29) /* block on recv after replying */
+#define DIOSIX_MSG_SENDASUSR   (1 << 28) /* send message as an unpriv'd user process */
+#define DIOSIX_MSG_KERNELONLY  (1 << 29) /* accept signals from the kernel only */
 /* simple type bits low (bits 0-11) */
 #define DIOSIX_MSG_GENERIC     (1)
 #define DIOSIX_MSG_SIGNAL      (2)
@@ -128,10 +129,12 @@ typedef struct
 #define DIOSIX_KERNEL_INFO  (2)
 
 /* reason codes for driver management */
-#define DIOSIX_DRIVER_REGISTER   (0)
-#define DIOSIX_DRIVER_DEREGISTER (1)
-#define DIOSIX_DRIVER_MAP_PHYS   (2)
-#define DIOSIX_DRIVER_UNMAP_PHYS (3)
+#define DIOSIX_DRIVER_REGISTER       (0)
+#define DIOSIX_DRIVER_DEREGISTER     (1)
+#define DIOSIX_DRIVER_MAP_PHYS       (2)
+#define DIOSIX_DRIVER_UNMAP_PHYS     (3)
+#define DIOSIX_DRIVER_REGISTER_IRQ   (4)
+#define DIOSIX_DRIVER_DEREGISTER_IRQ (5)
 
 /* vmm_area flags */
 #define VMA_READABLE    (0 << 0)

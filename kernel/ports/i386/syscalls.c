@@ -462,6 +462,12 @@ void syscall_do_driver(int_registers_block *regs)
             
          }
          else SYSCALL_RETURN(e_no_rights);
+         
+      case DIOSIX_DRIVER_REGISTER_IRQ:
+         if(current->flags & THREAD_FLAG_ISDRIVER)
+         {
+            unsigned char irq = regs->ebx;
+         }
    }
    
    /* fall through to returning an error code */

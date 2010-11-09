@@ -48,6 +48,8 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #define FB_PHYS_BASE (0xe0000000)
 #define FB_LOG_BASE  (0x400000)
 
+#define KEYBOARD_IRQ (33) /* IRQ1 */
+
 unsigned short read_port(unsigned short port)
 {
    unsigned char ret_val;
@@ -92,7 +94,7 @@ void vbe_set_mode(unsigned short width, unsigned short height, unsigned char bpp
 void do_listen(void)
 {
    unsigned int buffer;
-   unsigned int *px = 0;
+   unsigned int px;
    diosix_msg_info msg;
    diosix_phys_request req;
    
@@ -121,14 +123,12 @@ void do_listen(void)
 
       if(diosix_msg_receive(&msg) == success)
       {
-         /* write a pixel to the screen */
-         *((unsigned int *)(FB_LOG_BASE + (unsigned int)px)) = buffer & 0xffffff;
+         /* change screen colour */
+         for(px = 0; px < FB_MAX_SIZE; px += sizeof(unsigned int))
+            *((unsigned int *)(FB_LOG_BASE + px)) = buffer & 0xffffff;
          
          buffer++;
-         px++;
-         
-         if((unsigned int)px > FB_MAX_SIZE) px = 0;
-         
+                  
          msg.flags = DIOSIX_MSG_GENERIC;
          msg.send = &buffer;
          msg.send_size = sizeof(unsigned int);
@@ -139,7 +139,7 @@ void do_listen(void)
 
 void main(void)
 {
-   diosix_msg_info msg;
+   diosix_msg_info msg, sig;
    unsigned int child;
    unsigned int message = 0;
 
@@ -148,21 +148,36 @@ void main(void)
    
    if(child == 0) do_listen(); /* child does the listening */
       
-   /* send the message to the child */
+   /* move into driver layer and get access to the keyboard IRQ */
+   diosix_priv_layer_up();
+   diosix_driver_register();
+   diosix_driver_register_irq(KEYBOARD_IRQ);
+   
+   /* wait for keyboard IRQ */
    while(1)
    {
-      /* set up message block */
-      msg.tid = DIOSIX_MSG_ANY_THREAD;
-      msg.pid = child;
-      msg.flags = DIOSIX_MSG_GENERIC | DIOSIX_MSG_SENDASUSR;
-      msg.send = &message;
-      msg.send_size = sizeof(unsigned int);
-      msg.recv = &message;
-      msg.recv_max_size = sizeof(unsigned int);
+      /* wait for IRQ signal */
+      sig.tid = DIOSIX_MSG_ANY_THREAD;
+      sig.pid = DIOSIX_MSG_ANY_PROCESS;
+      sig.flags = DIOSIX_MSG_SIGNAL | DIOSIX_MSG_KERNELONLY;
+      sig.recv = (void *)&(sig.signal);
+      sig.recv_max_size = sizeof(diosix_signal);
       
-      /* send message any listening thread, block if successfully
-         foudn a receiver */ 
-      if(diosix_msg_send(&msg))
-         diosix_thread_yield();
+      if(diosix_msg_receive(&sig) == success)
+      {
+         /* set up message block to poke the child */
+         msg.tid = DIOSIX_MSG_ANY_THREAD;
+         msg.pid = child;
+         msg.flags = DIOSIX_MSG_GENERIC | DIOSIX_MSG_SENDASUSR;
+         msg.send = &message;
+         msg.send_size = sizeof(unsigned int);
+         msg.recv = &message;
+         msg.recv_max_size = sizeof(unsigned int);
+         
+         /* send message any listening thread, block if successfully
+            found a receiver */ 
+         if(diosix_msg_send(&msg))
+            diosix_thread_yield();
+      }
    }
 }
