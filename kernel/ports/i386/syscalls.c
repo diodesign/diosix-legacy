@@ -344,6 +344,10 @@ void syscall_do_privs(int_registers_block *regs)
             DIOSIX_DRIVER_DEREGISTER: deregister a thread as a driver.
             DIOSIX_DRIVER_MAP_PHYS: map some physical memory into the driver's virtual space
                => ebx = pointer to phys map request block
+            DIOSIX_DRIVER_REGISTER_IRQ: route the given IRQ to the caller as a signal
+               => ebx = IRQ number to register
+            DIOSIX_DRIVER_DEREGISTER_IRQ: stop routing IRQ signals to the caller
+               => ebx = IRQ number to deregister
    <= eax = 0 for success or an error code
 */
 void syscall_do_driver(int_registers_block *regs)
@@ -466,7 +470,23 @@ void syscall_do_driver(int_registers_block *regs)
       case DIOSIX_DRIVER_REGISTER_IRQ:
          if(current->flags & THREAD_FLAG_ISDRIVER)
          {
+            kresult err;
             unsigned char irq = regs->ebx;
+            
+            /* let the IRQ code take care of it including outputting debug */
+            err = irq_register_driver(irq, IRQ_DRIVER_PROCESS, current->proc, NULL);
+            SYSCALL_RETURN(err);
+         }
+         
+      case DIOSIX_DRIVER_DEREGISTER_IRQ:
+         if(current->flags & THREAD_FLAG_ISDRIVER)
+         {
+            kresult err;
+            unsigned char irq = regs->ebx;
+            
+            /* let the IRQ code take care of it including outputting debug */
+            err = irq_deregister_driver(irq, IRQ_DRIVER_PROCESS, current->proc, NULL);
+            SYSCALL_RETURN(err);
          }
    }
    
