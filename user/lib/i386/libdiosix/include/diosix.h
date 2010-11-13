@@ -124,6 +124,8 @@ typedef struct
 #define DIOSIX_RIGHTS_CLEAR    (1)
 #define DIOSIX_IORIGHTS_REMOVE (2)
 #define DIOSIX_IORIGHTS_CLEAR  (3)
+#define DIOSIX_UNIX_SIGNALS    (4)
+#define DIOSIX_KERNEL_SIGNALS  (5)
 
 /* reason codes for requesting info from the kernel */
 #define DIOSIX_THREAD_INFO  (0)

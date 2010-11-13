@@ -156,6 +156,22 @@ unsigned int diosix_iorights_clear(unsigned int index, unsigned int bits)
    return retval;
 }
 
+unsigned int diosix_signals_unix(unsigned int mask)
+/* bitfield to enable unix signals to be received, a set bit indicates the signal will be accepted */
+{
+   unsigned int retval;
+   __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (DIOSIX_UNIX_SIGNALS), "b" (mask), "d" (SYSCALL_PRIVS));
+   return retval;   
+}
+
+unsigned int diosix_signals_kernel(unsigned int mask)
+/* bitfield to enable kernel-generated signals to be received, a set bit indicates the signal will be accepted */
+{
+   unsigned int retval;
+   __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (DIOSIX_KERNEL_SIGNALS), "b" (mask), "d" (SYSCALL_PRIVS));
+   return retval;   
+}
+
 /* --------------------------- driver management -------------------- */
 unsigned int diosix_driver_register(void)
 /* remove the previously afforded process right to access IO ports entirely */

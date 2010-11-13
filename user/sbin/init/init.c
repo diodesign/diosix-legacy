@@ -17,6 +17,7 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 #include <diosix.h>
 #include <functions.h>
+#include <signal.h>
 
 /* values taken from http://wiki.osdev.org/Bochs_Graphics_Adaptor */
 
@@ -91,6 +92,12 @@ void vbe_set_mode(unsigned short width, unsigned short height, unsigned char bpp
              VBE_DISPI_ENABLED | VBE_DISPI_LFB_ENABLED);
 }
 
+void do_idle(void)
+{  
+   /* always give the processor something to do */
+   while(1) diosix_thread_yield();
+}
+
 void do_listen(void)
 {
    unsigned int buffer;
@@ -142,42 +149,54 @@ void main(void)
    diosix_msg_info msg, sig;
    unsigned int child;
    unsigned int message = 0;
+   unsigned char count = 100;
 
+   /* create a new thread that'll idle for us */
+   child = diosix_fork();
+   if(child == 0) do_idle(); /* child can idle */
+   
    /* create new process to receive */
    child = diosix_fork();
-   
    if(child == 0) do_listen(); /* child does the listening */
       
    /* move into driver layer and get access to the keyboard IRQ */
    diosix_priv_layer_up();
    diosix_driver_register();
+   diosix_signals_kernel(SIG_ACCEPT_KERNEL(SIGXIRQ));
+   // diosix_driver_register_irq(KEYBOARD_IRQ);
    diosix_driver_register_irq(32);
    
    /* wait for keyboard IRQ */
    while(1)
    {
-      /* wait for IRQ signal */
-      sig.tid = DIOSIX_MSG_ANY_THREAD;
-      sig.pid = DIOSIX_MSG_ANY_PROCESS;
-      sig.flags = DIOSIX_MSG_SIGNAL | DIOSIX_MSG_KERNELONLY;
-      sig.recv = (void *)&(sig.signal);
-      sig.recv_max_size = sizeof(diosix_signal);
-      
-      if(diosix_msg_receive(&sig) == success)
+      count--;
+      if(!count)
       {
-         /* set up message block to poke the child */
-         msg.tid = DIOSIX_MSG_ANY_THREAD;
-         msg.pid = child;
-         msg.flags = DIOSIX_MSG_GENERIC | DIOSIX_MSG_SENDASUSR;
-         msg.send = &message;
-         msg.send_size = sizeof(unsigned int);
-         msg.recv = &message;
-         msg.recv_max_size = sizeof(unsigned int);
+         /* wait for IRQ signal */
+         sig.tid = DIOSIX_MSG_ANY_THREAD;
+         sig.pid = DIOSIX_MSG_ANY_PROCESS;
+         sig.flags = DIOSIX_MSG_SIGNAL | DIOSIX_MSG_KERNELONLY;
+         sig.recv = (void *)&(sig.signal);
+         sig.recv_max_size = sizeof(diosix_signal);
          
-         /* send message any listening thread, block if successfully
-            found a receiver */ 
-         if(diosix_msg_send(&msg))
-            diosix_thread_yield();
+         if(diosix_msg_receive(&sig) == success)
+         {
+            /* set up message block to poke the child */
+            msg.tid = DIOSIX_MSG_ANY_THREAD;
+            msg.pid = child;
+            msg.flags = DIOSIX_MSG_GENERIC | DIOSIX_MSG_SENDASUSR;
+            msg.send = &message;
+            msg.send_size = sizeof(unsigned int);
+            msg.recv = &message;
+            msg.recv_max_size = sizeof(unsigned int);
+            
+            /* send message any listening thread, block if successfully
+               found a receiver */ 
+            if(diosix_msg_send(&msg))
+               diosix_thread_yield();
+         }
+         
+         count = 100;
       }
    }
 }

@@ -309,6 +309,10 @@ void syscall_do_msg_recv(int_registers_block *regs)
             DIOSIX_IORIGHTS_CLEAR: remove selected IO port access from a process
               => ebx = index (in 32bit words) into 8bit x (2^16) bitmap
                  ecx = word to apply to bitmap. Set bits to remove corresponding port access
+            DIOSIX_UNIX_SIGNALS:
+              => ebx = bitfield of POSIX-compatible signals that process will accept
+            DIOSIX_KERNEL_SIGNALS:
+              => ebx = bitfield of kernel-generated signals that process will accept
    <= eax = 0 for success or an error code
 */
 void syscall_do_privs(int_registers_block *regs)
@@ -331,6 +335,14 @@ void syscall_do_privs(int_registers_block *regs)
          
       case DIOSIX_IORIGHTS_CLEAR:
          SYSCALL_RETURN(x86_ioports_clear(current->proc, regs->ebx, regs->ecx));
+         
+      case DIOSIX_UNIX_SIGNALS:
+         current->proc->unix_signals_accepted = regs->ebx;
+         SYSCALL_RETURN(success);
+         
+      case DIOSIX_KERNEL_SIGNALS:
+         current->proc->kernel_signals_accepted = regs->ebx;
+         SYSCALL_RETURN(success);
    }
    
    /* fall through to returning an error code */

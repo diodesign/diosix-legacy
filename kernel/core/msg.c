@@ -72,7 +72,7 @@ kresult msg_send_signal(process *target, thread *sender, unsigned int signum, un
       !sender)
    {
       /* is this kernel signal accepted? */
-      if(!(target->unix_signals_accepted & (1 << signum)))
+      if(!(target->kernel_signals_accepted & (1 << (signum - SIG_KERNEL_MIN))))
          MSG_SIGNAL_REJECT(e_no_receiver);
    }
    

@@ -47,6 +47,8 @@ unsigned int diosix_priv_layer_up(void);
 unsigned int diosix_priv_rights_clear(unsigned int bits);
 unsigned int diosix_iorights_remove(void);
 unsigned int diosix_iorights_clear(unsigned int index, unsigned int bits);
+unsigned int diosix_signals_unix(unsigned int mask);
+unsigned int diosix_signals_kernel(unsigned int mask);
 
 /* manage drivers */
 unsigned int diosix_driver_register(void);

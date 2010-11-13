@@ -64,4 +64,8 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 /* signals reserved for diosix process */
 #define SIG_USER_MIN     (64)
 
+/* macros to set bits for accepted signals */
+#define SIG_ACCEPT_UNIX(a)   (1 << a)
+#define SIG_ACCEPT_KERNEL(a) (1 << (a - SIG_KERNEL_MIN))
+
 #endif
