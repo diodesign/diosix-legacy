@@ -74,6 +74,14 @@ kresult msg_send_signal(process *target, thread *sender, unsigned int signum, un
       /* is this kernel signal accepted? */
       if(!(target->kernel_signals_accepted & (1 << (signum - SIG_KERNEL_MIN))))
          MSG_SIGNAL_REJECT(e_no_receiver);
+      
+      /* create a queued pool if one doesn't exist */
+      if(!(target->system_signals))
+      {
+         pool = vmm_create_pool(sizeof(diosix_signal), 4);
+         if(!pool) MSG_SIGNAL_REJECT(e_failure);
+      }
+      else pool = target->system_signals;
    }
    
    /* the kernel shouldn't really send user signals */
@@ -91,11 +99,11 @@ kresult msg_send_signal(process *target, thread *sender, unsigned int signum, un
    /* if pool hasn't been set by now and we haven't bailed out
       of the function by now then something's wrong with signum */
    if(!pool) MSG_SIGNAL_REJECT(e_bad_params);
-   
+      
    /* allocate our new signal block and write into it */
    err = vmm_alloc_pool((void **)&newsig, pool);
    if(err) MSG_SIGNAL_REJECT(err);
-   
+      
    newsig->number = signum;
    newsig->extra = sigcode;
    if(sender)
@@ -109,7 +117,6 @@ kresult msg_send_signal(process *target, thread *sender, unsigned int signum, un
       newsig->sender_pid = newsig->sender_tid = RESERVED_PID;
    
    /* all done */
-   
    MSG_DEBUG("[msg:%i] sent signal %i:0x%x to pid %i from process %x\n",
              CPU_ID, signum, sigcode, target->pid, sender);
    
