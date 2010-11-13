@@ -569,11 +569,14 @@ kresult x86_init_tss(thread *toinit)
    
    /* quick sanity check */
    if(!toinit) return e_bad_params;
-   
+
    /* free the TSS if one's already allocated */
    if(toinit->tss)
+   {
       if(vmm_free(toinit->tss))
          return e_failure;
+      toinit->tss = NULL;
+   }
 
    /* calculate size of TSS, it may need space for an IO bitmap after */
    size_req = sizeof(tss_descr);
@@ -584,7 +587,7 @@ kresult x86_init_tss(thread *toinit)
    /* allocate a new TSS */
    if(vmm_malloc((void **)&(toinit->tss), size_req))
       return e_failure;
-   
+
    /* copy in the process's IO map into the TSS if required, the IO
       map will be located at the end of the tss_descr structure */
    if(size_req > sizeof(tss_descr))

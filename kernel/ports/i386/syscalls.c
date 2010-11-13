@@ -63,7 +63,7 @@ void syscall_do_fork(int_registers_block *regs)
    }
    
    /* don't forget to init the tss for the new thread in the new process and duplicate the 
-      state of the current thread */
+      state of the current thread and its tss */
    vmm_memcpy(&(tnew->regs), regs, sizeof(int_registers_block));
    x86_init_tss(tnew);
    

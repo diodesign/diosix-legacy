@@ -329,8 +329,16 @@ kresult vmm_free(void *addr)
    /* sanity check the block */
    if(block->magic != KHEAP_INUSE)
    {
-      KOOPS_DEBUG("[vmm:%i] OMGWTF! vmm_free: block %x has wrong magic %x\n",
-              CPU_ID, block, block->magic);
+      if(block->magic == KHEAP_FREE)
+      {
+         KOOPS_DEBUG("[vmm:%i] OMGWTF! vmm_free: double free detetced on block %x\n",
+                     CPU_ID, block);
+      }
+      else
+      {
+         KOOPS_DEBUG("[vmm:%i] OMGWTF! vmm_free: block %x has wrong magic %x\n",
+                     CPU_ID, block, block->magic);
+      }
       debug_stacktrace();
       return e_bad_magic;
    }
@@ -1263,6 +1271,10 @@ void vmm_memcpy(void *target, void *source, unsigned int count)
    unsigned char *ptr1 = (unsigned char *)target;
    unsigned char *ptr2 = (unsigned char *)source;
    unsigned int i;
+   
+   /* sanity checks */
+   if(!target || !source || !count) return;
+   
    for(i = 0; i < count; i++)
       ptr1[i] = ptr2[i];
 }

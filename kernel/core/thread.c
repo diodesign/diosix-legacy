@@ -112,9 +112,6 @@ thread *thread_duplicate(process *proc, thread *source)
    /* the new thread is asleep and due to be scheduled */
    new->state = sleeping;
    
-   /* clone the source thread's tss FIXME not very portable? :( */
-   vmm_memcpy(&(new->tss), &(source->tss), sizeof(tss_descr));
-   
    /* clone the source thread's kernel stack for this new thread */
    err = vmm_malloc((void **)&kstack, MEM_PGSIZE);
    if(err)

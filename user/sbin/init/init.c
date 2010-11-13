@@ -151,7 +151,7 @@ void main(void)
    /* move into driver layer and get access to the keyboard IRQ */
    diosix_priv_layer_up();
    diosix_driver_register();
-   diosix_driver_register_irq(KEYBOARD_IRQ);
+   diosix_driver_register_irq(32);
    
    /* wait for keyboard IRQ */
    while(1)
