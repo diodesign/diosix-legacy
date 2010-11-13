@@ -110,6 +110,9 @@ kresult msg_send_signal(process *target, thread *sender, unsigned int signum, un
    
    /* all done */
    
+   MSG_DEBUG("[msg:%i] sent signal %i:0x%x to tid %i pid %i from process %x\n",
+             CPU_ID, signum, sigcode, target->tid, target->proc->pid, sender);
+   
 msg_send_signal_exit:
    unlock_gate(&(target->lock), LOCK_WRITE);
    return err;
