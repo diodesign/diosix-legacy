@@ -18,7 +18,7 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #ifndef _PROCESSES_H
 #define   _PROCESSES_H
 
-/* PID and TID 0 are reserved */
+/* PID and TID 0 are reserved for the kernel */
 #define RESERVED_PID (0)
 #define FIRST_PID    (RESERVED_PID + 1)
 #define FIRST_TID    (FIRST_PID)
@@ -212,10 +212,14 @@ struct thread
 #define PROC_FLAG_RUNLOCKED   (1 << 0)
 
 /* process status flags (rights) */
-#define PROC_FLAG_CANMSGASUSR (1 << 1) /* can send messages as a user process */
-#define PROC_FLAG_CANBEDRIVER (1 << 2) /* can register as a driver process */
-#define PROC_FLAG_CANMAPPHYS  (1 << 3) /* is allowed to map physical memory into its virtual space */
-#define PROC_RIGHTS_MASK      (PROC_FLAG_CANMSGASUSR | PROC_FLAG_CANBEDRIVER | PROC_FLAG_CANMAPPHYS)
+#define PROC_FLAG_CANMSGASUSR   (1 << 1) /* can send messages as a user process */
+#define PROC_FLAG_CANBEDRIVER   (1 << 2) /* can register as a driver process */
+#define PROC_FLAG_CANMAPPHYS    (1 << 3) /* is allowed to map physical memory into its virtual space */
+#define PROC_FLAG_CANUNIXSIGNAL (1 << 4) /* is allowed to send POSIX-compatible signals (sig code 0-31) */
+#define PROC_RIGHTS_MASK  (PROC_FLAG_CANMSGASUSR | \
+                           PROC_FLAG_CANBEDRIVER | \
+                           PROC_FLAG_CANMAPPHYS | \
+                           PROC_FLAG_CANUNIXSIGNAL)
 
 /* needed in the process struct */
 typedef struct irq_driver_entry irq_driver_entry;
@@ -287,14 +291,15 @@ struct process
    /* signal management */
    unsigned int unix_signals_accepted; /* mask for the first 32 signals (UNIX-compatible ones) */
    unsigned int unix_signals_inprogress; /* bitfield for the first 32 signals (UNIX-compatible ones) */
-   kpool *unix_signals; /* queue of UNIX-compatible signals */
+   unsigned int kernel_signals_accepted; /* bitfield for the kernel's signals */
+   kpool *system_signals; /* queue of UNIX-compatible and kernel signals */
    kpool *user_signals; /* queue of user defined signals */
 };
 
 #define LAYER_MAX        (255)
 #define LAYER_EXECUTIVE  (0)
 #define LAYER_DRIVERS    (1)
-#define FLAGS_EXECUTIVE  (PROC_FLAG_CANMSGASUSR | PROC_FLAG_CANBEDRIVER | PROC_FLAG_CANMAPPHYS)
+#define FLAGS_EXECUTIVE  (PROC_RIGHTS_MASK) /* give executive all rights */
 
 /* processes, threads and scheduling */
 extern process *proc_sys_executive;

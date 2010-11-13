@@ -47,12 +47,21 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #define SIGUSR1   (30)
 #define SIGUSR2   (31)
 
-/* diosix-specific signals for trusted processes */
+#define SIG_UNIX_MAX     (31)
+
+/* diosix-specific signals for trusted processes from the kernel */
 #define SIGXPROCKILLED   (32) /* process has been killed, code = victim PID */
 #define SIGXPROCCLONED   (33) /* process memory map has been cloned, code = new PID */
 #define SIGXPROCEXIT     (34) /* process has called SYSCALL_EXIT and must be killed, code = victim PID */
 #define SIGXTHREADKILLED (35) /* a thread has been killed, code = thread owner's TID */
 #define SIGXTHREADEXIT   (36) /* a thread has called SYSCALL_THREAD_EXIT, code = thread owner's PID */
 #define SIGXIRQ          (37) /* an IRQ has been raised, code = IRQ line number */
+
+/* range of kernel signals (inclusive) */
+#define SIG_KERNEL_MIN   (32)
+#define SIG_KERNEL_MAX   (63)
+
+/* signals reserved for diosix process */
+#define SIG_USER_MIN     (64)
 
 #endif

@@ -355,7 +355,7 @@ kresult pg_new_process(process *new, process *current)
    /* notify the userspace page manager that a process is starting up */
    if(userspace_page_handler)
    {
-      if(msg_send_signal(userspace_page_handler, SIGXPROCCLONED, new->pid))
+      if(msg_send_signal(userspace_page_handler, NULL, SIGXPROCCLONED, new->pid))
       {
          KOOPS_DEBUG("[page:%i] OMGWTF userspace page manager has gone AWOL\n"
                      "          tried talking to proc %i (%p) while cloning %i (%p)\n",
@@ -401,7 +401,7 @@ kresult pg_destroy_process(process *victim)
    /* bump the userspace page manager */
    if(userspace_page_handler)
    {
-      if(msg_send_signal(userspace_page_handler, SIGXPROCKILLED, victim->pid))
+      if(msg_send_signal(userspace_page_handler, NULL, SIGXPROCKILLED, victim->pid))
       {
          KOOPS_DEBUG("[page:%i] OMGWTF userspace page manager has gone AWOL\n"
                      "       tried signalling proc %i (%p) while tearing down %i (%p)\n",

@@ -17,18 +17,102 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 #include <portdefs.h>
 
+/* Return an error code from msg_send_signal() */
+#define MSG_SIGNAL_REJECT(a) { err = a; goto msg_send_signal_exit; }
+
 /* msg_send_signal
    Send a POSIX signal message to a process - this function will not block.
    It queues a signal message for the process and wakes up the thread that's
    supposed to be handling it, then returns. If no signal handler can be found
    then alert the caller.
    => target  = pointer to receiving process
+      sender  = pointer to thread structure of sender, or NULL for kernel
       signum  = signal code to send
       sigcode = additional reason code
    <= 0 for success or an error reason code */
-kresult msg_send_signal(process *target, unsigned int signum, unsigned int sigcode)
+kresult msg_send_signal(process *target, thread *sender, unsigned int signum, unsigned int sigcode)
 {
-   return e_no_handler;
+   kresult err = success;
+   kpool *pool = NULL; /* pool queue - no pun intended */
+   diosix_signal *newsig;
+   
+   /* sanity checks */
+   if(!target || !signum) return e_bad_params;
+   
+   /* protect from changes */
+   err = lock_gate(&(target->lock), LOCK_WRITE);
+   if(err) return err;
+   
+   /* only authorised senders and the kernel can send UNIX signals */
+   if(signum <= SIG_UNIX_MAX &&
+      (!sender || (sender->proc->flags & PROC_FLAG_CANUNIXSIGNAL)))
+   {
+      /* it's a UNIX-compatible signal, but is it accepted? */
+      if(!(target->unix_signals_accepted & (1 << signum)))
+         MSG_SIGNAL_REJECT(e_no_receiver);
+      
+      /* is the signal pending? */
+      if(target->unix_signals_inprogress & (1 << signum))
+         MSG_SIGNAL_REJECT(e_signal_pending);
+      
+      /* create a queued pool if one doesn't exist */
+      if(!(target->system_signals))
+      {
+         pool = vmm_create_pool(sizeof(diosix_signal), 4);
+         if(!pool) MSG_SIGNAL_REJECT(e_failure);
+      }
+      else pool = target->system_signals;
+    
+      /* signal is in progress */
+      target->unix_signals_inprogress |= (1 << signum);
+   }
+   
+   /* only kernel can send kernel signals */
+   if(signum >= SIG_KERNEL_MIN && signum <= SIG_KERNEL_MAX &&
+      !sender)
+   {
+      /* is this kernel signal accepted? */
+      if(!(target->unix_signals_accepted & (1 << signum)))
+         MSG_SIGNAL_REJECT(e_no_receiver);
+   }
+   
+   /* the kernel shouldn't really send user signals */
+   if(signum >= SIG_USER_MIN && sender)
+   {
+      /* create a queued pool for the user signals if one doesn't exist */
+      if(!(target->user_signals))
+      {
+         pool = vmm_create_pool(sizeof(diosix_signal), 4);
+         if(!pool) MSG_SIGNAL_REJECT(e_failure);
+      }
+      else pool = target->user_signals;
+   }
+   
+   /* if pool hasn't been set by now and we haven't bailed out
+      of the function by now then something's wrong with signum */
+   if(!pool) MSG_SIGNAL_REJECT(e_bad_params);
+   
+   /* allocate our new signal block and write into it */
+   err = vmm_alloc_pool((void **)&newsig, pool);
+   if(err) MSG_SIGNAL_REJECT(err);
+   
+   newsig->number = signum;
+   newsig->extra = sigcode;
+   if(sender)
+   {
+      /* sender is a user thread */
+      newsig->sender_pid = sender->proc->pid;
+      newsig->sender_tid = sender->tid;
+   }
+   else
+      /* sender is the kernel */
+      newsig->sender_pid = newsig->sender_tid = RESERVED_PID;
+   
+   /* all done */
+   
+msg_send_signal_exit:
+   unlock_gate(&(target->lock), LOCK_WRITE);
+   return err;
 }
 
 /* msg_test_receiver

@@ -68,7 +68,7 @@ void irq_handler(int_registers_block regs)
                          CPU_ID, driver->proc->pid, driver->proc, regs.intnum, driver);
                if(driver->proc)
                {
-                  msg_send_signal(driver->proc, SIGXIRQ, regs.intnum);
+                  msg_send_signal(driver->proc, NULL, SIGXIRQ, regs.intnum);
                   handled = 1;
                }
             }

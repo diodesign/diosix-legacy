@@ -456,7 +456,7 @@ do_proc_kill:
    
    /* don't forget to dispatch a signal to the parent and
       don't fret if the parent shuns its moment of mourning */
-   msg_send_signal(parent, SIGCHLD, 0);
+   msg_send_signal(parent, NULL, SIGCHLD, 0);
    
    PROC_DEBUG("[proc:%i] killed process %i (%p)\n", CPU_ID, victim->pid, victim);
    

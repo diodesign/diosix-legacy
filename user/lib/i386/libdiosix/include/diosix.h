@@ -33,6 +33,7 @@ typedef enum
    e_no_handler,
    e_no_rights,
    e_no_receiver,
+   e_signal_pending,
    e_not_pg_aligned,
    e_not_enough_pgs,
    e_not_contiguous,
@@ -74,7 +75,7 @@ typedef enum
 #define DIOSIX_MSG_MULTIPART   (1 << 30) /* message split into multiple blocks */
 #define DIOSIX_MSG_RECVONREPLY (1 << 29) /* block on recv after replying */
 #define DIOSIX_MSG_SENDASUSR   (1 << 28) /* send message as an unpriv'd user process */
-#define DIOSIX_MSG_KERNELONLY  (1 << 29) /* accept signals from the kernel only */
+#define DIOSIX_MSG_KERNELONLY  (1 << 27) /* accept signals from the kernel only */
 /* simple type bits low (bits 0-11) */
 #define DIOSIX_MSG_GENERIC     (1)
 #define DIOSIX_MSG_SIGNAL      (2)
@@ -92,6 +93,7 @@ typedef struct
 {
    unsigned int number; /* the signal number */
    unsigned int extra;  /* an extra word of information */
+   unsigned int sender_pid, sender_tid; /* sender's TID+PID */
 } diosix_signal;
 
 /* message passing - describe an outgoing multipart message */

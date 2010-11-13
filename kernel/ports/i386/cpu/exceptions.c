@@ -89,7 +89,7 @@ void exception_handler(int_registers_block regs)
                /* mark this process as attempting to handle the fault */
                cpu_table[CPU_ID].current->proc->unix_signals_inprogress |= (1 << SIGBUS);
                
-               if(msg_send_signal(cpu_table[CPU_ID].current->proc, SIGBUS, 0))
+               if(msg_send_signal(cpu_table[CPU_ID].current->proc, NULL, SIGBUS, 0))
                   /* something went wrong, so default action is shoot to kill */
                   proc_kill(cpu_table[CPU_ID].current->proc->pid, cpu_table[CPU_ID].current->proc);
             }
@@ -110,7 +110,7 @@ void exception_handler(int_registers_block regs)
                /* mark this process as attempting to handle the fault */
                cpu_table[CPU_ID].current->proc->unix_signals_inprogress |= (1 << SIGSEGV);         
    
-               if(msg_send_signal(cpu_table[CPU_ID].current->proc, SIGSEGV, 0))
+               if(msg_send_signal(cpu_table[CPU_ID].current->proc, NULL, SIGSEGV, 0))
                {
                   /* something went wrong, so shoot to kill */
                   regs.eax = POSIX_GENERIC_FAILURE;

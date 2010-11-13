@@ -25,7 +25,7 @@ void syscall_do_exit(int_registers_block *regs)
               cpu_table[CPU_ID].current->tid);
 
    /* request to be killed by the system executive */
-   msg_send_signal(proc_sys_executive, SIGXPROCEXIT, cpu_table[CPU_ID].current->proc->pid);
+   msg_send_signal(proc_sys_executive, NULL, SIGXPROCEXIT, cpu_table[CPU_ID].current->proc->pid);
 
    /* remove from the run queue and mark as dying */
    sched_remove(cpu_table[CPU_ID].current, dead);
@@ -93,7 +93,7 @@ void syscall_do_kill(int_registers_block *regs)
    
    if(!(regs->eax) && cpu_table[CPU_ID].current->proc != proc_sys_executive)
       /* inform the system executive that a process has been killed */
-      msg_send_signal(proc_sys_executive, SIGXPROCKILLED, victim);
+      msg_send_signal(proc_sys_executive, NULL, SIGXPROCKILLED, victim);
 }
          
 /* syscall: yield - give up the processor to another thread, if it exists. A thread that
@@ -134,7 +134,7 @@ void syscall_do_thread_exit(int_registers_block *regs)
    }
    
    /* request to be killed by the system executive */
-   msg_send_signal(proc_sys_executive, SIGXTHREADEXIT, cpu_table[CPU_ID].current->proc->pid);
+   msg_send_signal(proc_sys_executive, NULL, SIGXTHREADEXIT, cpu_table[CPU_ID].current->proc->pid);
    
    /* remove from the run queue and mark as dying */
    sched_remove(cpu_table[CPU_ID].current, dead);   
@@ -223,7 +223,7 @@ void syscall_do_thread_kill(int_registers_block *regs)
    
    if(cpu_table[CPU_ID].current->proc != proc_sys_executive)
       /* inform the system executive that a thread has been killed */
-      msg_send_signal(proc_sys_executive, SIGXTHREADKILLED, owner->pid);
+      msg_send_signal(proc_sys_executive, NULL, SIGXTHREADKILLED, owner->pid);
 }
 
 /* syscall:msg_send - send a message to a process and block until a reply is received
