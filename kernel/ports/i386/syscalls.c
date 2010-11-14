@@ -297,8 +297,33 @@ void syscall_do_msg_recv(int_registers_block *regs)
    /* sanitise the input data while we're here */
    if(!msg || ((unsigned int)msg >= KERNEL_SPACE_BASE)) SYSCALL_RETURN(e_bad_address);
    
-   /* do the actual receiving */
-   SYSCALL_RETURN(msg_recv(current, msg));
+   /* do the actual receiving, syscall_post_msg_recv() will set return code in eax */
+   msg_recv(current, msg);
+}
+
+/* syscall_post_msg_recv
+   Perform the final stage of syscall:msg_recv just before the call returns.
+   It is called from the context of the sending thread.
+   => receiver = thread that blocked awaiting a message
+      result = return code from the syscall
+*/
+void syscall_post_msg_recv(thread *receiver, kresult result)
+{
+   diosix_msg_info *msg;
+   
+   if(!receiver) return; /* sanity check */
+   
+   /* get the address of the receiver's block - it's been verified by this point */
+   msg = (diosix_msg_info *)receiver->regs.eax;
+   
+   MSG_DEBUG("[msg:%i] updating receiver %p (tid %i pid %i) msg %p result %i\n",
+             CPU_ID, receiver, receiver->tid, receiver->proc->pid, msg, result);
+   
+   /* copy the receiver's updated message block back into its address space */
+   if(vmm_memcpyuser(msg, receiver->proc, &(receiver->msg), NULL, sizeof(diosix_msg_info)))
+      receiver->regs.eax = e_bad_address;
+   else
+      receiver->regs.eax = result;
 }
 
 /* syscall:privs - alter the privs/rights of a process

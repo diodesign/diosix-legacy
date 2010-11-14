@@ -79,8 +79,7 @@ typedef enum
 /* simple type bits low (bits 0-11) */
 #define DIOSIX_MSG_GENERIC     (1)
 #define DIOSIX_MSG_SIGNAL      (2)
-#define DIOSIX_MSG_ANY_TYPE    ((1 << 12) - 1)
-#define DIOSIX_MSG_TYPEMASK    (DIOSIX_MSG_ANY_TYPE)
+#define DIOSIX_MSG_TYPEMASK    ((1 << 12) - 1)
 /* zero is a reserved tid/pid */
 #define DIOSIX_MSG_ANY_THREAD  (0)
 #define DIOSIX_MSG_ANY_PROCESS (0)
@@ -93,7 +92,6 @@ typedef struct
 {
    unsigned int number; /* the signal number */
    unsigned int extra;  /* an extra word of information */
-   unsigned int sender_pid, sender_tid; /* sender's TID+PID */
 } diosix_signal;
 
 /* message passing - describe an outgoing multipart message */

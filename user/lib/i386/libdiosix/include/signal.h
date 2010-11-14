@@ -19,6 +19,7 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #define   _SIGNAL_H
 
 /* UNIX-compatible signal numbers */
+/* SIGZERO (0) is invalid */
 #define SIGHUP    (1)
 #define SIGINT    (2)
 #define SIGQUIT   (3)

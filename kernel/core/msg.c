@@ -34,9 +34,9 @@ kresult msg_send_signal(process *target, thread *sender, unsigned int signum, un
 {
    kresult err = success;
    kpool *pool = NULL; /* pool queue - no pun intended */
-   diosix_signal *newsig;
+   queued_signal *newsig;
    
-   /* sanity checks */
+   /* sanity checks - no NULL pointers nor SIGZERO */
    if(!target || !signum) return e_bad_params;
    
    /* protect from changes */
@@ -58,7 +58,7 @@ kresult msg_send_signal(process *target, thread *sender, unsigned int signum, un
       /* create a queued pool if one doesn't exist */
       if(!(target->system_signals))
       {
-         pool = vmm_create_pool(sizeof(diosix_signal), 4);
+         pool = vmm_create_pool(sizeof(queued_signal), 4);
          if(!pool) MSG_SIGNAL_REJECT(e_failure);
       }
       else pool = target->system_signals;
@@ -78,7 +78,7 @@ kresult msg_send_signal(process *target, thread *sender, unsigned int signum, un
       /* create a queued pool if one doesn't exist */
       if(!(target->system_signals))
       {
-         pool = vmm_create_pool(sizeof(diosix_signal), 4);
+         pool = vmm_create_pool(sizeof(queued_signal), 4);
          if(!pool) MSG_SIGNAL_REJECT(e_failure);
       }
       else pool = target->system_signals;
@@ -90,7 +90,7 @@ kresult msg_send_signal(process *target, thread *sender, unsigned int signum, un
       /* create a queued pool for the user signals if one doesn't exist */
       if(!(target->user_signals))
       {
-         pool = vmm_create_pool(sizeof(diosix_signal), 4);
+         pool = vmm_create_pool(sizeof(queued_signal), 4);
          if(!pool) MSG_SIGNAL_REJECT(e_failure);
       }
       else pool = target->user_signals;
@@ -104,8 +104,8 @@ kresult msg_send_signal(process *target, thread *sender, unsigned int signum, un
    err = vmm_alloc_pool((void **)&newsig, pool);
    if(err) MSG_SIGNAL_REJECT(err);
       
-   newsig->number = signum;
-   newsig->extra = sigcode;
+   newsig->signal.number = signum;
+   newsig->signal.extra = sigcode;
    if(sender)
    {
       /* sender is a user thread */
@@ -116,7 +116,8 @@ kresult msg_send_signal(process *target, thread *sender, unsigned int signum, un
       /* sender is the kernel */
       newsig->sender_pid = newsig->sender_tid = RESERVED_PID;
    
-   /* all done */
+   /* all done */   
+   
    MSG_DEBUG("[msg:%i] sent signal %i:0x%x to pid %i from process %x\n",
              CPU_ID, signum, sigcode, target->pid, sender);
    
@@ -134,7 +135,6 @@ msg_send_signal_exit:
 */
 kresult msg_test_receiver(thread *sender, thread *target, diosix_msg_info *msg)
 {
-   diosix_msg_info *tmsg;
    unsigned char layer;
    
    /* sanity check */
@@ -148,45 +148,39 @@ kresult msg_test_receiver(thread *sender, thread *target, diosix_msg_info *msg)
    /* protect us from changes to the target's metadata */
    lock_gate(&(target->lock), LOCK_READ);
    
-   /* calculate layer - if DIOSIX_MSG_SENDASUSR is set then the message is
-      being sent as an unprivileged user program */
-   if((sender->proc->flags & PROC_FLAG_CANMSGASUSR) &&
-      (msg->flags & DIOSIX_MSG_SENDASUSR))
-      layer = LAYER_MAX;
-   else
-      layer = sender->proc->layer;
-   
-   /* threads can only recieve messages if they are in a layer below the sender - unless it's a 
-      reply. we check below whether this is a legit reply */
-   if((target->proc->layer >= layer) && !(msg->flags & DIOSIX_MSG_REPLY))
+   switch(msg->flags & DIOSIX_MSG_TYPEMASK)
    {
-      MSG_DEBUG("[msg:%i] recv layer %i not below sender layer %i and message isn't a reply (%i)\n",
-                CPU_ID, target->proc->layer, sender->proc->layer, msg->flags);
-      goto msg_test_receiver_failure;
-   }
-   
-   /* has the target thread given us a sane message block to access? */
-   if(pg_preempt_fault(target, (unsigned int)(target->msg), sizeof(diosix_msg_info), VMA_WRITEABLE))
-      goto msg_test_receiver_failure;
-   
-   /* is this message waiting on a reply from this thread? */
-   if((target->state == waitingforreply) &&
-      (msg->flags & DIOSIX_MSG_REPLY) &&
-      (target->replysource == sender) &&
-      target->msg)
-      goto msg_test_receiver_success;
-   
-   /* is the target thread willing to accept the message type? */
-   if(target->msg)
-   {
-      /* don't forget that within the context of the sending thread we can't access the
-       receiver's msg structure unless we go via a kernel mapping.. */
-      if(pg_user2kernel((unsigned int *)&tmsg, (unsigned int)(target->msg), target->proc))
-         goto msg_test_receiver_failure;      
+      case DIOSIX_MSG_SIGNAL:
+         /* is the target thread willing to accept the message type? */
+         if((target->state == waitingformsg) &&
+            ((target->msg.flags & DIOSIX_MSG_TYPEMASK) == DIOSIX_MSG_SIGNAL))
+            goto msg_test_receiver_success;
+         break;
       
-      if((target->state == waitingformsg) &&
-         ((msg->flags & DIOSIX_MSG_TYPEMASK) & tmsg->flags))
-         goto msg_test_receiver_success;
+      case DIOSIX_MSG_GENERIC:
+         /* calculate layer - if DIOSIX_MSG_SENDASUSR is set then the message is
+            being sent as an unprivileged user program */
+         if((sender->proc->flags & PROC_FLAG_CANMSGASUSR) &&
+            (msg->flags & DIOSIX_MSG_SENDASUSR))
+            layer = LAYER_MAX;
+         else
+            layer = sender->proc->layer;
+   
+         /* threads can only recieve messages if they are in a layer below the sender - unless it's a 
+            reply. we check below whether this is a legit reply */
+         if((target->proc->layer >= layer) && !(msg->flags & DIOSIX_MSG_REPLY))
+            goto msg_test_receiver_failure;
+   
+         /* is this message waiting on a reply from this thread? */
+         if((target->state == waitingforreply) &&
+            (msg->flags & DIOSIX_MSG_REPLY) &&
+            (target->replysource == sender))
+            goto msg_test_receiver_success;
+   
+         /* is the target thread willing to accept the message type? */
+         if((target->state == waitingformsg) &&
+            ((target->msg.flags & DIOSIX_MSG_TYPEMASK) == DIOSIX_MSG_GENERIC))
+            goto msg_test_receiver_success;
    }
    
    /* give up */
@@ -278,19 +272,21 @@ kresult msg_copy(thread *receiver, void *data, unsigned int size, unsigned int *
    unsigned int recv;
    unsigned int recv_base;
    
-   /* protect us from metadata changes */
-   lock_gate(&(receiver->lock), LOCK_READ);
+   /* sanity checks - no NULL pointers or zero-byte copies */
+   if(!receiver || !data || !sender) return e_bad_params;
+   if(!size) return success; /* copying zero bytes also succeeds */
    
-   /* don't forget that within the context of the sending thread we can't access the
-      receiver's msg structure unless we go via a kernel mapping - it'll also sanity
-      check the addresses for us */
-   if(pg_user2kernel((unsigned int *)&rmsg, (unsigned int)(receiver->msg), receiver->proc))
-   {
-      unlock_gate(&(receiver->lock), LOCK_READ);
-      return e_bad_target_address;
-   }
-
+   /* protect us from metadata changes */
+   if(lock_gate(&(receiver->lock), LOCK_READ)) return e_failure;
+   
+   rmsg = &(receiver->msg);
    recv = (unsigned int)rmsg->recv;
+   if(!recv)
+   {
+      /* protect us from NULL pointers */
+      unlock_gate(&(receiver->lock), LOCK_READ);
+      return e_bad_address;
+   }
    recv_base = recv + (*(offset));
    
    /* stop abusive processes trying to smash out of a recv buffer */
@@ -347,19 +343,7 @@ kresult msg_send(thread *sender, diosix_msg_info *msg)
    lock_gate(&(receiver->proc->lock), LOCK_READ);
    lock_gate(&(receiver->lock), LOCK_WRITE);
    
-   /* get the receiver thread's msg block - msg_find_receiver()
-      double-checked it was ok to use the msg block */
-   if(pg_user2kernel((void *)&rmsg, (unsigned int)receiver->msg, receiver->proc))
-   {
-      unlock_gate(&(receiver->lock), LOCK_WRITE);
-      unlock_gate(&(receiver->proc->lock), LOCK_READ); /* give up the process lock */
-      
-      /* TODO: take action against the at-fault receiver process */
-      MSG_DEBUG("[msg:%i] receiver %p (tid %i pid %i) tried to use invalid address %p for its receive block\n",
-                CPU_ID, receiver, receiver->tid, receiver->proc->pid, receiver->msg);
-      
-      return e_bad_target_address; /* this shouldn't really happen */
-   }
+   rmsg = &(receiver->msg);
 
    /* sanatise the receiver's msg buffer we're about to use */
    if(pg_preempt_fault(receiver, (unsigned int)(rmsg->recv), rmsg->recv_max_size, VMA_WRITEABLE))
@@ -367,7 +351,9 @@ kresult msg_send(thread *sender, diosix_msg_info *msg)
       unlock_gate(&(receiver->lock), LOCK_WRITE);
       unlock_gate(&(receiver->proc->lock), LOCK_READ); /* give up the process lock */
       
-      /* TODO: take action against the at-fault receiver process */
+      /* let the receiver know about its buffer screw up */
+      syscall_post_msg_recv(receiver, e_bad_target_address);
+                     
       MSG_DEBUG("[msg:%i] receiver %p (tid %i pid %i) tried to use invalid address %p for its receive buffer\n",
                 CPU_ID, receiver, receiver->tid, receiver->proc->pid, rmsg->recv);
       
@@ -434,8 +420,8 @@ kresult msg_send(thread *sender, diosix_msg_info *msg)
       sched_remove(sender, waitingforreply);
       sender->replysource = receiver;
       
-      /* take a copy of the message block ptr */
-      sender->msg = msg;
+      /* take a copy of the message block */
+      vmm_memcpy(&(sender->msg), msg, sizeof(diosix_msg_info));
       
       /* bump the receiver's priority up if the sender has a higher priority to
          avoid priority inversion */
@@ -451,6 +437,7 @@ kresult msg_send(thread *sender, diosix_msg_info *msg)
    unlock_gate(&(receiver->proc->lock), LOCK_READ); /* give up the process lock */
 
    /* wake up the receiving thread */
+   syscall_post_msg_recv(receiver, success);
    sched_add(receiver->cpu, receiver);
    
    MSG_DEBUG("[msg:%x] thread %i of process %i sent message %x (%i bytes first word %x) to thread %i of process %i\n",
@@ -472,18 +459,17 @@ kresult msg_recv(thread *receiver, diosix_msg_info *msg)
    if(!receiver || !msg) return e_bad_address;
    if((unsigned int)msg + MEM_CLIP(msg, sizeof(diosix_msg_info)) >= KERNEL_SPACE_BASE)
       return e_bad_address;
-   if(!(msg->recv) || !(msg->recv_max_size)) return e_bad_address;
    
-   /* keep a copy of this pointer */
+   /* grab a copy of the user's message block, we'll fault the thread if the address is dodgy */
    lock_gate(&(receiver->lock), LOCK_WRITE);
-   receiver->msg = msg;
+   vmm_memcpy(&(receiver->msg), msg, sizeof(diosix_msg_info));
    unlock_gate(&(receiver->lock), LOCK_WRITE);
 
    /* remove receiver from the queue until a message comes in */
    sched_remove(receiver, waitingformsg);
 
-   MSG_DEBUG("[msg:%i] tid %i pid %i now receiving (%p buffer %p)\n",
-             CPU_ID, receiver->tid, receiver->proc->pid, msg, receiver->msg->recv);
+   MSG_DEBUG("[msg:%i] tid %i pid %i now receiving (%p)\n",
+             CPU_ID, receiver->tid, receiver->proc->pid, msg);
 
    return success;
 }

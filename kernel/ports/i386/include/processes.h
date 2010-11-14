@@ -73,7 +73,7 @@ typedef struct mp_thread_queue mp_thread_queue; /* in cpu.h */
 /* a queued signal block held in the kernel */
 typedef struct
 {
-   diosix_signal signal; /* the signal number */
+   diosix_signal signal; /* the signal number and code */
    unsigned int sender_pid, sender_tid; /* process & thread IDs of the sender */
 } queued_signal;
 
@@ -187,9 +187,9 @@ struct thread
                                     a priority level and is rescheduled. If it hits 2*(2^priority)
                                     then it is bumped up a priority level and rescheduled. */
    
-   thread_state state;      /* the running state of the thread */
-   thread *replysource;     /* thread awaiting reply from */
-   diosix_msg_info *msg;    /* copy of the message block ptr submitted to syscall msg_send/recv */
+   thread_state state;  /* the running state of the thread */
+   thread *replysource; /* thread awaiting reply from */
+   diosix_msg_info msg; /* copy of the message block ptr submitted to syscall msg_send/recv */
    
    /* simple thread locking mechanism - acquire a lock before modifying
     or reading the thread's structure */

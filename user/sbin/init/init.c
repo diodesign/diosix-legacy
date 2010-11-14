@@ -100,7 +100,7 @@ void do_idle(void)
 
 void do_listen(void)
 {
-   unsigned int buffer;
+   unsigned int buffer = 0;
    unsigned int px;
    diosix_msg_info msg;
    diosix_phys_request req;
@@ -124,7 +124,7 @@ void do_listen(void)
       /* accept any message from any thread/process */
       msg.tid = DIOSIX_MSG_ANY_THREAD;
       msg.pid = DIOSIX_MSG_ANY_PROCESS;
-      msg.flags = DIOSIX_MSG_ANY_TYPE;
+      msg.flags = DIOSIX_MSG_GENERIC;
       msg.recv = &buffer;
       msg.recv_max_size = sizeof(unsigned int);
 
@@ -134,7 +134,7 @@ void do_listen(void)
          for(px = 0; px < FB_MAX_SIZE; px += sizeof(unsigned int))
             *((unsigned int *)(FB_LOG_BASE + px)) = buffer & 0xffffff;
          
-         buffer++;
+         buffer+= 0x00010204; /* cycle through colours */
                   
          msg.flags = DIOSIX_MSG_GENERIC;
          msg.send = &buffer;
@@ -158,7 +158,24 @@ void main(void)
    /* create new process to receive */
    child = diosix_fork();
    if(child == 0) do_listen(); /* child does the listening */
+   
+   while(1)
+   {      
+      /* set up message block to poke the child */
+      msg.tid = DIOSIX_MSG_ANY_THREAD;
+      msg.pid = child;
+      msg.flags = DIOSIX_MSG_GENERIC | DIOSIX_MSG_SENDASUSR;
+      msg.send = &message;
+      msg.send_size = sizeof(unsigned int);
+      msg.recv = &message;
+      msg.recv_max_size = sizeof(unsigned int);
       
+      /* send message any listening thread, block if successfully
+       found a receiver */ 
+      if(diosix_msg_send(&msg))
+         diosix_thread_yield();
+   }   
+   
    /* move into driver layer and get access to the keyboard IRQ */
    diosix_priv_layer_up();
    diosix_driver_register();
@@ -176,7 +193,7 @@ void main(void)
          sig.tid = DIOSIX_MSG_ANY_THREAD;
          sig.pid = DIOSIX_MSG_ANY_PROCESS;
          sig.flags = DIOSIX_MSG_SIGNAL | DIOSIX_MSG_KERNELONLY;
-         sig.recv = (void *)&(sig.signal);
+         sig.recv = NULL;
          sig.recv_max_size = sizeof(diosix_signal);
          
          if(diosix_msg_receive(&sig) == success)
