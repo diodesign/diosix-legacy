@@ -22,5 +22,7 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 kresult msg_send_signal(process *target, thread *sender, unsigned int signum, unsigned int sigcode);
 kresult msg_send(thread *sender, diosix_msg_info *msg);
 kresult msg_recv(thread *receiver, diosix_msg_info *msg);
+thread *msg_find_receiver(thread *sender, diosix_msg_info *msg);
+kresult msg_test_receiver(thread *sender, thread *target, diosix_msg_info *msg);
 
 #endif

@@ -149,7 +149,7 @@ void main(void)
    diosix_msg_info msg, sig;
    unsigned int child;
    unsigned int message = 0;
-   unsigned char count = 100;
+   unsigned char count = 10;
 
    /* create a new thread that'll idle for us */
    child = diosix_fork();
@@ -158,23 +158,6 @@ void main(void)
    /* create new process to receive */
    child = diosix_fork();
    if(child == 0) do_listen(); /* child does the listening */
-   
-   while(1)
-   {      
-      /* set up message block to poke the child */
-      msg.tid = DIOSIX_MSG_ANY_THREAD;
-      msg.pid = child;
-      msg.flags = DIOSIX_MSG_GENERIC | DIOSIX_MSG_SENDASUSR;
-      msg.send = &message;
-      msg.send_size = sizeof(unsigned int);
-      msg.recv = &message;
-      msg.recv_max_size = sizeof(unsigned int);
-      
-      /* send message any listening thread, block if successfully
-       found a receiver */ 
-      if(diosix_msg_send(&msg))
-         diosix_thread_yield();
-   }   
    
    /* move into driver layer and get access to the keyboard IRQ */
    diosix_priv_layer_up();
@@ -213,7 +196,7 @@ void main(void)
                diosix_thread_yield();
          }
          
-         count = 100;
+         count = 10;
       }
    }
 }

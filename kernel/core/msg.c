@@ -35,6 +35,8 @@ kresult msg_send_signal(process *target, thread *sender, unsigned int signum, un
    kresult err = success;
    kpool *pool = NULL; /* pool queue - no pun intended */
    queued_signal *newsig;
+   diosix_msg_info wakemsg;
+   thread *towake;
    
    /* sanity checks - no NULL pointers nor SIGZERO */
    if(!target || !signum) return e_bad_params;
@@ -116,7 +118,30 @@ kresult msg_send_signal(process *target, thread *sender, unsigned int signum, un
       /* sender is the kernel */
       newsig->sender_pid = newsig->sender_tid = RESERVED_PID;
    
-   /* all done */   
+   /* find a thread in the receiver to wake up to receive the message */
+   wakemsg.pid = target->pid;
+   wakemsg.tid = DIOSIX_MSG_ANY_THREAD;
+   wakemsg.flags = DIOSIX_MSG_SIGNAL;
+   towake = msg_find_receiver(sender, &wakemsg);
+   
+   if(towake)
+   {
+      /* update the receiver with details of the signal sender */
+      if(sender)
+      {
+         towake->msg.pid = sender->proc->pid;
+         towake->msg.tid = sender->tid;
+      }
+      else
+         towake->msg.pid = towake->msg.tid = RESERVED_PID;
+
+      /* wake the receiver */
+      syscall_post_msg_recv(towake, success);
+      sched_add(towake->cpu, towake);
+      
+      MSG_DEBUG("[msg:%i] waking thread %p (tid %i pid %i) to receive signal %i\n",
+                CPU_ID, towake, towake->tid, towake->proc->pid, signum);
+   }
    
    MSG_DEBUG("[msg:%i] sent signal %i:0x%x to pid %i from process %x\n",
              CPU_ID, signum, sigcode, target->pid, sender);
@@ -128,7 +153,8 @@ msg_send_signal_exit:
 
 /* msg_test_receiver
    Check if a given thread is capable of receiving the given message
-   => sender = threading trying to send the message
+   => sender = threading trying to send the message, or NULL for the 
+               kernel trying to send a signal.
       target = thread message is trying to be sent to
       msg = message block trying to be sent
    <= 0 for success, or an error code
@@ -138,7 +164,7 @@ kresult msg_test_receiver(thread *sender, thread *target, diosix_msg_info *msg)
    unsigned char layer;
    
    /* sanity check */
-   if(!sender || !target || !msg)
+   if(!target || !msg)
    {
       KOOPS_DEBUG("[msg:%i] OMGWTF msg_test_receiver() called with sender %p target %p msg %p\n",
                   CPU_ID, sender, target, msg);
@@ -158,6 +184,8 @@ kresult msg_test_receiver(thread *sender, thread *target, diosix_msg_info *msg)
          break;
       
       case DIOSIX_MSG_GENERIC:
+         if(!sender) goto msg_test_receiver_failure;
+         
          /* calculate layer - if DIOSIX_MSG_SENDASUSR is set then the message is
             being sent as an unprivileged user program */
          if((sender->proc->flags & PROC_FLAG_CANMSGASUSR) &&
@@ -213,8 +241,8 @@ thread *msg_find_receiver(thread *sender, diosix_msg_info *msg)
    proc = proc_find_proc(msg->pid);
    if(!proc) return NULL;
    
-   MSG_DEBUG("[msg:%i] trying to find a receiver, sender=[tid %i pid %i] msg %p target=[tid %i pid %i]\n",
-             CPU_ID, sender->tid, sender->proc->pid, msg, msg->tid, msg->pid);
+   MSG_DEBUG("[msg:%i] trying to find a receiver, sender %p msg %p target=[tid %i pid %i]\n",
+             CPU_ID, sender, msg, msg->tid, msg->pid);
    
    /* if a specific tid is given, then try that one */ 
    if(msg->tid != DIOSIX_MSG_ANY_THREAD)
