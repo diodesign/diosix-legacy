@@ -488,9 +488,63 @@ kresult msg_recv(thread *receiver, diosix_msg_info *msg)
    if((unsigned int)msg + MEM_CLIP(msg, sizeof(diosix_msg_info)) >= KERNEL_SPACE_BASE)
       return e_bad_address;
    
+   if(lock_gate(&(receiver->lock), LOCK_WRITE)) return e_failure;
+   
+   /* if receiving a signal, return immediately if one's queued and ready to go */
+   if((msg->flags & DIOSIX_MSG_TYPEMASK) == DIOSIX_MSG_SIGNAL)
+   {
+      queued_signal *sig = NULL;
+      kpool *pool = receiver->proc->system_signals; /* the default pool */
+      
+      /* check kernel and unix signals first */
+      if(receiver->proc->system_signals)
+      {
+         /* are we looking for kernel-generated signals only? */
+         if(msg->flags & DIOSIX_MSG_KERNELONLY)
+         {
+            sig = vmm_next_in_pool(sig, receiver->proc->system_signals);
+            while(sig && (sig->sender_pid != RESERVED_PID))
+            {
+               sig = vmm_next_in_pool(sig, receiver->proc->system_signals);
+               if(!sig) break; /* no suitable signals to be found */
+            }
+         }
+         else sig = vmm_next_in_pool(sig, receiver->proc->system_signals);
+      }
+
+      /* if sig remains NULL then a system signal wasn't found... */
+      if(!sig)
+         /* ...so check for user signals */
+         if(receiver->proc->user_signals)
+         {
+            sig = vmm_next_in_pool(NULL, receiver->proc->user_signals);
+            pool = receiver->proc->user_signals;
+         }
+      
+      /* if sig is set by now then a signal was found */
+      if(sig)
+      {
+         /* fill in the signal details */
+         receiver->msg.signal.number = sig->signal.number;
+         receiver->msg.signal.extra = sig->signal.extra;
+         receiver->msg.pid = sig->sender_pid;
+         receiver->msg.tid = sig->sender_tid;
+         
+         /* free the block */
+         vmm_free_pool(sig, pool);
+         
+         /* unlock and return immediately */
+         MSG_DEBUG("[msg:%i] returned queued signal %i to tid %i pid %i\n",
+                   CPU_ID, receiver->msg.signal.number, receiver->tid,
+                   receiver->proc->pid);
+         
+         return success;
+      }
+   }
+   
    /* grab a copy of the user's message block, we'll fault the thread if the address is dodgy */
-   lock_gate(&(receiver->lock), LOCK_WRITE);
    vmm_memcpy(&(receiver->msg), msg, sizeof(diosix_msg_info));
+   
    unlock_gate(&(receiver->lock), LOCK_WRITE);
 
    /* remove receiver from the queue until a message comes in */
