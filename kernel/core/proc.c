@@ -305,6 +305,7 @@ process *proc_new(process *current, thread *caller)
       new->layer         = current->layer;
       new->priority_low  = current->priority_low;
       new->priority_high = current->priority_high;
+      new->next_tid      = current->next_tid;
       
       if(proc_attach_child(current, new))
       {
