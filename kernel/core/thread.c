@@ -29,6 +29,7 @@ thread *thread_find_thread(process *proc, unsigned int tid)
    {
       KOOPS_DEBUG("[thread:%i] OMGWTF thread_find_thread failed on sanity check.\n"
                   "            process %p tid %i\n", CPU_ID, proc, tid);
+      debug_stacktrace();
       return NULL;
    }
 

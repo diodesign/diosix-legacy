@@ -64,10 +64,16 @@ void debug_stacktrace(void)
    while(base >= ptr)
    {
       /* look up a kernel symbol if relevant */
-      if((*(base) >= KERNEL_VIRTUAL_BASE) && (*(base) < KERNEL_VIRTUAL_END))
+      if(*(base) >= KERNEL_VIRTUAL_BASE)
          if(debug_lookup_symbol(*(base), buffer, 32, &sym_base) == success)
+         {
             dprintf("        [0x%p]  0x%x [func %s + 0x%x]\n",
                     base, *(base), buffer, (*base) - sym_base);
+         }
+         else
+         {
+            dprintf("        [0x%p]  0x%x\n", base, *(base));
+         }
       base--;
    }
    dprintf("\n");

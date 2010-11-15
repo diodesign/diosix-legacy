@@ -105,6 +105,10 @@ void do_listen(void)
    unsigned int state = 0;
    diosix_msg_info msg;
    diosix_phys_request req;
+   unsigned int child;
+   
+   child = diosix_thread_fork();
+   if(child == 0) do_idle();
    
    /* move into driver layer and get access to IO ports */
    diosix_priv_layer_up();
@@ -190,7 +194,7 @@ void main(void)
    /* wait for keyboard IRQ */
    while(1)
       if(diosix_msg_receive(&sig) == success)
-      {
+      {         
          /* set up message block to poke the child */
          msg.tid = DIOSIX_MSG_ANY_THREAD;
          msg.pid = child;
