@@ -19,6 +19,10 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 #include <portdefs.h>
 
+#ifdef LOCK_TIME_CHECK
+volatile unsigned int lock_time_check_lock = 0;
+#endif
+
 // --------------------- atomic locking support ---------------------------
 
 /* lock_spin
@@ -46,13 +50,13 @@ void lock_spin(volatile unsigned int *spinlock)
 
 /* unlock_spin
    Release a lock */
-#ifndef UNIPROC
 void unlock_spin(volatile unsigned int *spinlock)
 {
+#ifndef UNIPROC
    /* just slap a zero in it to unlock */
    *spinlock = 0;
-}
 #endif
+}
 
 /* lock_gate
    Allow multiple threads to read during a critical section, but only
@@ -140,6 +144,9 @@ kresult lock_gate(rw_gate *gate, unsigned int flags)
 #ifdef LOCK_TIME_CHECK
       if((x86_read_cyclecount() - ticks) > LOCK_TIMEOUT)
       {
+         /* prevent other cores from trashing the output debug while we dump this info */
+         lock_spin(&lock_time_check_lock);
+         
          KOOPS_DEBUG("[lock:%i] OMGWTF waited too long for gate %p to become available (flags %x)\n"
                      "         lock is owned by %p", CPU_ID, gate, flags, gate->owner);
          if(gate->owner)
@@ -149,6 +156,9 @@ kresult lock_gate(rw_gate *gate, unsigned int flags)
          }
          KOOPS_DEBUG("\n");
          debug_stacktrace();
+         
+         unlock_spin(&lock_time_check_lock);
+         
          err = e_failure;
          goto exit_lock_gate;
       }

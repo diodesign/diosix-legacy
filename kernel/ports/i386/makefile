@@ -13,6 +13,10 @@ VERSION		= -DKERNEL_IDENTIFIER="\"diosix-hyatt i386 SMP pre-Release1.0\"" \
 # set where the compiler is
 PREFIX = /Users/chris/Documents/Code/cross/i386-elf/bin/bin/i386-elf-
 
+# set where the root fs to store the kernel + OS os
+PATHTOROOT = ../../../../release/disc
+PATHTOMKFS = ../../../../release/makeiso.sh
+
 .SUFFIXES: .s .c
 
 CCbin = $(PREFIX)gcc
@@ -41,7 +45,7 @@ FLAGS		= -g -std=c99 -Wall -nostdlib -nostartfiles \
 # all flags possible
 # DEBUGFLAGS	= -DDEBUG -DMSG_DEBUG -DBUS_DEBUG -DPROC_DEBUG -DSCHED_DEBUG -DTHREAD_DEBUG -DVMM_DEBUG -DXPT_DEBUG -DINT_DEBUG -DIRQ_DEBUG -DMP_DEBUG -DPAGE_DEBUG -DKSYM_DEBUG -DIOAPIC_DEBUG -DLAPIC_DEBUG -DLOCK_DEBUG -DLOLVL_DEBUG -DPIC_DEBUG -DSYSCALL_DEBUG -DPERFORMANCE_DEBUG
 
-DEBUGFLAGS	= -DDEBUG -DPROC_DEBUG -DMSG_DEBUG # -DSCHED_DEBUG
+DEBUGFLAGS	= -DDEBUG -DPROC_DEBUG
 
 CC		= $(CCbin) $(SVNDEF) $(FLAGS) -I$(INCDIR) -I$(COREDIR) -I$(LIBDIOSIXDIR)/include $(DEBUGFLAGS) $(VERSION)
 LD		= $(CCbin) $(FLAGS) -Xlinker --script=$(LDSCRIPT) -Xlinker
@@ -132,8 +136,9 @@ objs/syscalls.o:	syscalls.c		$(MAKEDEP)
 kernel: $(OBJS) $(LDSCRIPT)
 	$(LD) $^ -o $@
 	$(OBJDUMPbin) --source $@ >diosix.lst
-	echo 'KSYM' > /Volumes/GRUB/boot/kernel.sym
+	echo 'KSYM' > $(PATHTOROOT)/boot/kernel.sym
 	$(READELFbin) -Ws kernel >diosix.ksym
-	cat diosix.ksym | awk '/FUNC/ { print $$2 " " $$3 " " $$8 }' >> /Volumes/GRUB/boot/kernel.sym
+	cat diosix.ksym | awk '/FUNC/ { print $$2 " " $$3 " " $$8 }' >> $(PATHTOROOT)/boot/kernel.sym
 	$(STRIPbin) -s kernel
-	cp kernel /Volumes/GRUB/boot/kernel
+	cp kernel $(PATHTOROOT)/boot/kernel
+	sh $(PATHTOMKFS)

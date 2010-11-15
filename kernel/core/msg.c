@@ -149,7 +149,7 @@ kresult msg_send_signal(process *target, thread *sender, unsigned int signum, un
       /* sender is the kernel */
          newsig->sender_pid = newsig->sender_tid = RESERVED_PID;
       
-      MSG_DEBUG("[msg:%i] queued signal %i:0x%x to pid %i in process %x\n",
+      MSG_DEBUG("[msg:%i] queued signal %i:0x%x to pid %i from process %x\n",
                 CPU_ID, signum, sigcode, target->pid, sender);      
    }
    

@@ -95,7 +95,11 @@ void vbe_set_mode(unsigned short width, unsigned short height, unsigned char bpp
 void do_idle(void)
 {  
    /* always give the processor something to do */
-   while(1) diosix_thread_yield();
+   while(1)
+   {
+      __asm__ __volatile__("pause");
+      diosix_thread_yield();
+   }
 }
 
 void do_listen(void)
@@ -106,9 +110,6 @@ void do_listen(void)
    diosix_msg_info msg;
    diosix_phys_request req;
    unsigned int child;
-   
-   child = diosix_thread_fork();
-   if(child == 0) do_idle();
    
    /* move into driver layer and get access to IO ports */
    diosix_priv_layer_up();
@@ -122,7 +123,7 @@ void do_listen(void)
    req.size  = DIOSIX_PAGE_ROUNDUP(FB_MAX_SIZE);
    req.flags = VMA_WRITEABLE | VMA_NOCACHE | VMA_FIXED;
    diosix_driver_map_phys(&req);
-   
+
    /* listen and reply */
    while(1)
    {      
@@ -181,8 +182,7 @@ void main(void)
    diosix_priv_layer_up();
    diosix_driver_register();
    diosix_signals_kernel(SIG_ACCEPT_KERNEL(SIGXIRQ));
-   // diosix_driver_register_irq(KEYBOARD_IRQ);
-   diosix_driver_register_irq(32);
+   diosix_driver_register_irq(KEYBOARD_IRQ);
    
    /* wait for IRQ signal */
    sig.tid = DIOSIX_MSG_ANY_THREAD;
@@ -193,8 +193,8 @@ void main(void)
    
    /* wait for keyboard IRQ */
    while(1)
-      if(diosix_msg_receive(&sig) == success)
-      {         
+      //if(diosix_msg_receive(&sig) == success)
+      {
          /* set up message block to poke the child */
          msg.tid = DIOSIX_MSG_ANY_THREAD;
          msg.pid = child;

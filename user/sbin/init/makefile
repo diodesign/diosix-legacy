@@ -8,6 +8,10 @@ PREFIX = /Users/chris/Documents/Code/cross/i386-elf/bin/bin/i386-elf-
 LIBDIOSIX = ../../lib/i386/libdiosix
 OBJDUMPbin = $(PREFIX)objdump 
 
+# set where the root fs to store the kernel + OS os
+PATHTOROOT = ../../../../release/disc
+PATHTOMKFS = ../../../../release/makeiso.sh
+
 # defines
 FLAGS		= -O2 -std=c99 -Wall -static -nostdlib -nostdinc -fno-builtin -nodefaultlibs -I$(LIBDIOSIX)/include/
 CC		= $(PREFIX)gcc $(FLAGS)
@@ -30,5 +34,5 @@ init.o:		init.c	makefile
 init:	$(OBJS)
 	$(LD) $^ $(LIBDIOSIX)/libdiosix.a -o $@
 	$(OBJDUMPbin) --source $@ >init.lst
-	cp init /Volumes/GRUB/sbin/
-
+	cp init $(PATHTOROOT)/sbin/
+	sh $(PATHTOMKFS)
