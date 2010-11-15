@@ -33,10 +33,9 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 kresult msg_send_signal(process *target, thread *sender, unsigned int signum, unsigned int sigcode)
 {
    kresult err = success;
-   kpool *pool = NULL; /* pool queue - no pun intended */
-   queued_signal *newsig;
    diosix_msg_info wakemsg;
    thread *towake;
+   kpool *pool = NULL; /* pool queue - no pun intended */
    
    /* sanity checks - no NULL pointers nor SIGZERO */
    if(!target || !signum) return e_bad_params;
@@ -64,7 +63,7 @@ kresult msg_send_signal(process *target, thread *sender, unsigned int signum, un
          if(!pool) MSG_SIGNAL_REJECT(e_failure);
       }
       else pool = target->system_signals;
-    
+      
       /* signal is in progress */
       target->unix_signals_inprogress |= (1 << signum);
    }
@@ -96,29 +95,13 @@ kresult msg_send_signal(process *target, thread *sender, unsigned int signum, un
          if(!pool) MSG_SIGNAL_REJECT(e_failure);
       }
       else pool = target->user_signals;
-   }
+   }      
    
    /* if pool hasn't been set by now and we haven't bailed out
-      of the function by now then something's wrong with signum */
-   if(!pool) MSG_SIGNAL_REJECT(e_bad_params);
-      
-   /* allocate our new signal block and write into it */
-   err = vmm_alloc_pool((void **)&newsig, pool);
-   if(err) MSG_SIGNAL_REJECT(err);
-      
-   newsig->signal.number = signum;
-   newsig->signal.extra = sigcode;
-   if(sender)
-   {
-      /* sender is a user thread */
-      newsig->sender_pid = sender->proc->pid;
-      newsig->sender_tid = sender->tid;
-   }
-   else
-      /* sender is the kernel */
-      newsig->sender_pid = newsig->sender_tid = RESERVED_PID;
+    of the function by now then something's wrong with signum */
+   if(!pool) MSG_SIGNAL_REJECT(e_bad_params); 
    
-   /* find a thread in the receiver to wake up to receive the message */
+   /* find a thread in the receiver to wake up to receive the signal */
    wakemsg.pid = target->pid;
    wakemsg.tid = DIOSIX_MSG_ANY_THREAD;
    wakemsg.flags = DIOSIX_MSG_SIGNAL;
@@ -134,17 +117,41 @@ kresult msg_send_signal(process *target, thread *sender, unsigned int signum, un
       }
       else
          towake->msg.pid = towake->msg.tid = RESERVED_PID;
-
+      
+      towake->msg.signal.number = signum;
+      towake->msg.signal.extra = sigcode;
+      
       /* wake the receiver */
       syscall_post_msg_recv(towake, success);
       sched_add(towake->cpu, towake);
       
-      MSG_DEBUG("[msg:%i] waking thread %p (tid %i pid %i) to receive signal %i\n",
+      MSG_DEBUG("[msg:%i] woke thread %p (tid %i pid %i) to receive signal %i\n",
                 CPU_ID, towake, towake->tid, towake->proc->pid, signum);
    }
-   
-   MSG_DEBUG("[msg:%i] sent signal %i:0x%x to pid %i from process %x\n",
-             CPU_ID, signum, sigcode, target->pid, sender);
+   else
+   {
+      /* no receiver to wake up just yet, so queue the message:
+         allocate our new signal block and write into it */      
+      queued_signal *newsig;     
+      
+      err = vmm_alloc_pool((void **)&newsig, pool);
+      if(err) MSG_SIGNAL_REJECT(err);
+      
+      newsig->signal.number = signum;
+      newsig->signal.extra = sigcode;
+      if(sender)
+      {
+         /* sender is a user thread */
+         newsig->sender_pid = sender->proc->pid;
+         newsig->sender_tid = sender->tid;
+      }
+      else
+      /* sender is the kernel */
+         newsig->sender_pid = newsig->sender_tid = RESERVED_PID;
+      
+      MSG_DEBUG("[msg:%i] queued signal %i:0x%x to pid %i in process %x\n",
+                CPU_ID, signum, sigcode, target->pid, sender);      
+   }
    
 msg_send_signal_exit:
    unlock_gate(&(target->lock), LOCK_WRITE);
