@@ -81,7 +81,7 @@ thread *sched_get_next_to_run(unsigned char cpuid)
    mp_core *cpu = &cpu_table[cpuid];
    mp_thread_queue *cpu_queue;
    volatile thread *torun;
-   
+
    lock_gate(&(cpu->lock), LOCK_READ);
    cpu_queue = &(cpu->queues[cpu->lowest_queue_filled]);
    torun = (volatile thread *)(cpu_queue->queue_head);

@@ -138,7 +138,7 @@ kresult lock_gate(rw_gate *gate, unsigned int flags)
       /* small window of opportunity for the other thread to
          release the gate :-/ */
       /* hint to newer processors that this is a spin-wait loop or
-       NOP for older processors */
+         NOP for older processors */
       __asm__ __volatile__("pause");
       
 #ifdef LOCK_TIME_CHECK
@@ -152,7 +152,7 @@ kresult lock_gate(rw_gate *gate, unsigned int flags)
          if(gate->owner)
          {
             thread *t = (thread *)(gate->owner);
-            KOOPS_DEBUG(" (thread %i process %i)", t->tid, t->proc->pid);
+            KOOPS_DEBUG(" (thread %i process %i on cpu %i)", t->tid, t->proc->pid, t->cpu);
          }
          KOOPS_DEBUG("\n");
          debug_stacktrace();
