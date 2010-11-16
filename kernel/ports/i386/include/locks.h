@@ -22,7 +22,7 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #define LOCK_TIMEOUT         (0xffffff)
 
 /* lock settings */
-#define LOCK_READ             (0)
+#define LOCK_READ           (0)
 #define LOCK_WRITE          (1 << 0)
 #define LOCK_SELFDESTRUCT   (1 << 1)
 #define LOCK_WRITEWAITING   (1 << 2)

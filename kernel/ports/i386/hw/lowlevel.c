@@ -76,17 +76,35 @@ kresult lock_gate(rw_gate *gate, unsigned int flags)
 {
 #ifndef UNIPROC
    kresult err = success;
+   unsigned int caller;
 
 #ifdef LOCK_TIME_CHECK
    unsigned long long ticks = x86_read_cyclecount();
 #endif
-   
-   LOCK_DEBUG("[lock:%i] -> lock_gate(%p, %x) on cpu %i\n", CPU_ID, gate, flags, CPU_ID);
-      
+
    /* sanity checks */
    if(!gate) return e_failure;
-   if(!cpu_table) return success; /* only one processor running */
+   if(!cpu_table) return success; /* only one processor running */   
    
+#ifdef LOCK_DEBUG
+   if(cpu_table)
+   {
+      LOCK_DEBUG("[lock:%i] -> lock_gate(%p, %x) by thread %p\n", CPU_ID, gate, flags, cpu_table[CPU_ID].current);
+   }
+   else
+   {
+      LOCK_DEBUG("[lock:%i] -> lock_gate(%p, %x) during boot\n", CPU_ID, gate, flags);
+   }
+#endif
+
+   /* cpu_table[CPU_ID].current cannot be lower than the kernel virtual base 
+      so it won't collide with the processor's CPU_ID, which is used to
+      identify the owner if no thread is running */
+   if(cpu_table[CPU_ID].current)
+      caller = (unsigned int)cpu_table[CPU_ID].current;
+   else
+      caller = (CPU_ID) + 1; /* zero means no owner, CPU_IDs start at zero... */
+
    while(1)
    {
       lock_spin(&(gate->spinlock));
@@ -95,7 +113,7 @@ kresult lock_gate(rw_gate *gate, unsigned int flags)
       if(gate->owner)
       {
          /* it's in use - but is it another thread? */
-         if(gate->owner != (unsigned int)cpu_table[CPU_ID].current)
+         if(gate->owner != caller)
          {
             /* another thread has it :( perform checks */
             
@@ -127,7 +145,7 @@ kresult lock_gate(rw_gate *gate, unsigned int flags)
       else
       {
          /* no one owns this gate, so make our mark */
-         gate->owner = (unsigned int)cpu_table[CPU_ID].current;
+         gate->owner = caller;
          gate->flags = flags;
          gate->refcount = 1; /* first in */
          goto exit_lock_gate;
@@ -149,7 +167,7 @@ kresult lock_gate(rw_gate *gate, unsigned int flags)
          
          KOOPS_DEBUG("[lock:%i] OMGWTF waited too long for gate %p to become available (flags %x)\n"
                      "         lock is owned by %p", CPU_ID, gate, flags, gate->owner);
-         if(gate->owner)
+         if(gate->owner > KERNEL_SPACE_BASE)
          {
             thread *t = (thread *)(gate->owner);
             KOOPS_DEBUG(" (thread %i process %i on cpu %i)", t->tid, t->proc->pid, t->cpu);
@@ -169,7 +187,7 @@ exit_lock_gate:
    /* release the gate so others can inspect it */
    unlock_spin(&(gate->spinlock));
    
-   LOCK_DEBUG("[lock:%i] locked %p with %x on cpu %i\n", CPU_ID, gate, flags, 0);
+   LOCK_DEBUG("[lock:%i] locked %p with %x\n", CPU_ID, gate, flags);
    
    return err;
 #endif
@@ -186,16 +204,32 @@ exit_lock_gate:
 kresult unlock_gate(rw_gate *gate, unsigned int flags)
 {   
 #ifndef UNIPROC
-   LOCK_DEBUG("[lock:%i] unlock_gate(%p, %x) on cpu %i\n", CPU_ID, gate, flags, 0);
+#ifdef LOCK_DEBUG
+   if(cpu_table)
+   {
+      LOCK_DEBUG("[lock:%i] unlock_gate(%p, %x) by thread %p\n", CPU_ID, gate, flags, cpu_table[CPU_ID].current);
+   }
+   else
+   {
+      LOCK_DEBUG("[lock:%i] unlock_gate(%p, %x)\n", CPU_ID, gate, flags);
+   }
+#endif
+   
+   unsigned int caller;
    
    /* sanity checks */
    if(!gate) return e_failure;
    if(!cpu_table) return success; /* only one processor running */   
    
+   if(cpu_table[CPU_ID].current)
+      caller = (unsigned int)cpu_table[CPU_ID].current;
+   else
+      caller = (CPU_ID) + 1;
+   
    lock_spin(&(gate->spinlock));
    
    /* if this is our gate then unset details */
-   if(gate->owner == (unsigned int)cpu_table[CPU_ID].current)
+   if(gate->owner == caller)
    {
       /* decrement thread entry count and release the gate if the
          owner has completely left, keeping the self-destruct lock
