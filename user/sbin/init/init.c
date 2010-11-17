@@ -94,6 +94,8 @@ void vbe_set_mode(unsigned short width, unsigned short height, unsigned char bpp
 
 void do_idle(void)
 {  
+   diosix_thread_info block;
+   
    /* always give the processor something to do */
    while(1)
    {

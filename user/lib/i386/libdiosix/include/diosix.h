@@ -76,10 +76,10 @@ typedef enum
 #define DIOSIX_MSG_RECVONREPLY (1 << 29) /* block on recv after replying */
 #define DIOSIX_MSG_SENDASUSR   (1 << 28) /* send message as an unpriv'd user process */
 #define DIOSIX_MSG_KERNELONLY  (1 << 27) /* accept signals from the kernel only */
-/* simple type bits low (bits 0-11) */
+/* simple type bits low (bits 0-3) */
 #define DIOSIX_MSG_GENERIC     (1)
 #define DIOSIX_MSG_SIGNAL      (2)
-#define DIOSIX_MSG_TYPEMASK    ((1 << 12) - 1)
+#define DIOSIX_MSG_TYPEMASK    ((1 << 3) - 1)
 /* zero is a reserved tid/pid */
 #define DIOSIX_MSG_ANY_THREAD  (0)
 #define DIOSIX_MSG_ANY_PROCESS (0)
