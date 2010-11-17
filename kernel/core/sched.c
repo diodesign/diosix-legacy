@@ -19,8 +19,9 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 unsigned int tick = SCHED_CARETAKER;
 
-/* provide locking around critical sections */
-rw_gate sched_lock;
+/* provide spinlocking around critical sections */
+volatile unsigned int sched_next_queue_slock = 0;
+volatile unsigned int sched_total_queued_slock = 0;
 
 /* act as a 'clock arm' selecting cpu queues one by one */
 unsigned char sched_next_queue = 0;
@@ -29,10 +30,10 @@ unsigned int sched_total_queued = 0; /* number of threads queued */
 /* sched_inc_queued_threads
  Increment the number of queued threads total in a thread-safe manner */
 void sched_inc_queued_threads(void)
-{   
-   lock_gate(&(sched_lock), LOCK_WRITE);
+{
+   lock_spin(&(sched_total_queued_slock));
    sched_total_queued++;
-   unlock_gate(&(sched_lock), LOCK_WRITE);
+   unlock_spin(&(sched_total_queued_slock));
    
    SCHED_DEBUG("[sched:%i] total queued threads now: %i (up one)\n", CPU_ID, sched_total_queued);
 }
@@ -41,9 +42,9 @@ void sched_inc_queued_threads(void)
    Decrement the number of queued threads total in a thread-safe manner */
 void sched_dec_queued_threads(void)
 {
-   lock_gate(&(sched_lock), LOCK_WRITE);
+   lock_spin(&(sched_total_queued_slock));
    sched_total_queued--;
-   unlock_gate(&(sched_lock), LOCK_WRITE);
+   unlock_spin(&(sched_total_queued_slock));
    
    SCHED_DEBUG("[sched:%i] total queued threads now: %i (down one)\n", CPU_ID, sched_total_queued);
 }
@@ -547,7 +548,7 @@ void sched_move_to_end(unsigned char cpu, thread *toqueue)
       sched_remove(toqueue, held);
    
    lock_gate(&(cpu_table[cpu].lock), LOCK_WRITE);
-   
+
    priority = sched_determine_priority(toqueue);
    cpu_queue = &(cpu_table[cpu].queues[priority]);
    
@@ -731,17 +732,18 @@ unsigned char sched_pick_queue(unsigned char hint)
    
    /* use the boot cpu queue if the hint is wild */
    if(hint >= mp_cpus) hint = mp_boot_cpu;
-   
-   /* protect the scheduler's critical section right here */
-   lock_gate(&(sched_lock), LOCK_WRITE);
 
    /* the number of threads per cpu queue that's 'fair' to run
       is simply the total number of threads divided by cpu queues 
       available */
+   lock_spin(&(sched_total_queued_slock));
    max_fair_share = sched_total_queued / mp_cpus;
+   unlock_spin(&(sched_total_queued_slock));
+   
    if(!max_fair_share) max_fair_share = 1; /* ensure a sane value */
 
    /* ensure next_queue is sane */
+   lock_spin(&(sched_next_queue_slock));
    if(sched_next_queue >= mp_cpus) sched_next_queue = 0;
    
    /* make sure the next queue is not the hinted queue */
@@ -750,7 +752,7 @@ unsigned char sched_pick_queue(unsigned char hint)
       sched_next_queue++;
       if(sched_next_queue >= mp_cpus) sched_next_queue = 0;
    }
-   
+
    SCHED_DEBUG("[sched:%i] load balancing: max threads per cpu: %i next queue: %i (%i) hint: %i (%i) total queued: %i\n",
                CPU_ID, max_fair_share, sched_next_queue, cpu_table[sched_next_queue].queued,
                hint, cpu_table[hint].queued, sched_total_queued);
@@ -759,6 +761,7 @@ unsigned char sched_pick_queue(unsigned char hint)
       fair share of threads or the next queue is empty. in which case, use the next queue if possible and advance it if
       successful. if the hinted queue is empty, then use that */
    original_sched_next = sched_next_queue;
+   
    lock_gate(&(cpu_table[hint].lock), LOCK_READ);
    lock_gate(&(cpu_table[original_sched_next].lock), LOCK_READ);
    
@@ -776,21 +779,10 @@ unsigned char sched_pick_queue(unsigned char hint)
                CPU_ID, picked);
    
    unlock_gate(&(cpu_table[original_sched_next].lock), LOCK_READ);
-   unlock_gate(&(cpu_table[hint].lock), LOCK_READ);         
-
-   unlock_gate(&(sched_lock), LOCK_WRITE);
+   unlock_gate(&(cpu_table[hint].lock), LOCK_READ);
+   unlock_spin(&(sched_next_queue_slock));
    
    return picked;
-}
-
-/* sched_pre_initalise
-   Perform initialisation prior to any sched_*() calls */
-kresult sched_pre_initalise(void)
-{   
-   /* initialise lock */
-   vmm_memset(&sched_lock, 0, sizeof(rw_gate));
-   
-   return success;
 }
 
 /* sched_initialise

@@ -19,7 +19,7 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #define   _LOCKS_H
 
 /* allow a lock_gate timeout (in cpu cycles) if LOCK_TIME_CHECK is defined */
-#define LOCK_TIMEOUT         (0xffffffff)
+#define LOCK_TIMEOUT         (0xfffffff)
 
 /* lock settings */
 #define LOCK_READ           (0)

@@ -174,12 +174,10 @@ kresult lock_gate(rw_gate *gate, unsigned int flags)
          }
          KOOPS_DEBUG("\n");
          debug_stacktrace();
-         debug_panic("deadlock in kernel: we can't go on together with suspicious minds");
          
          unlock_spin(&lock_time_check_lock);
          
-         err = e_failure;
-         goto exit_lock_gate;
+         debug_panic("deadlock in kernel: we can't go on together with suspicious minds");
       }
 #endif
    }
