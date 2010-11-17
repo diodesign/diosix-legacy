@@ -111,6 +111,7 @@ void syscall_do_yield(int_registers_block *regs)
             CPU_ID, cpu_table[CPU_ID].current->proc->pid, cpu_table[CPU_ID].current->proc,
             cpu_table[CPU_ID].current->tid);
 
+   sched_priority_calc(cpu_table[CPU_ID].current, priority_punish);
    sched_move_to_end(CPU_ID, cpu_table[CPU_ID].current);
 
    /* the syscall dispatch will call sched_pick() for us */
