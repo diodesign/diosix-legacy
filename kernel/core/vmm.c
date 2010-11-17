@@ -874,7 +874,10 @@ kresult vmm_req_phys_pg(void **addr, int pref)
    if(phys_pg_stack_high_ptr > phys_pg_stack_high_base)
    {
       if(phys_pg_stack_low_ptr > phys_pg_stack_low_base)
+      {
+         unlock_gate(&(vmm_lock), LOCK_WRITE);
          return e_no_phys_pgs;
+      }
       else
          goto get_low_page;
    }

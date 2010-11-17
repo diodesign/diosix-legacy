@@ -170,10 +170,11 @@ kresult lock_gate(rw_gate *gate, unsigned int flags)
          if(gate->owner > KERNEL_SPACE_BASE)
          {
             thread *t = (thread *)(gate->owner);
-            KOOPS_DEBUG(" (thread %i process %i on cpu %i)", t->tid, t->proc->pid, t->cpu);
+            KOOPS_DEBUG(" (thread %i process %i on cpu %i last known eip %x)", t->tid, t->proc->pid, t->cpu, t->regs.eip);
          }
          KOOPS_DEBUG("\n");
          debug_stacktrace();
+         debug_panic("deadlock in kernel: we can't go on together with suspicious minds");
          
          unlock_spin(&lock_time_check_lock);
          
