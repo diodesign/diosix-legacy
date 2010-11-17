@@ -77,13 +77,22 @@ typedef struct
    unsigned int sender_pid, sender_tid; /* process & thread IDs of the sender */
 } queued_signal;
 
-/* a process memory area - arranged as a tree. flags are defined in <diosix.h> */
+/* each virtual memory area can be mapped into a process at a particular place,
+   this structure defines where a VMA starts in a given process */
 typedef struct
 {
-   unsigned int flags;       /* control aspects of this memory area */
-   unsigned int refcount;  /* how many processes share this area? */
-   unsigned int base, size; /* virtual addr base and size of the area in bytes */   
+   process *owner;       /* process with this vma mapped in */
+   unsigned int base;   /* base address of the area */
+} vmm_area_mapping;
 
+/* a virtual memory area - arranged as a tree. flags are defined in <diosix.h> */
+typedef struct
+{
+   unsigned int flags;    /* control aspects of this memory area */
+   unsigned int size;     /* size of the area in bytes */
+   
+   kpool *mappings;       /* table of per-thread mappings */
+   
    unsigned int token; /* a cookie for the userspace page manager's reference */
    
    rw_gate lock; /* per-vma locking mechanism */

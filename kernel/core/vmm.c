@@ -819,22 +819,43 @@ kresult vmm_create_free_blocks_in_pool(kpool *pool, unsigned int start, unsigned
 void *vmm_next_in_pool(void *ptr, kpool *pool)
 {
    kpool_block *block;
+   void *result = NULL;
    
    /* sanity checks */
    if(!pool) return NULL;
    
+   lock_gate(&(pool->lock), LOCK_READ);
+   
    /* give out the first block if asked for */
-   if(!ptr) return pool->head;
+   if(!ptr)
+   {
+      result = pool->head;
+      goto vmm_next_in_pool_exit;
+   }
    
    block = (kpool_block *)((unsigned int)ptr - sizeof(kpool_block));
-   if(block->magic != KPOOL_INUSE) return NULL;
+   if(block->magic != KPOOL_INUSE) goto vmm_next_in_pool_exit; /* return NULL */
    
    if(block->next)
-      return (void *)((unsigned int)block->next + sizeof(kpool_block));
-   
-   return NULL; /* fall through to no block available */
+      result = (void *)((unsigned int)block->next + sizeof(kpool_block));
+
+vmm_next_in_pool_exit:
+   unlock_gate(&(pool->lock), LOCK_READ);
+   return result;
 }
 
+/* vmm_count_pool_inuse
+   Count how many inuse blocks there are in a pool.
+   => pool = pool structrue to investigate
+   <= number of inuse blocks, or zero for a failure - ambiguous :(
+*/
+unsigned int vmm_count_pool_inuse(kpool *pool)
+{
+   /* sanity check */
+   if(!pool) return 0;
+   
+   return pool->inuse_blocks;
+}
  
 /* -------------------------------------------------------------------------
     Physical page management

@@ -76,6 +76,7 @@ typedef enum
 #define DIOSIX_MSG_RECVONREPLY (1 << 29) /* block on recv after replying */
 #define DIOSIX_MSG_SENDASUSR   (1 << 28) /* send message as an unpriv'd user process */
 #define DIOSIX_MSG_KERNELONLY  (1 << 27) /* accept signals from the kernel only */
+#define DIOSIX_MSG_ATTACHVMA   (1 << 26) /* share a VMA in reply message */
 /* simple type bits low (bits 0-3) */
 #define DIOSIX_MSG_GENERIC     (1)
 #define DIOSIX_MSG_SIGNAL      (2)
