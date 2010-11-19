@@ -856,7 +856,8 @@ unsigned int vmm_count_pool_inuse(kpool *pool)
    
    return pool->inuse_blocks;
 }
- 
+
+
 /* -------------------------------------------------------------------------
     Physical page management
    ------------------------------------------------------------------------- */
@@ -1370,7 +1371,7 @@ vmm_memcpyuser_wtf:
 /* this should return a negative number if a given address x falls below
  the base of y, zero if it falls within the base and size of y, or positive to
  indicate it's greater than base+size of y */
-#define vmm_cmp_vma(x, y) ( (x->area->base) < (y->area->base) ? -1 : ( (x->area->base) >= ((y->area->base) + (y->area->size)) ? 1 : 0 ) )
+#define vmm_cmp_vma(x, y) ( (x->base) < (y->base) ? -1 : ( (x->base) >= ((y->base) + (y->area->size)) ? 1 : 0 ) )
 
 /* pointers to vmas are stored in a per-process balanced binary tree */
 SGLIB_DEFINE_RBTREE_PROTOTYPES(vmm_tree, left, right, colour, vmm_cmp_vma);
@@ -1379,73 +1380,49 @@ SGLIB_DEFINE_RBTREE_FUNCTIONS(vmm_tree, left, right, colour, vmm_cmp_vma);
 /* vmm_link_vma
    Link an existing area to a process
    => proc = process to link the vma with
+      baseaddr = base address of the vma in the process's virtual space
       vma = the vma to link
    <= success or a failure code
 */
-kresult vmm_link_vma(process *proc, vmm_area *vma)
+kresult vmm_link_vma(process *proc, unsigned int baseaddr, vmm_area *vma)
 {
    kresult err;
    vmm_tree *new, *existing;
-   unsigned int loop;
+   
+   /* sanity checks - no null pointers, or kernel or zero page mappings */
+   if(!proc || !baseaddr || !vma || baseaddr >= KERNEL_SPACE_BASE) return e_bad_params;
    
    /* allocate and zero memory for the new tree node */
    err = vmm_malloc((void **)&new, sizeof(vmm_tree));
    if(err) return err;
    vmm_memset(new, 0, sizeof(vmm_tree));
    
-   /* set the area pointer */
+   /* set the area pointer and base address */
    new->area = vma;
+   new->base = baseaddr;
    
    lock_gate(&(proc->lock), LOCK_WRITE);
    
    /* and try to add to the tree */
    if(sglib_vmm_tree_add_if_not_member(&(proc->mem), new, &existing))
    {
+      process **link_proc;
+      
       lock_gate(&(vma->lock), LOCK_WRITE);
       
-      /* non-zero return for success, so incremement the refcount */
-      vma->refcount++;
-      err = success;
-      
-      VMM_DEBUG("[vmm:%i] linked vma %p to process %i (%p) via tree node %p\n",
-              CPU_ID, vma, proc->pid, proc, new);
-      
-      /* add the vma to the list of users */
-      if(vma->refcount > vma->users_max)
+      /* allocate a new block to store this mapping in */
+      err = vmm_alloc_pool((void **)&link_proc, vma->mappings);
+      if(!err)
       {
-         process **new_list;
+         /* save the process pointer */
+         *link_proc = proc;
          
-         /* we need to grow the list size */
-         unsigned int new_size = vma->users_max * 2;
+         /* non-zero return for success */
+         err = success;
          
-         if(vmm_malloc((void **)&new_list, new_size * sizeof(process *)))
-         {
-            vmm_free(vma);
-            new->area = NULL; /* FIXME: and unlink from the tree ?? */
-            unlock_gate(&(vma->lock), LOCK_WRITE);
-            unlock_gate(&(proc->lock), LOCK_WRITE);
-            return e_failure; /* bail out if the malloc failed! */
-         }
-         
-         vmm_memset(new_list, 0, new_size); /* clean the new list */
-         
-         /* copy over the previous list */
-         vmm_memcpy(new_list, vma->users, vma->users_max * sizeof(process *));
-         vmm_free(vma->users); /* free the old list */
-         
-         /* update the list's accounting */
-         vma->users = new_list;
-         vma->users_max = new_size;
+         VMM_DEBUG("[vmm:%i] linked vma %p (addr %x) to process %i (%p) via tree node %p\n",
+                 CPU_ID, vma, baseaddr, proc->pid, proc, new);
       }
-      
-      /* find an empty slot and insert the new user's pointer */
-      for(loop = 0; loop < vma->users_max; loop++)
-         if((vma->users[loop]) == NULL)
-         {
-            /* found a free slot */
-            vma->users[loop] = proc;
-            break;
-         }
       
       unlock_gate(&(vma->lock), LOCK_WRITE);
    }
@@ -1465,8 +1442,8 @@ kresult vmm_link_vma(process *proc, vmm_area *vma)
 }
 
 /* vmm_unlink_vma
-   Unlink an existing area from a process and destroy the vma if its
-   refcount reaches zero - ie: it's no longer in use.
+   Unlink an existing area from a process and destroy the vma if 
+   it's no longer in use by any processes.
    => owner = process to unlink the vma from
       victim = the vma to unlink
    <= success or a failure code
@@ -1475,7 +1452,7 @@ kresult vmm_unlink_vma(process *owner, vmm_tree *victim)
 {
    lock_gate(&(owner->lock), LOCK_WRITE);
    
-   unsigned int loop;
+   process **mapped_proc;
    vmm_area *vma = victim->area;
    
    lock_gate(&(vma->lock), LOCK_WRITE);
@@ -1484,22 +1461,21 @@ kresult vmm_unlink_vma(process *owner, vmm_tree *victim)
    sglib_vmm_tree_delete(&(owner->mem), victim);
    unlock_gate(&(owner->lock), LOCK_WRITE);
    
-   /* delete from the vma's users list */
-   for(loop = 0; loop < vma->refcount; loop++)
+   /* delete from the vma's users pool */
+   mapped_proc = vmm_find_vma_mapping(vma, owner);
+   if(mapped_proc)
+      vmm_free_pool(mapped_proc, vma->mappings);
+   else
    {
-      if(vma->users[loop] == owner)
-      {
-         vma->users[loop] = NULL;
-         vma->users_ptr = loop; /* next free slot is this one */
-         break;
-      }
+         KOOPS_DEBUG("[vmm:%i] OMGWTF! tried removing process %p (pid %i) from vma %p where no mapping existed\n",
+                     CPU_ID, owner, owner->pid, vma);
    }
    
-   /* reduce the refcount and free if zero */
-   vma->refcount--;
-   if(!(vma->refcount))
+   /* free if there are no longer any processes mapping in this vma */
+   if(!(vmm_count_pool_inuse(vma->mappings)))
    {
       unlock_gate(&(vma->lock), LOCK_WRITE | LOCK_SELFDESTRUCT);
+      vmm_destroy_pool(vma->mappings);
       vmm_free(vma);
    }
    else
@@ -1509,6 +1485,37 @@ kresult vmm_unlink_vma(process *owner, vmm_tree *victim)
            CPU_ID, vma, victim, owner->pid, owner);
    
    return vmm_free(victim);
+}
+
+/* vmm_find_vma_mapping
+   Return a block in a vma's smappings pool that holds a pointer
+   to the given process.
+   => vma = vma to inspect
+      tofind = process to find within the vma's mapping pool
+   <= pointer to the block, or NULL for none
+*/
+process **vmm_find_vma_mapping(vmm_area *vma, process *tofind)
+{
+   process **found = NULL;
+   
+   /* sanity check */
+   if(!vma || !tofind) return NULL;
+   
+   /* assumes we have at least a read lock on the vma.
+      loop through the pool blocks looking for a mapping
+      that matches the owner. if vmm_next_in_pool() returns
+      NULL then we've run out of pool to check. */
+   for(;;)
+   {
+      found = vmm_next_in_pool(found, vma->mappings);
+      
+      if(found)
+      {
+         if(*found == tofind)
+            return found;
+      }
+      else return NULL;
+   }
 }
 
 /* vmm_add_vma
@@ -1532,30 +1539,26 @@ kresult vmm_add_vma(process *proc, unsigned int base, unsigned int size,
    if(err) return err;
    vmm_memset(new, 0, sizeof(vmm_area)); /* zero the area */
    
-   /* fill in the details - ref_count will be updated by the link_vma() call */
+   /* fill in the details */
    new->flags    = flags;
-   new->refcount = 0;
-   new->base     = base;
    new->size     = size;
    new->token    = cookie;
    
-   /* set up an empty amortised list of vma users */
-   new->users_max = 4;
-   err = vmm_malloc((void **)&(new->users), sizeof(process *) * new->users_max);
-   if(err)
-   {
-      vmm_free(new);
-      return err;
-   }
-   vmm_memset(new->users, 0, sizeof(process *) * new->users_max); /* zero the list */
+   new->mappings = vmm_create_pool(sizeof(process *), 4);
    
    VMM_DEBUG("[vmm:%i] created vma %p for proc %i (%p): base %x size %i flags %x cookie %x\n",
            CPU_ID, new, proc->pid, proc, base, size, flags, cookie);
    
-   if(vmm_link_vma(proc, new))
+   if(vmm_link_vma(proc, base, new))
+   {
+      /* tear down this failed vma */
+      vmm_destroy_pool(new->mappings);
+      vmm_free(new);
+      
       return e_failure;
-   else
-      return success;
+   }
+   
+   return success;
 }
 
 /* vmm_duplicate_vmas
@@ -1578,13 +1581,13 @@ kresult vmm_duplicate_vmas(process *new, process *source)
            CPU_ID, new->pid, new, source->pid, source);
    
    lock_gate(&(source->lock), LOCK_READ);
-   
+
    /* walk the parent's tree and copy it */
    for(node = sglib_vmm_tree_it_init(&state, source->mem);
        node != NULL;
        node = sglib_vmm_tree_it_next(&state))
    {
-      err = vmm_link_vma(new, node->area);
+      err = vmm_link_vma(new, node->base, node->area);
       if(err != success) break;
    }
    
@@ -1633,8 +1636,8 @@ vmm_tree *vmm_find_vma(process *proc, unsigned int addr)
    if(!proc) return NULL;
 
    /* mock up a vma and node to search for */
-   area.base = addr;
    area.size = 1;
+   node.base = addr;
    node.area = &area;
    
    lock_gate(&(proc->lock), LOCK_READ);
@@ -1643,6 +1646,7 @@ vmm_tree *vmm_find_vma(process *proc, unsigned int addr)
    
    return result;
 }
+
 
 /* vmm_fault
    Make a decision on what to do with a faulting user process by using its
@@ -1667,7 +1671,7 @@ vmm_decision vmm_fault(process *proc, unsigned int addr, unsigned char flags)
    unlock_gate(&(proc->lock), LOCK_READ);
    
    VMM_DEBUG("[vmm:%i] fault at %x lies within vma %p (base %x size %i) in process %i\n",
-           CPU_ID, addr, vma, vma->base, vma->size, proc->pid);
+           CPU_ID, addr, vma, found->base, vma->size, proc->pid);
    
    /* fail this access if it's a write to a non-writeable area */
    if((flags & VMA_WRITEABLE) && !(vma->flags & VMA_WRITEABLE))
@@ -1685,10 +1689,10 @@ vmm_decision vmm_fault(process *proc, unsigned int addr, unsigned char flags)
    
    /* if it's a linked vma then now's time to copy the page so this
       process can have its own private copy */
-   if(vma->refcount > 1)
+   if(vmm_count_pool_inuse(vma->mappings) > 1)
    {
-      unsigned int loop, loopmax, thisphys, phys;
-      process *search;
+      unsigned int thisphys, phys;
+      process **search;
       
       /* if there's nothing to copy, then have a new private blank page */
       if(!(flags & VMA_HASPHYS))
@@ -1706,19 +1710,23 @@ vmm_decision vmm_fault(process *proc, unsigned int addr, unsigned char flags)
          return badaccess;
       }
       
-      loopmax = vma->refcount;
-      for(loop = 0; loop < loopmax; loop++)
+      search = NULL;
+      for(;;)
       {
-         search = vma->users[loop];
+         search = vmm_next_in_pool(search, vma->mappings);
+         
          if(search)
+         {
             /* this process doesn't count in the search */
-            if(search != proc)
-               if(pg_user2phys(&phys, search->pgdir, addr) == success)
+            if(*search != proc)
+               if(pg_user2phys(&phys, (*search)->pgdir, addr) == success)
                   if(phys == thisphys)
                   {
                      unlock_gate(&(vma->lock), LOCK_READ);
                      return clonepage;
                   }
+         }
+         else break;
       }
       
       /* it's writeable, it's present, we're the only ones using it.. */
@@ -1729,7 +1737,7 @@ vmm_decision vmm_fault(process *proc, unsigned int addr, unsigned char flags)
    /* if it's single-linked and has its own physical memory and writes are
       allowed then it's a page left over from a copy-on-write, so just
       mark it writeable */
-   if(vma->refcount == 1)
+   if(vmm_count_pool_inuse(vma->mappings) == 1)
    {   
       /* but only if there's physical memory to write onto */
       if(flags & VMA_HASPHYS)

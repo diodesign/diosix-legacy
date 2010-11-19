@@ -130,6 +130,30 @@ typedef enum
    badaccess      /* the fault can't be handled */
 } vmm_decision;
 
+/* a virtual memory area - arranged as a tree. flags are defined in <diosix.h> */
+typedef struct
+{
+   rw_gate lock; /* per-vma locking mechanism */
+   
+   unsigned int flags; /* control aspects of this memory area */
+   unsigned int size;  /* size of the area in bytes */
+   unsigned int token; /* a cookie for the userspace page manager's reference */
+   
+   kpool *mappings; /* pool of process structure pointers for process sharing this vma */
+} vmm_area;
+
+struct vmm_tree
+{
+   /* pointer to the potentially shared area */
+   vmm_area *area;
+   
+   unsigned int base; /* base address of the vma in the process's virtual memory space */
+   
+   /* metadata to place this area in a per-process tree */
+   vmm_tree *left, *right;
+   unsigned char colour;
+};
+
 kresult vmm_initialise(multiboot_info_t *mbd);
 kresult vmm_req_phys_pg(void **addr, int pref);
 kresult vmm_return_phys_pg(void *addr);
@@ -143,8 +167,9 @@ unsigned int vmm_nullbufferlen(char *buffer);
 void vmm_memset(void *addr, unsigned char value, unsigned int count);
 void vmm_memcpy(void *target, void *source, unsigned int count);
 kresult vmm_memcpyuser(void *target, process *tproc, void *source, process *sproc, unsigned int count);
-kresult vmm_link_vma(process *proc, vmm_area *vma);
+kresult vmm_link_vma(process *proc, unsigned int baseaddr, vmm_area *vma);
 kresult vmm_unlink_vma(process *owner, vmm_tree *victim);
+process **vmm_find_vma_mapping(vmm_area *vma, process *tofind);
 kresult vmm_add_vma(process *proc, unsigned int base, unsigned int size, unsigned char flags, unsigned int cookie);
 kresult vmm_duplicate_vmas(process *new, process *source);
 kresult vmm_destroy_vmas(process *victim);
@@ -157,6 +182,7 @@ kresult vmm_free_pool(void *ptr, kpool *pool);
 void *vmm_next_in_pool(void *ptr, kpool *pool);
 kresult vmm_create_free_blocks_in_pool(kpool *pool, unsigned int start, unsigned int end);
 kresult vmm_fixup_moved_pool(kpool *pool, void *prev, void *new);
+unsigned int vmm_count_pool_inuse(kpool *pool);
 
 /* kernel global variables for managing physical pages */
 extern unsigned int *phys_pg_stack_low_base;

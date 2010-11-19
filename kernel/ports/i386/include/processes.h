@@ -66,8 +66,6 @@ typedef enum
 } payload_type;
 
 /* these are needed below and defined further down */
-typedef struct process process;
-typedef struct thread thread;
 typedef struct mp_thread_queue mp_thread_queue; /* in cpu.h */
 
 /* a queued signal block held in the kernel */
@@ -76,42 +74,6 @@ typedef struct
    diosix_signal signal; /* the signal number and code */
    unsigned int sender_pid, sender_tid; /* process & thread IDs of the sender */
 } queued_signal;
-
-/* each virtual memory area can be mapped into a process at a particular place,
-   this structure defines where a VMA starts in a given process */
-typedef struct
-{
-   process *owner;       /* process with this vma mapped in */
-   unsigned int base;   /* base address of the area */
-} vmm_area_mapping;
-
-/* a virtual memory area - arranged as a tree. flags are defined in <diosix.h> */
-typedef struct
-{
-   unsigned int flags;    /* control aspects of this memory area */
-   unsigned int size;     /* size of the area in bytes */
-   
-   kpool *mappings;       /* table of per-thread mappings */
-   
-   unsigned int token; /* a cookie for the userspace page manager's reference */
-   
-   rw_gate lock; /* per-vma locking mechanism */
-   
-   /* the users here are processes */
-   unsigned int users_max, users_ptr;
-   process **users;
-} vmm_area;
-
-typedef struct vmm_tree vmm_tree;
-struct vmm_tree
-{
-   /* pointer to the potentially shared area */
-   vmm_area *area;
-   
-   /* metadata to place this area in a per-process tree */
-   vmm_tree *left, *right;
-   unsigned char colour;
-};
 
 /* the x86 cpu's TSS, one needed per thread */
 typedef struct
@@ -178,6 +140,9 @@ typedef struct
 #define THREAD_FLAG_ISDRIVER         (1 << 1)
 #define THREAD_FLAG_HASIOBITMAP      (1 << 2)
 
+typedef struct process process; /* keep the compiler nice and sweet */
+typedef struct thread thread;
+
 /* describe each thread */
 struct thread
 {
@@ -236,6 +201,7 @@ typedef struct irq_driver_entry irq_driver_entry;
 /* needed in the process struct */
 typedef struct kpool kpool;
 typedef struct kpool_block kpool_block;
+typedef struct vmm_tree vmm_tree;
 
 /* describe each process */
 struct process
