@@ -1406,16 +1406,16 @@ kresult vmm_link_vma(process *proc, unsigned int baseaddr, vmm_area *vma)
    /* and try to add to the tree */
    if(sglib_vmm_tree_add_if_not_member(&(proc->mem), new, &existing))
    {
-      process **link_proc;
+      vmm_area_mapping *new_mapping;
       
       lock_gate(&(vma->lock), LOCK_WRITE);
       
       /* allocate a new block to store this mapping in */
-      err = vmm_alloc_pool((void **)&link_proc, vma->mappings);
+      err = vmm_alloc_pool((void **)&new_mapping, vma->mappings);
       if(!err)
       {
          /* save the process pointer */
-         *link_proc = proc;
+         new_mapping->proc = proc;
          
          /* non-zero return for success */
          err = success;
@@ -1452,7 +1452,7 @@ kresult vmm_unlink_vma(process *owner, vmm_tree *victim)
 {
    lock_gate(&(owner->lock), LOCK_WRITE);
    
-   process **mapped_proc;
+   vmm_area_mapping *mapping;
    vmm_area *vma = victim->area;
    
    lock_gate(&(vma->lock), LOCK_WRITE);
@@ -1462,9 +1462,9 @@ kresult vmm_unlink_vma(process *owner, vmm_tree *victim)
    unlock_gate(&(owner->lock), LOCK_WRITE);
    
    /* delete from the vma's users pool */
-   mapped_proc = vmm_find_vma_mapping(vma, owner);
-   if(mapped_proc)
-      vmm_free_pool(mapped_proc, vma->mappings);
+   mapping = vmm_find_vma_mapping(vma, owner);
+   if(mapping)
+      vmm_free_pool(mapping, vma->mappings);
    else
    {
          KOOPS_DEBUG("[vmm:%i] OMGWTF! tried removing process %p (pid %i) from vma %p where no mapping existed\n",
@@ -1494,9 +1494,9 @@ kresult vmm_unlink_vma(process *owner, vmm_tree *victim)
       tofind = process to find within the vma's mapping pool
    <= pointer to the block, or NULL for none
 */
-process **vmm_find_vma_mapping(vmm_area *vma, process *tofind)
+vmm_area_mapping *vmm_find_vma_mapping(vmm_area *vma, process *tofind)
 {
-   process **found = NULL;
+   vmm_area_mapping *search = NULL;
    
    /* sanity check */
    if(!vma || !tofind) return NULL;
@@ -1507,12 +1507,12 @@ process **vmm_find_vma_mapping(vmm_area *vma, process *tofind)
       NULL then we've run out of pool to check. */
    for(;;)
    {
-      found = vmm_next_in_pool(found, vma->mappings);
+      search = vmm_next_in_pool(search, vma->mappings);
       
-      if(found)
+      if(search)
       {
-         if(*found == tofind)
-            return found;
+         if(search->proc == tofind)
+            return search;
       }
       else return NULL;
    }
@@ -1544,7 +1544,7 @@ kresult vmm_add_vma(process *proc, unsigned int base, unsigned int size,
    new->size     = size;
    new->token    = cookie;
    
-   new->mappings = vmm_create_pool(sizeof(process *), 4);
+   new->mappings = vmm_create_pool(sizeof(vmm_area_mapping), 2);
    
    VMM_DEBUG("[vmm:%i] created vma %p for proc %i (%p): base %x size %i flags %x cookie %x\n",
            CPU_ID, new, proc->pid, proc, base, size, flags, cookie);
@@ -1692,7 +1692,7 @@ vmm_decision vmm_fault(process *proc, unsigned int addr, unsigned char flags)
    if(vmm_count_pool_inuse(vma->mappings) > 1)
    {
       unsigned int thisphys, phys;
-      process **search;
+      vmm_area_mapping *search;
       
       /* if there's nothing to copy, then have a new private blank page */
       if(!(flags & VMA_HASPHYS))
@@ -1718,8 +1718,8 @@ vmm_decision vmm_fault(process *proc, unsigned int addr, unsigned char flags)
          if(search)
          {
             /* this process doesn't count in the search */
-            if(*search != proc)
-               if(pg_user2phys(&phys, (*search)->pgdir, addr) == success)
+            if(search->proc != proc)
+               if(pg_user2phys(&phys, search->proc->pgdir, addr) == success)
                   if(phys == thisphys)
                   {
                      unlock_gate(&(vma->lock), LOCK_READ);

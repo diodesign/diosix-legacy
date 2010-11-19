@@ -130,6 +130,12 @@ typedef enum
    badaccess      /* the fault can't be handled */
 } vmm_decision;
 
+/* link a vma to processes through one or more of these mappings */
+typedef struct
+{
+   process *proc;
+} vmm_area_mapping;
+
 /* a virtual memory area - arranged as a tree. flags are defined in <diosix.h> */
 typedef struct
 {
@@ -139,7 +145,7 @@ typedef struct
    unsigned int size;  /* size of the area in bytes */
    unsigned int token; /* a cookie for the userspace page manager's reference */
    
-   kpool *mappings; /* pool of process structure pointers for process sharing this vma */
+   kpool *mappings; /* pool of vmm_area_mapping structures for this vma */
 } vmm_area;
 
 struct vmm_tree
@@ -169,7 +175,7 @@ void vmm_memcpy(void *target, void *source, unsigned int count);
 kresult vmm_memcpyuser(void *target, process *tproc, void *source, process *sproc, unsigned int count);
 kresult vmm_link_vma(process *proc, unsigned int baseaddr, vmm_area *vma);
 kresult vmm_unlink_vma(process *owner, vmm_tree *victim);
-process **vmm_find_vma_mapping(vmm_area *vma, process *tofind);
+vmm_area_mapping *vmm_find_vma_mapping(vmm_area *vma, process *tofind);
 kresult vmm_add_vma(process *proc, unsigned int base, unsigned int size, unsigned char flags, unsigned int cookie);
 kresult vmm_duplicate_vmas(process *new, process *source);
 kresult vmm_destroy_vmas(process *victim);
