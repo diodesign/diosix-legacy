@@ -177,12 +177,12 @@ void main(void)
    /* create new process to receive */
    child = diosix_fork();
    if(child == 0) do_listen(); /* child does the listening */
-
+   
    /* move into driver layer and get access to the keyboard IRQ */
    diosix_priv_layer_up();
    diosix_driver_register();
    diosix_signals_kernel(SIG_ACCEPT_KERNEL(SIGXIRQ));
-   // diosix_driver_register_irq(KEYBOARD_IRQ);
+   diosix_driver_register_irq(KEYBOARD_IRQ);
    
    /* wait for IRQ signal */
    sig.tid = DIOSIX_MSG_ANY_THREAD;

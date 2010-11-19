@@ -697,8 +697,8 @@ kresult vmm_alloc_pool(void **ptr, kpool *pool)
    
    unlock_gate(&(pool->lock), LOCK_WRITE);
    
-   VMM_DEBUG("[vmm:%i] allocated block %x from pool %p\n", 
-             CPU_ID, *ptr, pool);
+   VMM_DEBUG("[vmm:%i] allocated block %p (addr %x) from pool %p\n", 
+             CPU_ID, new, *ptr, pool);
    
    return success;
 }
@@ -758,7 +758,7 @@ kresult vmm_free_pool(void *ptr, kpool *pool)
  
    unlock_gate(&(pool->lock), LOCK_WRITE);
    
-   VMM_DEBUG("[vmm:%i] freed block %x in pool %p\n", CPU_ID, ptr, pool);
+   VMM_DEBUG("[vmm:%i] freed block %p (addr %x) in pool %p\n", CPU_ID, block, ptr, pool);
    
    return success;
 }
@@ -806,7 +806,7 @@ kresult vmm_create_free_blocks_in_pool(kpool *pool, unsigned int start, unsigned
    }
    
    VMM_DEBUG("[vmm:%i] initialised free blocks %i to %i in pool %p\n",
-             CPU_ID, start, end, pool);
+             CPU_ID, start, end - 1, pool);
    
    return success;
 }
@@ -833,12 +833,19 @@ void *vmm_next_in_pool(void *ptr, kpool *pool)
    /* give out the first block if asked for */
    if(!ptr)
    {
-      result = pool->head;
+      /* don't forget to fix up head pointer before returning it */
+      result = (void *)((unsigned int)pool->head + sizeof(kpool_block));
       goto vmm_next_in_pool_exit;
    }
    
    block = (kpool_block *)((unsigned int)ptr - sizeof(kpool_block));
-   if(block->magic != KPOOL_INUSE) goto vmm_next_in_pool_exit; /* return NULL */
+   if(block->magic != KPOOL_INUSE)
+   {
+      KOOPS_DEBUG("[vmm:%i] OMGWTF! vmm_next_in_pool: 'inuse' block %p (addr %x) in pool %p has bad magic (%x)\n",
+                  CPU_ID, block, ptr, pool, block->magic);
+      debug_stacktrace();
+      goto vmm_next_in_pool_exit; /* return NULL */
+   }
    
    if(block->next)
       result = (void *)((unsigned int)block->next + sizeof(kpool_block));
@@ -1417,7 +1424,7 @@ kresult vmm_link_vma(process *proc, unsigned int baseaddr, vmm_area *vma)
       /* allocate a new block to store this mapping in */
       err = vmm_alloc_pool((void **)&new_mapping, vma->mappings);
       if(!err)
-      {
+      {         
          /* save the process pointer */
          new_mapping->proc = proc;
          
@@ -1637,7 +1644,7 @@ vmm_tree *vmm_find_vma(process *proc, unsigned int addr)
    vmm_tree *result;
    
    /* give up now if we're given rubbish pointers */
-   if(!proc) return NULL;
+   if(!proc || !addr) return NULL;
 
    /* mock up a vma and node to search for */
    area.size = 1;
