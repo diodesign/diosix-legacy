@@ -495,6 +495,11 @@ void sched_pick(int_registers_block *regs)
          thread */
       if(!next && now)
          if(now->state == running) return;
+      
+      /* avoid running out of any work to do */
+      lock_gate(&(cpu->lock), LOCK_WRITE);
+      sched_rescan_queues(CPU_ID);
+      unlock_gate(&(cpu->lock), LOCK_WRITE);
    }
 
    /* keep with the currently running thread if it's
@@ -526,6 +531,24 @@ void sched_pick(int_registers_block *regs)
    
    SCHED_DEBUG("[sched:%i] switched thread %i of process %i (%p) for thread %i of process %i (%p)\n",
            CPU_ID, now->tid, now->proc->pid, now, next->tid, next->proc->pid, next);
+}
+
+/* sched_rescan_queues
+   Run through a CPU's queues and determine the highest-priority queue with threads waiting in it.
+   => cpuid = CPU_ID of core to scan
+*/
+void sched_rescan_queues(unsigned char cpuid)
+{
+   /* assumes at least a read lock on the CPU's structure */
+   mp_core *cpu = &cpu_table[cpuid];
+   unsigned int loop;
+   
+   for(loop = 0; loop < SCHED_PRIORITY_LEVELS; loop++)
+      if(cpu->queues[loop].queue_head)
+      {
+         cpu->lowest_queue_filled = loop;
+         break;
+      }
 }
 
 /* sched_move_to_end
@@ -575,6 +598,10 @@ void sched_move_to_end(unsigned char cpu, thread *toqueue)
    toqueue->state     = inrunqueue;
    toqueue->timeslice = SCHED_TIMESLICE;
    toqueue->queue     = cpu_queue;
+
+   /* determine the highest priority thread queue to run */
+   if(cpu_table[cpu].lowest_queue_filled != priority)
+      sched_rescan_queues(cpu);
    
    unlock_gate(&(cpu_table[cpu].lock), LOCK_WRITE);
    unlock_gate(&(toqueue->lock), LOCK_WRITE);
@@ -697,15 +724,7 @@ void sched_remove(thread *victim, thread_state state)
    
    /* determine the highest priority run queue that's non-empty */
    if(cpu_table[cpu].lowest_queue_filled >= victim->queue->priority)
-   {
-      unsigned int loop;
-      for(loop = 0; loop < SCHED_PRIORITY_LEVELS; loop++)
-         if(cpu_table[cpu].queues[loop].queue_head)
-         {
-            cpu_table[cpu].lowest_queue_filled = loop;
-            break;
-         }
-   }
+      sched_rescan_queues(cpu);
 
    SCHED_DEBUG("[sched:%i] removed thread %i (%p) of process %i from cpu %i queue, priority %i\n",
                CPU_ID, victim->tid, victim, victim->proc->pid, cpu, victim->queue->priority);

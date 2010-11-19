@@ -203,6 +203,8 @@ exit_lock_gate:
 kresult unlock_gate(rw_gate *gate, unsigned int flags)
 {   
 #ifndef UNIPROC
+   unsigned int caller;
+   
 #ifdef LOCK_DEBUG
    if(cpu_table)
    {
@@ -213,9 +215,7 @@ kresult unlock_gate(rw_gate *gate, unsigned int flags)
       LOCK_DEBUG("[lock:%i] unlock_gate(%p, %x)\n", CPU_ID, gate, flags);
    }
 #endif
-   
-   unsigned int caller;
-   
+
    /* sanity checks */
    if(!gate) return e_failure;
    if(!cpu_table) return success; /* only one processor running */   

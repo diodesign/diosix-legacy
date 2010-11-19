@@ -49,7 +49,18 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #define FB_PHYS_BASE (0xe0000000)
 #define FB_LOG_BASE  (0x400000)
 
-#define KEYBOARD_IRQ (33) /* IRQ1 */
+#define KEYBOARD_IRQ  (33)   /* IRQ1 */
+#define KEYBOARD_DATA (0x60) /* KBC data port */
+
+unsigned char read_port_byte(unsigned short port)
+{
+   unsigned char ret_val;
+   
+   __asm__ __volatile__("inb %1,%0"
+                        : "=a"(ret_val)
+                        : "d"(port));
+   return ret_val;
+}
 
 unsigned short read_port(unsigned short port)
 {
@@ -60,6 +71,14 @@ unsigned short read_port(unsigned short port)
                         : "d"(port));
    return ret_val;
 }
+
+void write_port_byte(unsigned short port, unsigned char val)
+{
+   __asm__ __volatile__("outb %0,%1"
+                        :
+                        : "a"(val), "d"(port));
+}
+
 
 void write_port(unsigned short port, unsigned short val)
 {
@@ -98,7 +117,7 @@ void do_idle(void)
    while(1)
    {
       __asm__ __volatile__("pause");
-      diosix_thread_yield();
+      // diosix_thread_yield();
    }
 }
 
@@ -109,7 +128,6 @@ void do_listen(void)
    unsigned int state = 0;
    diosix_msg_info msg;
    diosix_phys_request req;
-   unsigned int child;
    
    /* move into driver layer and get access to IO ports */
    diosix_priv_layer_up();
@@ -171,7 +189,7 @@ void main(void)
    unsigned int message = 0;
 
    /* create a new thread that'll idle for us */
-   child = diosix_fork();
+   child = diosix_thread_fork();
    if(child == 0) do_idle(); /* child can idle */
 
    /* create new process to receive */
@@ -182,7 +200,8 @@ void main(void)
    diosix_priv_layer_up();
    diosix_driver_register();
    diosix_signals_kernel(SIG_ACCEPT_KERNEL(SIGXIRQ));
-   diosix_driver_register_irq(KEYBOARD_IRQ);
+   // diosix_driver_register_irq(KEYBOARD_IRQ);
+   // diosix_driver_register_irq(32);
    
    /* wait for IRQ signal */
    sig.tid = DIOSIX_MSG_ANY_THREAD;
@@ -193,8 +212,12 @@ void main(void)
    
    /* wait for keyboard IRQ */
    while(1)
-      //if(diosix_msg_receive(&sig) == success)
+      if(diosix_msg_receive(&sig) == success)
       {
+         if(sig.signal.extra == KEYBOARD_IRQ)
+            /* deal with the keyboard interrupt */
+            message += read_port_byte(KEYBOARD_DATA);
+
          /* set up message block to poke the child */
          msg.tid = DIOSIX_MSG_ANY_THREAD;
          msg.pid = child;
