@@ -410,6 +410,7 @@ void *vmm_realloc(void *addr, signed int change)
    {
       KOOPS_DEBUG("[vmm:%i] OMGWTF! vmm_realloc: bad magic (%x) reallocing block %p by %i bytes\n",
                   CPU_ID, block->magic, change);
+      debug_stacktrace();
       return NULL; /* failed */
    }
    
@@ -615,7 +616,7 @@ kresult vmm_alloc_pool(void **ptr, kpool *pool)
    if(!ptr || !pool) return e_bad_params;
    
    lock_gate(&(pool->lock), LOCK_WRITE);
-   
+
    /* are there any free blocks? if not, we need more memory... */
    if(!pool->free_blocks)
    {
@@ -625,9 +626,9 @@ kresult vmm_alloc_pool(void **ptr, kpool *pool)
       unsigned int start_of_free;
       unsigned int pool_blocks = pool->total_blocks;
       unsigned int pool_size = KPOOL_BLOCK_TOTALSIZE(pool->block_size) * pool_blocks;
-      
+
       /* grow the pool by doubling it in size: increae it by pool_size bytes */
-      new_heap_addr = vmm_realloc((void **)&(pool->pool), pool_size);
+      new_heap_addr = vmm_realloc(pool->pool, pool_size);
       
       /* give up if we can't grow the pool */
       if(!new_heap_addr)
@@ -635,10 +636,13 @@ kresult vmm_alloc_pool(void **ptr, kpool *pool)
          unlock_gate(&(pool->lock), LOCK_WRITE);
          return e_failure;
       }
-      
+
       /* fix up the pool's pointers if the pool heap moved */
       if(prev_heap_addr != new_heap_addr)
+      {
+         pool->pool = new_heap_addr; /* save the new address */
          vmm_fixup_moved_pool(pool, prev_heap_addr, new_heap_addr);
+      }
       
       /* zero the new area and mark it as free */
       start_of_free = (unsigned int)(pool->pool) + pool_size;
@@ -1409,7 +1413,7 @@ kresult vmm_link_vma(process *proc, unsigned int baseaddr, vmm_area *vma)
       vmm_area_mapping *new_mapping;
       
       lock_gate(&(vma->lock), LOCK_WRITE);
-      
+
       /* allocate a new block to store this mapping in */
       err = vmm_alloc_pool((void **)&new_mapping, vma->mappings);
       if(!err)
