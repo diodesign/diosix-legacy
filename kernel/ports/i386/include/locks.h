@@ -19,13 +19,18 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #define   _LOCKS_H
 
 /* allow a lock_gate timeout (in cpu cycles) if LOCK_TIME_CHECK is defined */
-#define LOCK_TIMEOUT         (0xfffffff)
+#define LOCK_TIMEOUT         (0xffffffff)
 
 /* lock settings */
 #define LOCK_READ           (0)
 #define LOCK_WRITE          (1 << 0)
 #define LOCK_SELFDESTRUCT   (1 << 1)
 #define LOCK_WRITEWAITING   (1 << 2)
+
+/* Determine the owner of a lock gate (a) or set the owner (b) of a gate (a).
+   Only use once lock_gate() has been successful but before unlock_gate() is called. */
+#define LOCK_GET_OWNER(a)    (thread *)((rw_gate *)(a)->owner)
+#define LOCK_SET_OWNER(a, b) ((rw_gate *)(a))->owner = (unsigned int)(b)
 
 /* locking primitives for processes and threads */
 typedef struct

@@ -84,7 +84,7 @@ kresult lock_gate(rw_gate *gate, unsigned int flags)
 
    /* sanity checks */
    if(!gate) return e_failure;
-   if(!cpu_table) return success; /* only one processor running */   
+   if(!cpu_table) return success; /* only one processor running */
    
 #ifdef LOCK_DEBUG
    if(cpu_table)
@@ -562,7 +562,7 @@ void x86_proc_preinit(void)
 
 /* x86_thread_switch
    Freeze a thread and select another to run
-   => now = running thread to stop, or NULL for no thread
+   => now = running thread to stop
       next = thread to reload
       regs = pointer to kernel stack
 */

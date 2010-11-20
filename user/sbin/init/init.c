@@ -200,8 +200,7 @@ void main(void)
    diosix_priv_layer_up();
    diosix_driver_register();
    diosix_signals_kernel(SIG_ACCEPT_KERNEL(SIGXIRQ));
-   // diosix_driver_register_irq(KEYBOARD_IRQ);
-   // diosix_driver_register_irq(32);
+   diosix_driver_register_irq(KEYBOARD_IRQ);
    
    /* wait for IRQ signal */
    sig.tid = DIOSIX_MSG_ANY_THREAD;
@@ -212,6 +211,7 @@ void main(void)
    
    /* wait for keyboard IRQ */
    while(1)
+   {
       if(diosix_msg_receive(&sig) == success)
       {
          if(sig.signal.extra == KEYBOARD_IRQ)
@@ -232,4 +232,5 @@ void main(void)
          if(diosix_msg_send(&msg))
             diosix_thread_yield();
       }
+   }
 }

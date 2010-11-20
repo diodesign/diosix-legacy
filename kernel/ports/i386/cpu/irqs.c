@@ -38,6 +38,7 @@ void irq_handler(int_registers_block regs)
 
    unsigned int handled = 0;
    irq_driver_entry *driver;
+   thread *locker;
    
    IRQ_DEBUG("[irq:%i] processing IRQ %i (registers at %p)\n", CPU_ID, regs.intnum, &regs);
    
@@ -45,6 +46,18 @@ void irq_handler(int_registers_block regs)
    regs.intnum = regs.intnum % IRQ_MAX_LINES;
    
    lock_gate(&irq_lock, LOCK_READ);
+   
+   /* the interrupt might trigger a reschedule that will change the currently
+      running thread - but it'll still be holding onto irq_lock. so be prepared
+      to change the ownership of the lock if the thread is switched out. if
+      cpu_table isn't allocated yet then we have no threads running and the lock
+      is owned by the processor, so set locker to zero to prevent further changes. */
+   if(cpu_table)
+   {
+      locker = LOCK_GET_OWNER(&irq_lock);
+      if(locker != cpu_table[CPU_ID].current) locker = NULL; /* this isn't my locker... */
+   }
+   else locker = NULL;
 
    /* find the registered drivers */
    driver = irq_drivers[regs.intnum];
@@ -78,8 +91,11 @@ void irq_handler(int_registers_block regs)
       driver = driver->next;
    }
 
+   /* hand the lock over to the new thread if the current one was rescheduled away */
+   if(locker && locker != cpu_table[CPU_ID].current)
+      LOCK_SET_OWNER(&irq_lock, cpu_table[CPU_ID].current);
    unlock_gate(&irq_lock, LOCK_READ);
-
+   
    if(!handled)
    {
       IRQ_DEBUG("[irq:%i] spurious IRQ %i!\n", CPU_ID, regs.intnum);
