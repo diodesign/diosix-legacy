@@ -51,6 +51,7 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 #define KEYBOARD_IRQ  (33)   /* IRQ1 */
 #define KEYBOARD_DATA (0x60) /* KBC data port */
+#define KEYBOARD_CTRL (0x61) /* KBC control port */
 
 unsigned char read_port_byte(unsigned short port)
 {
@@ -214,10 +215,16 @@ void main(void)
    {
       if(diosix_msg_receive(&sig) == success)
       {
+         unsigned char control_bits;
+         
          if(sig.signal.extra == KEYBOARD_IRQ)
             /* deal with the keyboard interrupt */
             message += read_port_byte(KEYBOARD_DATA);
 
+         control_bits = read_port_byte(KEYBOARD_CTRL);
+         write_port_byte(KEYBOARD_CTRL, control_bits | 0x80);  /* disable intr */
+         write_port_byte(KEYBOARD_CTRL, control_bits & 0x7F);  /* re-enable intr */
+         
          /* set up message block to poke the child */
          msg.tid = DIOSIX_MSG_ANY_THREAD;
          msg.pid = child;

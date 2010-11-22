@@ -580,3 +580,44 @@ void syscall_do_info(int_registers_block *regs)
    /* fall through to returning an error code */
    SYSCALL_RETURN(e_bad_params);
 }
+
+/* syscall:memory - manipulate a process's virtual memory space
+   => eax = DIOSIX_MEMORY_CREATE: create a read-only virtual memory area, which cannot clash with any existing area.
+               => ebx = pointer to the start of the virtual area
+                  ecx = size of the area in bytes
+            DIOSIX_MEMORY_DESTROY: destroy a previously created virtual memory area
+               => ebx = pointer to start of virtual area to destroy
+            DIOSIX_MEMORY_RESIZE: change the size of a previously created virtual memory area
+               => ebx = pointer to start of virtual area to resize
+                  ecx = number of bytes to increase the area by, or negative for number of bytes to reduce by
+            DIOSIX_MEMORY_ACCESS: set the access flags of a virtual memory area.
+               => ebx = pointer to start of virtual area to alter
+                  ecx = access bits within the VMA_ACCESS_MASK bitmask
+   <= eax = 0 for success or an error code
+*/
+void syscall_do_memory(int_registers_block *regs)
+{
+   thread *current = cpu_table[CPU_ID].current;
+   unsigned int vma_base = regs->ebx;
+
+   SYSCALL_DEBUG("[sys:%i] SYSCALL_MEMORY(%i, %x) called by thread %x in process %x\n",
+                 CPU_ID, regs->eax, regs->ebx, current->tid, current->proc->pid);
+   
+   switch(regs->eax)
+   {
+      case DIOSIX_MEMORY_CREATE:
+      {
+         unsigned int vma_size = regs->ecx;
+      
+         /* sanity check the pointer and size */
+         if(!vma_size) SYSCALL_RETURN(e_bad_params);
+         if(!vma_base || (vma_base + MEM_CLIP(vma_base, vma_size) >= KERNEL_SPACE_BASE))
+            SYSCALL_RETURN(e_bad_address);
+            
+         SYSCALL_RETURN(vmm_add_vma(current->proc, vma_base, vma_size, VMA_MEMSOURCE, 0))
+      }
+   }
+   
+   /* fall through to returning an error code because eax was incorrect */
+   SYSCALL_RETURN(e_bad_params);
+}
