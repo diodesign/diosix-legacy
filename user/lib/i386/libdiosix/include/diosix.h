@@ -69,6 +69,7 @@ typedef enum
 #define SYSCALL_PRIVS         (9)
 #define SYSCALL_INFO          (10)
 #define SYSCALL_DRIVER        (11)
+#define SYSCALL_MEMORY        (12)
 
 /* message passing - control flags bits high */
 #define DIOSIX_MSG_REPLY       (1 << 31) /* message is a reply */
@@ -139,14 +140,22 @@ typedef struct
 #define DIOSIX_DRIVER_REGISTER_IRQ   (4)
 #define DIOSIX_DRIVER_DEREGISTER_IRQ (5)
 
-/* vmm_area flags */
+/* reason codes for memory management */
+#define DIOSIX_MEMORY_CREATE         (0)
+#define DIOSIX_MEMORY_DESTROY        (1)
+#define DIOSIX_MEMORY_RESIZE         (2)
+#define DIOSIX_MEMORY_ACCESS         (3)
+
+/* vmm_area access flags */
 #define VMA_READABLE    (0 << 0)
 #define VMA_WRITEABLE   (1 << 0)
 #define VMA_MEMSOURCE   (1 << 1) /* on fault, map in a physical page if set, or bump the userspace manager if not */
                                  /* this is overridden by page bit 9 */
 #define VMA_NOCACHE     (1 << 2) /* disable caching on pages in this area */
 #define VMA_FIXED       (1 << 3) /* do not swap out physical pages in this VMA */
+#define VMA_EXECUTABLE  (1 << 4) /* code can be executed in this vma */
 #define VMA_HASPHYS     (1 << 7) /* hint to the vmm that a page has physical memory assigned to it */
+#define VMA_ACCESS_MASK (VMA_WRITEABLE | VMA_EXECUTABLE | VMA_NOCACHE)
 
 /* describe a physical memory request */
 typedef struct

@@ -63,4 +63,9 @@ unsigned int diosix_get_thread_info(diosix_thread_info *block);
 unsigned int diosix_get_process_info(diosix_process_info *block);
 unsigned int diosix_get_kernel_info(diosix_kernel_info *block);
 
+/* manage memory */
+unsigned int diosix_memory_create(void *ptr, unsigned int size);
+unsigned int diosix_memory_destroy(void *ptr);
+unsigned int diosix_memory_resize(void *ptr, signed int change);
+
 #endif
