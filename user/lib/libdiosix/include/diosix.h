@@ -1,5 +1,5 @@
-/* user/lib/i386/libdiosix/include/diosix.h
- * prototypes and structures for the i386 port of the kernel relevant to userspace
+/* user/lib/libdiosix/include/diosix.h
+ * prototypes, defines and structures in the kernel relevant to userspace
  * Author : Chris Williams
  * Date   : Sat,14 Nov 2009.17:17:00
 

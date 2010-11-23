@@ -1,5 +1,6 @@
-/* user/lib/i386/libdiosix/include/signal.h
+/* user/lib/libdiosix/include/signal.h
  * Single Unix Specification's <signal.h> - http://www.opengroup.org/onlinepubs/009695399/basedefs/signal.h.html
+   With diosix-specific extensions.
  * Author : Chris Williams
  * Date   : Sat,14 Nov 2009.17:17:00
 

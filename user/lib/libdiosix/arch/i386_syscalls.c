@@ -1,5 +1,5 @@
-/* user/lib/i386/libdiosix/syscalls.h
- * the syscall veneers for applications to talk to the microkernel
+/* user/lib/libdiosix/arch/i386_syscalls.c
+ * the syscall veneers for i386 applications to talk to the microkernel
  * Author : Chris Williams
  * Date   : Sat,14 Nov 2009.17:17:00
 
