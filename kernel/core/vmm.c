@@ -1397,7 +1397,7 @@ vmm_memcpyuser_wtf:
 */
 #define vma_min(x) (x->base)
 #define vma_max(x) (x->base + x->area->size)
-#define vma_cmp(x, y) ( (vma_min(x)) < vma_min(y) ? -1 : ( vma_min(x) >= vma_max(y) ? 1 : 0 ) )
+#define vma_cmp(x, y) ( (vma_max(x)) < vma_min(y) ? -1 : ( vma_min(x) >= vma_max(y) ? 1 : 0 ) )
 
 /* pointers to vmas are stored in a per-process balanced (rb) binary tree */
 SGLIB_DEFINE_RBTREE_PROTOTYPES(vmm_tree, left, right, colour, vma_cmp);
@@ -1417,6 +1417,8 @@ kresult vmm_link_vma(process *proc, unsigned int baseaddr, vmm_area *vma)
    vmm_tree *new, *existing;
    
    baseaddr = baseaddr & ~MEM_PGMASK; /* round down */
+   
+   dprintf("*** vmm_link_vma: proc %i baseaddr %x size %x (vma %p)\n", proc->pid, baseaddr, vma->size, vma);
    
    /* sanity checks - no null pointers, or kernel or zero page mappings */
    if(!proc || !baseaddr || !vma || baseaddr >= KERNEL_SPACE_BASE) return e_bad_params;
@@ -1461,8 +1463,8 @@ kresult vmm_link_vma(process *proc, unsigned int baseaddr, vmm_area *vma)
       err = e_vma_exists;
       vmm_free(new);
       
-      VMM_DEBUG("[vmm:%i] couldn't link vma %p to process %i (%p) - collision with vma %p\n", 
-              CPU_ID, vma, proc->pid, proc, existing->area);
+      VMM_DEBUG("[vmm:%i] couldn't link vma %p to process %i (%p) - collision with vma %p (base %x size %x)\n", 
+              CPU_ID, vma, proc->pid, proc, existing->area, existing->base, existing->area->size);
    }
    
    unlock_gate(&(proc->lock), LOCK_WRITE);
@@ -1676,7 +1678,7 @@ kresult vmm_add_vma(process *proc, unsigned int base, unsigned int size,
    
    /* block any attempt to map over the kernel */
    if(base + MEM_CLIP(base, size) >= KERNEL_SPACE_BASE) return e_bad_params;
-   
+
    kresult err = vmm_malloc((void **)&new, sizeof(vmm_area));
    if(err) return err;
    vmm_memset(new, 0, sizeof(vmm_area)); /* zero the area */
