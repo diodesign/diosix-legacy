@@ -1,0 +1,9 @@
+timeout 1
+
+title diosix-hyatt
+root (cd)
+kernel /boot/kernel
+
+module /boot/kernel.sym
+module /sbin/init
+

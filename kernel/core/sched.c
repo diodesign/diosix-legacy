@@ -467,6 +467,24 @@ void sched_tick(int_registers_block *regs)
       unlock_gate(&(cpu->current->lock), LOCK_WRITE);
 }
 
+/* sched_rescan_queues
+ Run through a CPU's queues and determine the highest-priority queue with threads waiting in it.
+ => cpuid = CPU_ID of core to scan
+ */
+void sched_rescan_queues(unsigned char cpuid)
+{
+   /* assumes at least a read lock on the CPU's structure */
+   mp_core *cpu = &cpu_table[cpuid];
+   unsigned int loop;
+   
+   for(loop = 0; loop < SCHED_PRIORITY_LEVELS; loop++)
+      if(cpu->queues[loop].queue_head)
+      {
+         cpu->lowest_queue_filled = loop;
+         break;
+      }
+}
+
 /* sched_pick
    Check the run queues for new higher prority threads to run
    and perform a task switch if one is present
@@ -531,24 +549,6 @@ void sched_pick(int_registers_block *regs)
    
    SCHED_DEBUG("[sched:%i] switched thread %i of process %i (%p) for thread %i of process %i (%p)\n",
            CPU_ID, now->tid, now->proc->pid, now, next->tid, next->proc->pid, next);
-}
-
-/* sched_rescan_queues
-   Run through a CPU's queues and determine the highest-priority queue with threads waiting in it.
-   => cpuid = CPU_ID of core to scan
-*/
-void sched_rescan_queues(unsigned char cpuid)
-{
-   /* assumes at least a read lock on the CPU's structure */
-   mp_core *cpu = &cpu_table[cpuid];
-   unsigned int loop;
-   
-   for(loop = 0; loop < SCHED_PRIORITY_LEVELS; loop++)
-      if(cpu->queues[loop].queue_head)
-      {
-         cpu->lowest_queue_filled = loop;
-         break;
-      }
 }
 
 /* sched_move_to_end
