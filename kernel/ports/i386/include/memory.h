@@ -51,7 +51,7 @@ extern unsigned int KernelBootStackBase, APStack;
 #define MEM_PGSIZE           (4 * 1024)
 #define MEM_4M_PGSIZE        (4 * 1024 * 1024)
 #define MEM_PGSHIFT          (12)
-#define MEM_PGMASK           ((1<<MEM_PGSHIFT) - 1)
+#define MEM_PGMASK           ((1 << MEM_PGSHIFT) - 1)
 #define MEM_PGALIGN(a)       ((void *)((unsigned int)(a) & ~MEM_PGMASK))
 #define MEM_PHYS_STACK_BASE  (12 * 1024 * 1024)
 #define MEM_DMA_REGION_MARK  (16 * 1024 * 1024)
@@ -63,6 +63,8 @@ extern unsigned int KernelBootStackBase, APStack;
 #define MEM_CLIP(a, b)       ( (unsigned int)(b) > (KERNEL_PHYSICAL_TOP - (unsigned int)(a)) ? (KERNEL_PHYSICAL_TOP - (unsigned int)(a)) : (b) )
 /* MEM_IS_PG_ALIGNED(a) - return 1 for a page-aligned address or 0 for not */
 #define MEM_IS_PG_ALIGNED(a) ( ((unsigned int)(a) & PG_4K_MASK) == (unsigned int)(a) ? 1 : 0 )
+/* MEM_PG_ROUND_UP - round up to the nearest page-aligned address */
+#define MEM_PG_ROUND_UP(a)   ( ((unsigned int)(a) + MEM_PGSIZE) & ~(MEM_PGMASK) )
 
 /* vmm magic */
 #define KHEAP_FREE           (0xdeaddead)
@@ -180,7 +182,7 @@ kresult vmm_add_vma(process *proc, unsigned int base, unsigned int size, unsigne
 kresult vmm_duplicate_vmas(process *new, process *source);
 kresult vmm_destroy_vmas(process *victim);
 vmm_decision vmm_fault(process *proc, unsigned int addr, unsigned char flags);
-vmm_tree *vmm_find_vma(process *proc, unsigned int addr);
+vmm_tree *vmm_find_vma(process *proc, unsigned int addr, unsigned int size);
 kpool *vmm_create_pool(unsigned int block_size, unsigned int init_count);
 kresult vmm_destroy_pool(kpool *pool);
 kresult vmm_alloc_pool(void **ptr, kpool *pool);
@@ -189,6 +191,8 @@ void *vmm_next_in_pool(void *ptr, kpool *pool);
 kresult vmm_create_free_blocks_in_pool(kpool *pool, unsigned int start, unsigned int end);
 kresult vmm_fixup_moved_pool(kpool *pool, void *prev, void *new);
 unsigned int vmm_count_pool_inuse(kpool *pool);
+kresult vmm_alter_vma(process *owner, vmm_tree *node, unsigned int flags);
+kresult vmm_resize_vma(process *owner, vmm_tree *node, signed int change);
 
 /* kernel global variables for managing physical pages */
 extern unsigned int *phys_pg_stack_low_base;
@@ -237,5 +241,6 @@ kresult pg_do_fault(thread *target, unsigned int addr, unsigned int cpuflags);
 void pg_postmortem(int_registers_block *regs);
 kresult pg_user2phys(unsigned int *paddr, unsigned int **pgdir, unsigned int vaddr);
 kresult pg_user2kernel(unsigned int *kaddr, unsigned int uaddr, process *proc);
+kresult pg_remove_4K_mapping(unsigned int **pgdir, unsigned int virtual);
 
 #endif

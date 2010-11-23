@@ -99,9 +99,7 @@ void syscall_do_driver(int_registers_block *regs)
                SYSCALL_RETURN(e_bad_params);
                         
             /* check there's no conflict in mapping this area in */
-            if(vmm_find_vma(current->proc, (unsigned int)req->vaddr))
-               SYSCALL_RETURN(e_vma_exists);
-            if(vmm_find_vma(current->proc, (unsigned int)req->vaddr + req->size))
+            if(vmm_find_vma(current->proc, (unsigned int)req->vaddr, req->size))
                SYSCALL_RETURN(e_vma_exists);
                         
             /* sanatise the settings flags */

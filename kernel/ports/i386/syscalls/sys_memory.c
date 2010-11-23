@@ -20,8 +20,8 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 /* syscall:memory - manipulate a process's virtual memory space
    => eax = DIOSIX_MEMORY_CREATE: create a read-only virtual memory area, which cannot clash with any existing area.
-               => ebx = pointer to the start of the virtual area
-                  ecx = size of the area in bytes
+               => ebx = pointer to the start of the page-aligned virtual area
+                  ecx = size of the area in whole number of pages in bytes
             DIOSIX_MEMORY_DESTROY: destroy a previously created virtual memory area
                => ebx = pointer to start of virtual area to destroy
             DIOSIX_MEMORY_RESIZE: change the size of a previously created virtual memory area
@@ -43,15 +43,49 @@ void syscall_do_memory(int_registers_block *regs)
    switch(regs->eax)
    {
       case DIOSIX_MEMORY_CREATE:
+         /* vmm_add_vma() has sufficient sanity checking */
+         SYSCALL_RETURN(vmm_add_vma(current->proc, vma_base, regs->ecx, VMA_MEMSOURCE, 0));
+         
+      case DIOSIX_MEMORY_DESTROY:
       {
-         unsigned int vma_size = regs->ecx;
-      
-         /* sanity check the pointer and size */
-         if(!vma_size) SYSCALL_RETURN(e_bad_params);
-         if(!vma_base || (vma_base + MEM_CLIP(vma_base, vma_size) >= KERNEL_SPACE_BASE))
-            SYSCALL_RETURN(e_bad_address);
-            
-         SYSCALL_RETURN(vmm_add_vma(current->proc, vma_base, vma_size, VMA_MEMSOURCE, 0));
+         /* sanity check pointer */
+         if(!vma_base || vma_base >= KERNEL_SPACE_BASE) SYSCALL_RETURN(e_bad_params);
+         
+         vmm_tree *node = vmm_find_vma(current->proc, vma_base, 0);
+         if(!node) SYSCALL_RETURN(e_bad_address);
+         
+         SYSCALL_RETURN(vmm_unlink_vma(current->proc, node));
+      }
+         
+      case DIOSIX_MEMORY_RESIZE:
+      {
+         kresult err;
+         
+         /* sanity check pointer */
+         if(!vma_base || vma_base >= KERNEL_SPACE_BASE) SYSCALL_RETURN(e_bad_params);
+         
+         vmm_tree *node = vmm_find_vma(current->proc, vma_base, 0);
+         if(!node) SYSCALL_RETURN(e_bad_address);
+         
+         err = vmm_resize_vma(current->proc, node, (signed int)(regs->ecx));
+         if(!err && (signed int)(regs->ecx) < 0)
+         {
+            /* reload the process's page directory in case we've lost pages */
+            x86_load_cr3(KERNEL_LOG2PHYS(current->proc->pgdir));
+            mp_interrupt_process(current->proc, INT_IPI_FLUSHTLB);
+         }
+         SYSCALL_RETURN(err);
+      }
+         
+      case DIOSIX_MEMORY_ACCESS:
+      {
+         /* sanity check pointer */
+         if(!vma_base || vma_base >= KERNEL_SPACE_BASE) SYSCALL_RETURN(e_bad_params);
+         
+         vmm_tree *node = vmm_find_vma(current->proc, vma_base, 0);
+         if(!node) SYSCALL_RETURN(e_bad_address);
+         
+         SYSCALL_RETURN(vmm_alter_vma(current->proc, node, regs->ecx & VMA_ACCESS_MASK));
       }
    }
    

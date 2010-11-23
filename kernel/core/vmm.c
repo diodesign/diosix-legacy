@@ -1380,18 +1380,34 @@ vmm_memcpyuser_wtf:
  ------------------------------------------------------------------------- */
 
 /* this should return a negative number if a given address x falls below
- the base of y, zero if it falls within the base and size of y, or positive to
- indicate it's greater than base+size of y */
-#define vmm_cmp_vma(x, y) ( (x->base) < (y->base) ? -1 : ( (x->base) >= ((y->base) + (y->area->size)) ? 1 : 0 ) )
+   the base of y, zero if it falls within the base and size of y, or positive to
+   indicate it's greater than base+size of y.
 
-/* pointers to vmas are stored in a per-process balanced binary tree */
-SGLIB_DEFINE_RBTREE_PROTOTYPES(vmm_tree, left, right, colour, vmm_cmp_vma);
-SGLIB_DEFINE_RBTREE_FUNCTIONS(vmm_tree, left, right, colour, vmm_cmp_vma);
+   xmin = x->base;  xmax = x->base + x->area->size;
+   ymin = y->base;  ymax = y->base + y->area->size;
+ 
+ Possible combinations of areas...                           vma_cmp() result
+ ..................ymin------------------ymax............... 
+ ..xmin###xmax.............................................. allowed     (-1)
+ ..xmin##################xmax............................... not allowed (0)
+ ........................xmin####xmax....................... not allowed (0)
+ ................................xmin###########xmax........ not allowed (0)
+ ...............................................xmin####xmax allowed     (1)
+ ..xmin#########################################xmax........ not allowed (0)
+*/
+#define vma_min(x) (x->base)
+#define vma_max(x) (x->base + x->area->size)
+#define vma_cmp(x, y) ( (vma_min(x)) < vma_min(y) ? -1 : ( vma_min(x) >= vma_max(y) ? 1 : 0 ) )
+
+/* pointers to vmas are stored in a per-process balanced (rb) binary tree */
+SGLIB_DEFINE_RBTREE_PROTOTYPES(vmm_tree, left, right, colour, vma_cmp);
+SGLIB_DEFINE_RBTREE_FUNCTIONS(vmm_tree, left, right, colour, vma_cmp);
 
 /* vmm_link_vma
    Link an existing area to a process
    => proc = process to link the vma with
-      baseaddr = base address of the vma in the process's virtual space
+      baseaddr = base address of the vma in the process's virtual space. 
+                 this will be rounded down to the nearest page boundary.
       vma = the vma to link
    <= success or a failure code
 */
@@ -1399,6 +1415,8 @@ kresult vmm_link_vma(process *proc, unsigned int baseaddr, vmm_area *vma)
 {
    kresult err;
    vmm_tree *new, *existing;
+   
+   baseaddr = baseaddr & ~MEM_PGMASK; /* round down */
    
    /* sanity checks - no null pointers, or kernel or zero page mappings */
    if(!proc || !baseaddr || !vma || baseaddr >= KERNEL_SPACE_BASE) return e_bad_params;
@@ -1498,8 +1516,114 @@ kresult vmm_unlink_vma(process *owner, vmm_tree *victim)
    return vmm_free(victim);
 }
 
+#define VMM_RESIZE_VMA_RETURN(a) { err = (a); goto vmm_resize_vma_exit; }
+
+/* vmm_resize_vma
+   Change the size of a vma within a process. A vma can only be resized if there is a sole owner.
+   => owner = pointer to the owning process
+      node = pointer to a vma's node within the process's virtual memory tree
+      change = signed integer of number of bytes to expand by (or shrink by if negative).
+               the new size of the vma will be rounded up to the nearest page boundary if increasing 
+               or rounded down if shrinking.
+   <= 0 for success or an error code
+*/
+kresult vmm_resize_vma(process *owner, vmm_tree *node, signed int change)
+{
+   kresult err = success;
+   vmm_area *vma;
+   
+   /* sanity check parameters */
+   if(!node || !owner) return e_bad_params;
+   if(change == 0) return success; /* a resize of zero always succeeds */
+   
+   vma = node->area;
+   
+   /* give up if the vma is in use by more than one process - we must have 
+      exclusive access to it or everything starts getting messy */
+   lock_gate(&(owner->lock), LOCK_WRITE);
+   lock_gate(&(vma->lock), LOCK_WRITE);
+   
+   if(vmm_count_pool_inuse(vma->mappings) > 1)
+      VMM_RESIZE_VMA_RETURN(e_no_rights); /* permission denied to alter the vma */
+   
+   if(change > 0)
+   {
+      vmm_tree *check;
+      /* positive change - round up to the nearest page bundary */
+      change = MEM_PG_ROUND_UP(change - 1);
+      
+      /* stop the process mapping over the kernel */
+      if(node->base + MEM_CLIP(node->base, change) >= KERNEL_SPACE_BASE)
+         VMM_RESIZE_VMA_RETURN(e_too_big);
+      
+      /* check there's no collision with the area above in memory */
+      check = vmm_find_vma(owner, node->base + node->area->size, change);
+      if(check) VMM_RESIZE_VMA_RETURN(e_vma_exists);
+      
+      /* do the actual size change */
+      vma->size += change;
+      VMM_DEBUG("[vmm:%i] increased vma %p (base %x) in process %i by %i bytes\n",
+                CPU_ID, vma, node->base, owner->pid, change);
+   }
+   else
+   {
+      unsigned int page_loop;
+      /* negative change - check we don't shrink to zero or beyond.
+         round down to the nearest page boundary */
+      unsigned int bytes = (0 - change) & ~MEM_PGMASK;
+      if(bytes >= vma->size) VMM_RESIZE_VMA_RETURN(e_bad_params);
+      
+      vma->size -= bytes; /* do the actual size change */
+      VMM_DEBUG("[vmm:%i] reduced vma %p (base %x) in process %i by %i bytes\n",
+                CPU_ID, vma, node->base, owner->pid, bytes);
+      
+      /* now we need to unmap any pages that might have been present or
+         else the process can continue to access any previously mapped in
+         pages.. and other processes will want to use the physical pages. */
+      for(page_loop = 0; page_loop < bytes; page_loop += MEM_PGSIZE)
+         pg_remove_4K_mapping(owner->pgdir, node->base + vma->size + page_loop);
+   }
+
+vmm_resize_vma_exit:
+   unlock_gate(&(node->area->lock), LOCK_WRITE);
+   unlock_gate(&(owner->lock), LOCK_WRITE);
+   return err;
+}
+
+/* vmm_alter_vma
+   Alter a vma's access flags.
+   => owner = pointer to the owning process
+      node = pointer to a vma's node within the process's virtual memory tree
+      flags = new flags word for the vma
+   <= 0 for success or an error code
+*/
+kresult vmm_alter_vma(process *owner, vmm_tree *node, unsigned int flags)
+{
+   kresult err = success;
+   vmm_area *vma;
+   
+   /* sanity check parameters */
+   if(!node || !owner) return e_bad_params;
+   
+   vma = node->area;
+   
+   /* give up if the vma is in use by more than one process - we must have 
+    exclusive access to it or everything starts getting messy */
+   lock_gate(&(owner->lock), LOCK_WRITE);
+   lock_gate(&(vma->lock), LOCK_WRITE);
+   
+   if(vmm_count_pool_inuse(vma->mappings) == 1)
+      vma->flags = flags;
+   else
+      err = e_no_rights; /* permission denied */
+   
+   unlock_gate(&(node->area->lock), LOCK_WRITE);
+   unlock_gate(&(owner->lock), LOCK_WRITE);
+   return err;
+}
+
 /* vmm_find_vma_mapping
-   Return a block in a vma's smappings pool that holds a pointer
+   Return a block in a vma's mappings pool that holds a pointer
    to the given process.
    => vma = vma to inspect
       tofind = process to find within the vma's mapping pool
@@ -1532,8 +1656,8 @@ vmm_area_mapping *vmm_find_vma_mapping(vmm_area *vma, process *tofind)
 /* vmm_add_vma
    Create a new memory area and link it to a process
    => proc = process to link the new vma to
-      base = base virtual address for this vma
-      size = vma size in bytes
+      base = base virtual address for this vma, rounded down to nearest page size multiple
+      size = vma size in bytes. this will be rounded up to nearest page size multiple
       flags = vma status and access flags
       cookie = a private reference set by the userspace page manager
    <= success or a failure code
@@ -1542,9 +1666,16 @@ kresult vmm_add_vma(process *proc, unsigned int base, unsigned int size,
                     unsigned char flags, unsigned int cookie)
 {
    vmm_area *new;
-   
-   /* sanity check - no zero page or zero size mappings */
+
+   /* sanity check */
    if(!base || !size) return e_bad_params;
+   
+   /* round up the size and round down the base to 4K page multiples */
+   size = MEM_PG_ROUND_UP(size - 1);
+   base = base & ~MEM_PGMASK;
+   
+   /* block any attempt to map over the kernel */
+   if(base + MEM_CLIP(base, size) >= KERNEL_SPACE_BASE) return e_bad_params;
    
    kresult err = vmm_malloc((void **)&new, sizeof(vmm_area));
    if(err) return err;
@@ -1560,13 +1691,14 @@ kresult vmm_add_vma(process *proc, unsigned int base, unsigned int size,
    VMM_DEBUG("[vmm:%i] created vma %p for proc %i (%p): base %x size %i flags %x cookie %x\n",
            CPU_ID, new, proc->pid, proc, base, size, flags, cookie);
    
-   if(vmm_link_vma(proc, base, new))
+   err = vmm_link_vma(proc, base, new);
+   if(err)
    {
       /* tear down this failed vma */
       vmm_destroy_pool(new->mappings);
       vmm_free(new);
       
-      return e_failure;
+      return err;
    }
    
    return success;
@@ -1634,10 +1766,14 @@ kresult vmm_destroy_vmas(process *victim)
 }
 
 /* vmm_find_vma
-   Locate a vma tree node using the given address in the given proc
+   Locate a vma tree node using the given address in the given proc. Any overlapping
+   vmas will be returned or NULL for no vma.
+   => proc = process to inspect
+      addr = base address to check
+      size = range of ranges (in bytes) to check from the base address
    <= pointer to tree node or NULL for not found
 */
-vmm_tree *vmm_find_vma(process *proc, unsigned int addr)
+vmm_tree *vmm_find_vma(process *proc, unsigned int addr, unsigned int size)
 {
    vmm_tree node;
    vmm_area area;
@@ -1647,7 +1783,7 @@ vmm_tree *vmm_find_vma(process *proc, unsigned int addr)
    if(!proc || !addr) return NULL;
 
    /* mock up a vma and node to search for */
-   area.size = 1;
+   area.size = size;
    node.base = addr;
    node.area = &area;
    
@@ -1672,7 +1808,7 @@ vmm_decision vmm_fault(process *proc, unsigned int addr, unsigned char flags)
    lock_gate(&(proc->lock), LOCK_READ);
    
    vmm_area *vma;
-   vmm_tree *found = vmm_find_vma(proc, addr);
+   vmm_tree *found = vmm_find_vma(proc, addr, 0);
 
    if(!found) return badaccess; /* no vma means no possible access */
    

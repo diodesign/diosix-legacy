@@ -471,6 +471,63 @@ kresult pg_user2kernel(unsigned int *kaddr, unsigned int uaddr, process *proc)
    return success;
 }
 
+/* pg_remove_4K_mapping
+   Remove a 4K mapping from a page directory (if present) and release the physical
+   page frame (if present).
+   => pgdir pointer to page directory to remove the 4K mapping from
+      virtual = the full virtual address for the start of the 4K page
+   <= 0 for success or an error code
+*/
+kresult pg_remove_4K_mapping(unsigned int **pgdir, unsigned int virtual)
+{
+   unsigned int pgdir_index = (virtual >> PG_DIR_BASE) & PG_INDEX_MASK;
+   unsigned int pgtable_index = (virtual >> PG_TBL_BASE) & PG_INDEX_MASK;
+   unsigned int *pgtbl, physical;
+   
+   if(!pgdir || ((unsigned int)pgdir < KERNEL_SPACE_BASE))
+   {
+      KOOPS_DEBUG("[page:%i] OMGWTF bad page directory pointer to pg_remove_4K_mapping!\n"
+                  "              pgdir %p virtual %x\n"
+                  "              pgdir_index %i pgtable_index %i\n",
+                  CPU_ID, pgdir, virtual, pgdir_index, pgtable_index);
+      debug_stacktrace();
+      return e_failure; /* bail out now if we get a bad pointer */
+   }
+   
+   /* if a 4M mapping already exists for this virtual address then bail out */
+   if((unsigned int)(pgdir[pgdir_index]) & PG_SIZE)
+   {
+      KOOPS_DEBUG("[page:%i] OMGWTF tried to remove a 4M page entry in pg_remove_4K_mapping!\n"
+                  "              pgdir %p virtual %x\n"
+                  "              pgdir_index %i pgtable_index %i\n",
+                  CPU_ID, pgdir, virtual, pgdir_index, pgtable_index);
+      debug_stacktrace();
+      return e_failure;
+   }
+   
+   /* get the page table entry */
+   pgtbl = (unsigned int *)KERNEL_PHYS2LOG(pgdir[pgdir_index]);
+   pgtbl = (unsigned int *)((unsigned int)pgtbl & PG_TBL_MASK); /* clean out lower bits */
+   physical = pgtbl[pgtable_index];
+   
+   /* was the page ever present? */
+   if(physical & PG_PRESENT)
+   {
+      /* set page as not present and strip out the physical address */
+      pgtbl[pgtable_index] &= (~PG_TBL_MASK & ~PG_PRESENT); 
+
+      /* mask off all the low bits in the table entry to get the physical address */
+      physical &= PG_TBL_MASK;
+
+      PAGE_DEBUG("[page:%i] removing 4K page at %x in pd %p, freeing physical frame %x\n",
+                 CPU_ID, virtual, pgdir, physical);
+      
+      return vmm_return_phys_pg((void *)physical); /* release the physical frame */
+   }
+   
+   return success;
+}
+
 /* pg_add_4K_mapping
    Add or edit an existing 4K mapping to a page directory, allocating a
    new page table if needed.
