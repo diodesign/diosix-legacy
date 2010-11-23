@@ -51,7 +51,7 @@ void syscall_do_memory(int_registers_block *regs)
          /* sanity check pointer */
          if(!vma_base || vma_base >= KERNEL_SPACE_BASE) SYSCALL_RETURN(e_bad_params);
          
-         vmm_tree *node = vmm_find_vma(current->proc, vma_base, 0);
+         vmm_tree *node = vmm_find_vma(current->proc, vma_base, sizeof(char));
          if(!node) SYSCALL_RETURN(e_bad_address);
          
          SYSCALL_RETURN(vmm_unlink_vma(current->proc, node));
@@ -64,7 +64,7 @@ void syscall_do_memory(int_registers_block *regs)
          /* sanity check pointer */
          if(!vma_base || vma_base >= KERNEL_SPACE_BASE) SYSCALL_RETURN(e_bad_params);
          
-         vmm_tree *node = vmm_find_vma(current->proc, vma_base, 0);
+         vmm_tree *node = vmm_find_vma(current->proc, vma_base, sizeof(char));
          if(!node) SYSCALL_RETURN(e_bad_address);
          
          err = vmm_resize_vma(current->proc, node, (signed int)(regs->ecx));
@@ -82,7 +82,7 @@ void syscall_do_memory(int_registers_block *regs)
          /* sanity check pointer */
          if(!vma_base || vma_base >= KERNEL_SPACE_BASE) SYSCALL_RETURN(e_bad_params);
          
-         vmm_tree *node = vmm_find_vma(current->proc, vma_base, 0);
+         vmm_tree *node = vmm_find_vma(current->proc, vma_base, sizeof(char));
          if(!node) SYSCALL_RETURN(e_bad_address);
          
          SYSCALL_RETURN(vmm_alter_vma(current->proc, node, regs->ecx & VMA_ACCESS_MASK));

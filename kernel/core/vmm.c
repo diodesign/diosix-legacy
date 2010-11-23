@@ -1397,7 +1397,7 @@ vmm_memcpyuser_wtf:
 */
 #define vma_min(x) (x->base)
 #define vma_max(x) (x->base + x->area->size)
-#define vma_cmp(x, y) ( (vma_max(x)) < vma_min(y) ? -1 : ( vma_min(x) >= vma_max(y) ? 1 : 0 ) )
+#define vma_cmp(x, y) ( (vma_max(x) - 1) < vma_min(y) ? -1 : ( vma_min(x) >= vma_max(y) ? 1 : 0 ) )
 
 /* pointers to vmas are stored in a per-process balanced (rb) binary tree */
 SGLIB_DEFINE_RBTREE_PROTOTYPES(vmm_tree, left, right, colour, vma_cmp);
@@ -1417,9 +1417,7 @@ kresult vmm_link_vma(process *proc, unsigned int baseaddr, vmm_area *vma)
    vmm_tree *new, *existing;
    
    baseaddr = baseaddr & ~MEM_PGMASK; /* round down */
-   
-   dprintf("*** vmm_link_vma: proc %i baseaddr %x size %x (vma %p)\n", proc->pid, baseaddr, vma->size, vma);
-   
+
    /* sanity checks - no null pointers, or kernel or zero page mappings */
    if(!proc || !baseaddr || !vma || baseaddr >= KERNEL_SPACE_BASE) return e_bad_params;
    
@@ -1791,8 +1789,6 @@ vmm_tree *vmm_find_vma(process *proc, unsigned int addr, unsigned int size)
    
    lock_gate(&(proc->lock), LOCK_READ);
    result = sglib_vmm_tree_find_member(proc->mem, &node);
-   dprintf("*** vmm_find_vma: proc %i addr %x size %x result %p\n",
-           proc->pid, addr, size, result);
    unlock_gate(&(proc->lock), LOCK_READ);
    
    return result;
@@ -1812,9 +1808,7 @@ vmm_decision vmm_fault(process *proc, unsigned int addr, unsigned char flags)
    lock_gate(&(proc->lock), LOCK_READ);
    
    vmm_area *vma;
-   vmm_tree *found = vmm_find_vma(proc, addr, 0);
-
-   dprintf("*** fault *** process %i addr %x vma %p\n", proc->pid, addr, found);
+   vmm_tree *found = vmm_find_vma(proc, addr, sizeof(char));
    
    if(!found) return badaccess; /* no vma means no possible access */
    
