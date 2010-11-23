@@ -287,8 +287,19 @@ thread *thread_new(process *proc)
 
    /* create a vma for the thread's user stack - don't forget stacks grow down */
    stackbase = KERNEL_SPACE_BASE - (THREAD_MAX_STACK * MEM_PGSIZE * new->tid);
-   vmm_add_vma(proc, stackbase - (THREAD_MAX_STACK * MEM_PGSIZE), (THREAD_MAX_STACK * MEM_PGSIZE),
-               VMA_READABLE | VMA_WRITEABLE | VMA_MEMSOURCE, 0);
+   err = vmm_add_vma(proc, stackbase - (THREAD_MAX_STACK * MEM_PGSIZE), (THREAD_MAX_STACK * MEM_PGSIZE),
+                     VMA_READABLE | VMA_WRITEABLE | VMA_MEMSOURCE, 0);
+   /* bail out and clean up if linking the stack failed */
+   if(err)
+   {
+      proc->threads[hash] = new->hash_next;
+      if(new->hash_next) new->hash_prev = NULL;
+      vmm_free((void *)kstack);
+      vmm_free(new);
+      unlock_gate(&(proc->lock), LOCK_WRITE);
+      return NULL;
+   }
+   
    new->stackbase = stackbase;
 
    /* stacks grow down... */

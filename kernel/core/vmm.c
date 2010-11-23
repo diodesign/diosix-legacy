@@ -1789,6 +1789,8 @@ vmm_tree *vmm_find_vma(process *proc, unsigned int addr, unsigned int size)
    
    lock_gate(&(proc->lock), LOCK_READ);
    result = sglib_vmm_tree_find_member(proc->mem, &node);
+   dprintf("*** vmm_find_vma: proc %i addr %x size %x result %p\n",
+           proc->pid, addr, size, result);
    unlock_gate(&(proc->lock), LOCK_READ);
    
    return result;
@@ -1810,6 +1812,8 @@ vmm_decision vmm_fault(process *proc, unsigned int addr, unsigned char flags)
    vmm_area *vma;
    vmm_tree *found = vmm_find_vma(proc, addr, 0);
 
+   dprintf("*** fault *** process %i addr %x vma %p\n", proc->pid, addr, found);
+   
    if(!found) return badaccess; /* no vma means no possible access */
    
    vma = found->area;
