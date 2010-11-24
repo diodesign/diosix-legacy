@@ -77,7 +77,7 @@ typedef enum
 #define DIOSIX_MSG_RECVONREPLY (1 << 29) /* block on recv after replying */
 #define DIOSIX_MSG_SENDASUSR   (1 << 28) /* send message as an unpriv'd user process */
 #define DIOSIX_MSG_KERNELONLY  (1 << 27) /* accept signals from the kernel only */
-#define DIOSIX_MSG_ATTACHVMA   (1 << 26) /* share a VMA in reply message */
+#define DIOSIX_MSG_SHAREVMA    (1 << 26) /* share a VMA in reply message */
 /* simple type bits low (bits 0-3) */
 #define DIOSIX_MSG_GENERIC     (1)
 #define DIOSIX_MSG_SIGNAL      (2)
@@ -96,6 +96,12 @@ typedef struct
    unsigned int extra;  /* an extra word of information */
 } diosix_signal;
 
+/* describe a memory share request */
+typedef struct
+{
+   unsigned int base, size;
+} diosix_share_request;
+
 /* message passing - describe an outgoing multipart message */
 typedef struct
 {
@@ -112,8 +118,11 @@ typedef struct
 
    unsigned int send_size;  /* size in bytes of the send message data, or number of multipart entries to send */
    void *send;              /* pointer to the send message data as a block or multipart */
-   diosix_signal signal;    /* signal info block */
    
+   diosix_signal signal;    /* signal info block */
+
+   diosix_share_request mem_req; /* memory sharing request */
+
    unsigned int recv_max_size; /* max size in bytes the reply/recv can be, or 0 for sending a reply */
    unsigned int recv_size; /* actual number of bytes in the reply/recv, or 0 for sending a reply */
    void *recv;             /* pointer to buffer for the reply/recv data */

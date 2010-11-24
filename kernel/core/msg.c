@@ -350,6 +350,78 @@ kresult msg_copy(thread *receiver, void *data, unsigned int size, unsigned int *
    return success;
 }
 
+/* msg_share_mem
+   Link a virtual memory area in one process with another process through the inter-process
+   messaging system. The entire vma must be linked and it must not collide with any other vmas.
+   => target = process the vma will be linked with
+      target_mem = structure describing where to link the vma in the target
+      source = process the vma is already linked with
+      source_mem = structure describing where to fidn the vma to link
+   <= 0 for success, or an error code
+*/
+kresult msg_share_mem(process *target, diosix_share_request *target_mem,
+                      process *source, diosix_share_request *source_mem)
+{
+   vmm_tree *source_node, *target_node;
+   kresult result;
+   
+   /* sanity checks - stop null pointers and zero-sized mappings */
+   if(!target || !source || !target_mem->size || !target_mem->base ||
+      !source_mem->size || !source_mem->base)
+      return e_bad_params;
+   
+   /* the two processes must agree on a size for the mapping */
+   if(target_mem->size != source_mem->size) return e_bad_params;
+   
+   /* the processes cannot attempt to map over the kernel */
+   if(target_mem->base + MEM_CLIP(target_mem->base, target_mem->size) >= KERNEL_SPACE_BASE)
+      return e_bad_target_address;
+   if(source_mem->base + MEM_CLIP(source_mem->base, source_mem->size) >= KERNEL_SPACE_BASE)
+      return e_bad_source_address;
+
+   lock_gate(&(source->lock), LOCK_READ);
+   lock_gate(&(target->lock), LOCK_READ);
+
+   source_node = vmm_find_vma(source, source_mem->base, sizeof(char));
+
+   /* check to see if the vma exists in the source */
+   if(source_node)
+   {
+      lock_gate(&(source_node->area->lock), LOCK_WRITE);
+
+      /* the vma size and location must match with what the source process claims */
+      if((source_node->base == source_mem->base) &&
+         (source_node->area->size == source_mem->size))
+      {
+         /* this is the vma we are trying to link */
+         vmm_area *vma = source_node->area;
+         
+         /* check for vma collision in the target process */
+         target_node = vmm_find_vma(target, target_mem->base, target_mem->size);
+         if(!target_node)
+         {
+            /* no collision - we are green for go */
+            result = vmm_link_vma(target, target_mem->base, vma);
+            
+            /* Discovery has cleared the tower */
+            MSG_DEBUG("[msg:%i] sharing vma %p (base %x size %i) in process %i with "
+                      "process %i at %x\n [result = %i]",
+                      CPU_ID, vma, source_mem->base, source_mem->size, source->pid,
+                      target->pid, target_mem->base, result);
+         }
+         else result = e_bad_target_address;
+      }
+      
+      unlock_gate(&(source_node->area->lock), LOCK_WRITE);
+   }
+   else result = e_bad_source_address;
+
+   unlock_gate(&(target->lock), LOCK_READ);
+   unlock_gate(&(source->lock), LOCK_READ);
+      
+   return result;
+}
+
 /* msg_send
    Send a basic diosix IPC message to a thread within another process.
    the kernel doesn't care about the contents of the message. threads
@@ -445,9 +517,28 @@ kresult msg_send(thread *sender, diosix_msg_info *msg)
    /* was the send a reply or an actual send? */
    if(msg->flags & DIOSIX_MSG_REPLY)
    {
-      /* restore the receiver's priority if it was bumped up to send this reply */
-      receiver->priority_granted = SCHED_PRIORITY_INVALID;
-      sched_priority_calc(receiver, priority_check);
+      /* restore the replier's priority if it was bumped up to send this reply */
+      sender->priority_granted = SCHED_PRIORITY_INVALID;
+      sched_priority_calc(sender, priority_check);
+      
+      /* check to see if the two conversing processes want to share memory */
+      if(rmsg->flags & DIOSIX_MSG_SHAREVMA)
+      {
+         if(msg->flags & DIOSIX_MSG_SHAREVMA)
+         {
+            kresult err = msg_share_mem(receiver->proc, &(rmsg->mem_req),
+                                        sender->proc, &(msg->mem_req));
+            if(err)
+            {
+               /* clear the flag to indicate the share failed */
+               msg->flags &= ~DIOSIX_MSG_SHAREVMA;
+               rmsg->flags &= ~DIOSIX_MSG_SHAREVMA;
+            }
+         }
+         else
+            /* replier didn't want to share so clear the flag */
+            rmsg->flags &= ~DIOSIX_MSG_SHAREVMA;
+      }
    }
    else
    {  
@@ -457,6 +548,15 @@ kresult msg_send(thread *sender, diosix_msg_info *msg)
       
       /* take a copy of the message block */
       vmm_memcpy(&(sender->msg), msg, sizeof(diosix_msg_info));
+      
+      /* did the message include a share request? */
+      if(msg->flags & DIOSIX_MSG_SHAREVMA)
+      {
+         /* notify the receiver of the request, the context should be in the message payload */
+         rmsg->mem_req.size = msg->mem_req.size;
+         rmsg->mem_req.base = 0; /* don't reveal the requester's memory map */
+         rmsg->flags |= DIOSIX_MSG_SHAREVMA;
+      }
       
       /* bump the receiver's priority up if the sender has a higher priority to
          avoid priority inversion */
