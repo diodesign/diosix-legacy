@@ -163,8 +163,9 @@ typedef struct
 #define VMA_NOCACHE     (1 << 2) /* disable caching on pages in this area */
 #define VMA_FIXED       (1 << 3) /* do not swap out physical pages in this VMA */
 #define VMA_EXECUTABLE  (1 << 4) /* code can be executed in this vma */
+#define VMA_SHARED      (1 << 5) /* inhibit copy-on-write with this area, it should shared */
 #define VMA_HASPHYS     (1 << 7) /* hint to the vmm that a page has physical memory assigned to it */
-#define VMA_ACCESS_MASK (VMA_WRITEABLE | VMA_EXECUTABLE | VMA_NOCACHE)
+#define VMA_ACCESS_MASK (VMA_WRITEABLE | VMA_EXECUTABLE | VMA_NOCACHE | VMA_SHARED)
 
 /* describe a physical memory request */
 typedef struct

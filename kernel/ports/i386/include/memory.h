@@ -125,11 +125,18 @@ struct kpool
    ask the page code to carry out */
 typedef enum
 {
-   clonepage,     /* grab a blank phys page, map it in at same virtual addr, copy the data, mark writeable */
-   makewriteable, /* it's safe to mark the page as writeable and continue */
-   newpage,       /* grab a blank phys page, map it in and continue */
-   external,      /* get the external page manage to fix up this access */
-   badaccess      /* the fault can't be handled */
+   clonepage,      /* grab a blank phys page, map it in at same virtual addr, copy the data, mark read-only */
+   clonewpage,     /* grab a blank phys page, map it in at same virtual addr, copy the data, mark writeable */
+ 
+   newpage,        /* grab a blank phys page, map it in as read-only and continue */
+   newwpage,       /* grab a blank phys page, map it in as read-write and continue */
+   
+   newsharedpage,  /* grab a blank phys page, map it into all owning processes as read-only */
+   newwsharedpage, /* grab a blank phys page, map it into all owning processes as read-write */
+   
+   makewriteable,  /* it's safe to mark the page as writeable and continue */
+   external,       /* get the external page manage to fix up this access */
+   badaccess       /* the fault can't be handled */
 } vmm_decision;
 
 /* link a vma to processes through one or more of these mappings */

@@ -1794,6 +1794,19 @@ vmm_tree *vmm_find_vma(process *proc, unsigned int addr, unsigned int size)
    return result;
 }
 
+/* standardise return from vmm_fault() */
+#define VMM_FAULT_RETURN(r) { unlock_gate(&(vma->lock), LOCK_READ); return (r); }
+/* return (w) if the vma is writeable, or return (r) */
+#define VMM_FAULT_RETURN_CHOICE(w, r) { if(vma->flags & VMA_WRITEABLE) \
+                                        { \
+                                           unlock_gate(&(vma->lock), LOCK_READ); \
+                                           return (w); \
+                                        } \
+                                        else \
+                                        { \
+                                           unlock_gate(&(vma->lock), LOCK_READ); \
+                                           return (r); \
+                                        } }
 
 /* vmm_fault
    Make a decision on what to do with a faulting user process by using its
@@ -1806,7 +1819,7 @@ vmm_tree *vmm_find_vma(process *proc, unsigned int addr, unsigned int size)
 vmm_decision vmm_fault(process *proc, unsigned int addr, unsigned char flags)
 {
    lock_gate(&(proc->lock), LOCK_READ);
-   
+
    vmm_area *vma;
    vmm_tree *found = vmm_find_vma(proc, addr, sizeof(char));
    
@@ -1822,17 +1835,14 @@ vmm_decision vmm_fault(process *proc, unsigned int addr, unsigned char flags)
    
    /* fail this access if it's a write to a non-writeable area */
    if((flags & VMA_WRITEABLE) && !(vma->flags & VMA_WRITEABLE))
-   {
-      unlock_gate(&(vma->lock), LOCK_READ);
-      return badaccess;
-   }
+      VMM_FAULT_RETURN(badaccess);
 
+   /* is this a shared page? if so, skip the copy-on-write system */
+   if(vma->flags & VMA_SHARED)
+      VMM_FAULT_RETURN_CHOICE(newwsharedpage, newsharedpage);
+   
    /* defer to the userspace page manager if it is managing this vma */
-   if(!(vma->flags & VMA_MEMSOURCE))
-   {
-      unlock_gate(&(vma->lock), LOCK_READ);
-      return external;
-   }
+   if(!(vma->flags & VMA_MEMSOURCE)) VMM_FAULT_RETURN(external);
    
    /* if it's a linked vma then now's time to copy the page so this
       process can have its own private copy */
@@ -1840,21 +1850,17 @@ vmm_decision vmm_fault(process *proc, unsigned int addr, unsigned char flags)
    {
       unsigned int thisphys, phys;
       vmm_area_mapping *search;
-      
+
       /* if there's nothing to copy, then have a new private blank page */
       if(!(flags & VMA_HASPHYS))
-      {
-         unlock_gate(&(vma->lock), LOCK_READ);
-         return newpage;
-      }
-      
+         VMM_FAULT_RETURN_CHOICE(newwpage, newpage);
+
       /* to avoid leaking a page of phys mem, only clone if there are two
          or more processes (including this one) sharing one physical page */
       if(pg_user2phys(&thisphys, proc->pgdir, addr))
       {
          KOOPS_DEBUG("[vmm:%i] OMGWTF page claimed to have physical memory - but doesn't\n", CPU_ID);
-         unlock_gate(&(vma->lock), LOCK_READ);
-         return badaccess;
+         VMM_FAULT_RETURN(badaccess);
       }
       
       search = NULL;
@@ -1868,17 +1874,13 @@ vmm_decision vmm_fault(process *proc, unsigned int addr, unsigned char flags)
             if(search->proc != proc)
                if(pg_user2phys(&phys, search->proc->pgdir, addr) == success)
                   if(phys == thisphys)
-                  {
-                     unlock_gate(&(vma->lock), LOCK_READ);
-                     return clonepage;
-                  }
+                     VMM_FAULT_RETURN_CHOICE(clonewpage, clonepage);
          }
          else break;
       }
       
       /* it's writeable, it's present, we're the only ones using it.. */
-      unlock_gate(&(vma->lock), LOCK_READ);
-      return makewriteable;
+      VMM_FAULT_RETURN(makewriteable);
    }
 
    /* if it's single-linked and has its own physical memory and writes are
@@ -1888,18 +1890,13 @@ vmm_decision vmm_fault(process *proc, unsigned int addr, unsigned char flags)
    {   
       /* but only if there's physical memory to write onto */
       if(flags & VMA_HASPHYS)
-      {
-         unlock_gate(&(vma->lock), LOCK_READ);
-         return makewriteable;
-      }
+         VMM_FAULT_RETURN(makewriteable);
    
-      /* but if there's no physical memory and it's single-linked and
-         writes are allowed then allocate some memory for this page */
-      unlock_gate(&(vma->lock), LOCK_READ);
-      return newpage;
+      /* but if there's no physical memory and it's single-linked 
+         then allocate some memory for this page */
+      VMM_FAULT_RETURN_CHOICE(newwpage, newpage);
    }
 
    /* if this access satisfies no other cases then give up and fail it */
-   unlock_gate(&(vma->lock), LOCK_READ);
-   return badaccess;
+   VMM_FAULT_RETURN(badaccess);
 }
