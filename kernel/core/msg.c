@@ -444,7 +444,52 @@ kresult msg_send(thread *sender, diosix_msg_info *msg)
    
    /* identify the receiver */
    receiver = msg_find_receiver(sender, msg);
-   if(!receiver) return e_no_receiver;
+   if(!receiver)
+   {
+      /* none found, but wait: does this thread wish to be queued until a receiver is ready?
+         note that we can't queue replies. a reply is always sent to a ready receiver */
+      if((msg->flags & DIOSIX_MSG_QUEUEME) && !(msg->flags & DIOSIX_MSG_REPLY))
+      {
+         process *target = proc_find_proc(msg->pid);
+         if(target)
+         {
+            queued_sender *entry;
+            
+            lock_gate(&(target->lock), LOCK_WRITE);
+            
+            /* create a new queued message pool if need be */
+            if(!(target->msg_queue))
+               target->msg_queue = vmm_create_pool(sizeof(queued_sender), 4);
+
+            /* create a new queue entry and fill in the details */
+            if(vmm_alloc_pool((void **)&entry, target->msg_queue) == success)
+            {
+               entry->pid = sender->proc->pid;
+               entry->tid = sender->tid;
+               
+               /* send the sender to sleep */
+               sched_remove(sender, waitingforreply);
+               sender->replysource = NULL;
+               
+               /* take a copy of the message block */
+               vmm_memcpy(&(sender->msg), msg, sizeof(diosix_msg_info));
+               sender->msg_src = msg;
+
+               MSG_DEBUG("[msg:%i] queuing thread %i process %i with msg %p in process %i\n",
+                         CPU_ID, sender->tid, sender->proc->pid, msg, target->pid);
+               
+               unlock_gate(&(target->lock), LOCK_WRITE);
+               return success;
+            }
+
+            unlock_gate(&(target->lock), LOCK_WRITE);
+            return e_failure;
+         }
+      }
+      
+      /* fall through to inform the sender */
+      return e_no_receiver;
+   }
 
    /* protect us from changes to the receiver's memory structure */
    lock_gate(&(receiver->proc->lock), LOCK_READ);
