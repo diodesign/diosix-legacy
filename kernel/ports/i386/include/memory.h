@@ -183,7 +183,7 @@ vmm_area_mapping *vmm_find_vma_mapping(vmm_area *vma, process *tofind);
 kresult vmm_add_vma(process *proc, unsigned int base, unsigned int size, unsigned char flags, unsigned int cookie);
 kresult vmm_duplicate_vmas(process *new, process *source);
 kresult vmm_destroy_vmas(process *victim);
-vmm_decision vmm_fault(process *proc, unsigned int addr, unsigned char flags);
+vmm_decision vmm_fault(process *proc, unsigned int addr, unsigned char flags, unsigned char *rw_flag);
 vmm_tree *vmm_find_vma(process *proc, unsigned int addr, unsigned int size);
 kpool *vmm_create_pool(unsigned int block_size, unsigned int init_count);
 kresult vmm_destroy_pool(kpool *pool);

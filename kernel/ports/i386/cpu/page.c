@@ -30,9 +30,11 @@ unsigned char page_fatal_flag = 0; /* set to 1 when handling a fatal kernel faul
 */
 kresult pg_do_fault(thread *target, unsigned int faultaddr, unsigned int cpuflags)
 {
+   vmm_decision decision;
    unsigned int *pgtable, pgentry, errflags;
    unsigned int pgdir_index = (faultaddr >> PG_DIR_BASE) & PG_INDEX_MASK;
    unsigned int pgtable_index = (faultaddr >> PG_TBL_BASE) & PG_INDEX_MASK;
+   unsigned char rw_flag = 0;
    
    process *proc = target->proc;
    
@@ -65,7 +67,9 @@ kresult pg_do_fault(thread *target, unsigned int faultaddr, unsigned int cpuflag
       errflags |= VMA_HASPHYS;
    
    /* ask the vmm for a decision */
-   switch(vmm_fault(proc, faultaddr, errflags))
+   decision = vmm_fault(proc, faultaddr, errflags, &rw_flag);
+   if(rw_flag) rw_flag = PG_RW; /* use to mark new pages as read-only or read-write */
+   switch(decision)
    {
       case newsharedpage:
       {
@@ -107,7 +111,7 @@ kresult pg_do_fault(thread *target, unsigned int faultaddr, unsigned int cpuflag
                {
                   /* ...and map the physical page in for them all right now */
                   pg_add_4K_mapping(search->proc->pgdir, (search->base + offset) & PG_4K_MASK,
-                                    physical, PG_PRESENT | PG_RW | PG_PRIVLVL | PG_PRIVATE);
+                                    physical, PG_PRESENT | rw_flag | PG_PRIVLVL | PG_PRIVATE);
                   
                   if(search->proc == proc)
                      /* tell this processor to reload the page tables */
@@ -123,7 +127,7 @@ kresult pg_do_fault(thread *target, unsigned int faultaddr, unsigned int cpuflag
          {
             /* found an existing physical page from another process so map it in */
             pg_add_4K_mapping(proc->pgdir, faultaddr & PG_4K_MASK,
-                              physical, PG_PRESENT | PG_RW | PG_PRIVLVL);
+                              physical, PG_PRESENT | rw_flag | PG_PRIVLVL);
             
             /* tell the processor to reload the page tables */
             x86_load_cr3(KERNEL_LOG2PHYS(proc->pgdir));
@@ -142,7 +146,7 @@ kresult pg_do_fault(thread *target, unsigned int faultaddr, unsigned int cpuflag
          
          /* map this new physical page in, remembering to set write access */
          pg_add_4K_mapping(proc->pgdir, faultaddr & PG_4K_MASK,
-                           new_phys, PG_PRESENT | PG_RW | PG_PRIVLVL | PG_PRIVATE);
+                           new_phys, PG_PRESENT | rw_flag | PG_PRIVLVL | PG_PRIVATE);
          
          /* tell the processor to reload the page tables */
          x86_load_cr3(KERNEL_LOG2PHYS(proc->pgdir));
@@ -168,7 +172,7 @@ kresult pg_do_fault(thread *target, unsigned int faultaddr, unsigned int cpuflag
          
          /* map this new physical page in, remembering to set write access */
          pg_add_4K_mapping(proc->pgdir, faultaddr & PG_4K_MASK,
-                           new_phys, PG_PRESENT | PG_RW | PG_PRIVLVL | PG_PRIVATE);
+                           new_phys, PG_PRESENT | rw_flag | PG_PRIVLVL | PG_PRIVATE);
          
          /* tell the processor to reload the page tables */
          x86_load_cr3(KERNEL_LOG2PHYS(proc->pgdir));
@@ -183,7 +187,7 @@ kresult pg_do_fault(thread *target, unsigned int faultaddr, unsigned int cpuflag
       {            
          /* it's safe to just set write access on this page */
          pg_add_4K_mapping(proc->pgdir, faultaddr & PG_4K_MASK,
-                           pgentry & PG_4K_MASK, PG_PRESENT | PG_RW | PG_PRIVLVL | PG_PRIVATE);
+                           pgentry & PG_4K_MASK, PG_PRESENT | rw_flag | PG_PRIVLVL | PG_PRIVATE);
          
          /* tell the processor to reload the page tables */
          x86_load_cr3(KERNEL_LOG2PHYS(proc->pgdir));
