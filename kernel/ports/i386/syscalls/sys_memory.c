@@ -48,13 +48,22 @@ void syscall_do_memory(int_registers_block *regs)
          
       case DIOSIX_MEMORY_DESTROY:
       {
+         kresult err;
+         
          /* sanity check pointer */
          if(!vma_base || vma_base >= KERNEL_SPACE_BASE) SYSCALL_RETURN(e_bad_params);
          
          vmm_tree *node = vmm_find_vma(current->proc, vma_base, sizeof(char));
          if(!node) SYSCALL_RETURN(e_bad_address);
          
-         SYSCALL_RETURN(vmm_unlink_vma(current->proc, node));
+         err = vmm_unlink_vma(current->proc, node);
+         if(!err)
+         {
+            /* reload the process's page directory in case we've lost pages */
+            x86_load_cr3(KERNEL_LOG2PHYS(current->proc->pgdir));
+            mp_interrupt_process(current->proc, INT_IPI_FLUSHTLB);
+         }
+         SYSCALL_RETURN(err);
       }
          
       case DIOSIX_MEMORY_RESIZE:

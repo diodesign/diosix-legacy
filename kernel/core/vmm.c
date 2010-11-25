@@ -1,4 +1,4 @@
-/* kernel/core/vmm.c
+   /* kernel/core/vmm.c
  * diosix portable virtual memory manager
  * Author : Chris Williams
  * Date   : Mon,26 Mar 2007.23:09:39
@@ -1443,8 +1443,9 @@ kresult vmm_link_vma(process *proc, unsigned int baseaddr, vmm_area *vma)
       err = vmm_alloc_pool((void **)&new_mapping, vma->mappings);
       if(!err)
       {         
-         /* save the process pointer */
+         /* save the process pointer and base address */
          new_mapping->proc = proc;
+         new_mapping->base = baseaddr;
          
          /* non-zero return for success */
          err = success;
@@ -1482,6 +1483,7 @@ kresult vmm_unlink_vma(process *owner, vmm_tree *victim)
    lock_gate(&(owner->lock), LOCK_WRITE);
    
    vmm_area_mapping *mapping;
+   unsigned int page_loop, release_flag = 1;
    vmm_area *vma = victim->area;
    
    lock_gate(&(vma->lock), LOCK_WRITE);
@@ -1490,14 +1492,22 @@ kresult vmm_unlink_vma(process *owner, vmm_tree *victim)
    sglib_vmm_tree_delete(&(owner->mem), victim);
    unlock_gate(&(owner->lock), LOCK_WRITE);
    
+   /* remove any page mappings associated with this vma in this process.
+      release the pages if we're the last linked process. */
+   if((vma->flags & VMA_SHARED) && (vmm_count_pool_inuse(vma->mappings) > 1))
+      release_flag = 0;
+   
+   for(page_loop = 0; page_loop < vma->size; page_loop += MEM_PGSIZE)
+      pg_remove_4K_mapping(owner->pgdir, victim->base + page_loop, release_flag);
+   
    /* delete from the vma's users pool */
    mapping = vmm_find_vma_mapping(vma, owner);
    if(mapping)
       vmm_free_pool(mapping, vma->mappings);
    else
    {
-         KOOPS_DEBUG("[vmm:%i] OMGWTF! tried removing process %p (pid %i) from vma %p where no mapping existed\n",
-                     CPU_ID, owner, owner->pid, vma);
+      KOOPS_DEBUG("[vmm:%i] OMGWTF! tried removing process %p (pid %i) from vma %p where no mapping existed\n",
+                  CPU_ID, owner, owner->pid, vma);
    }
    
    /* free if there are no longer any processes mapping in this vma */
@@ -1568,6 +1578,7 @@ kresult vmm_resize_vma(process *owner, vmm_tree *node, signed int change)
    else
    {
       unsigned int page_loop;
+      unsigned int release_flag = 1;
       /* negative change - check we don't shrink to zero or beyond.
          round down to the nearest page boundary */
       unsigned int bytes = (0 - change) & ~MEM_PGMASK;
@@ -1576,12 +1587,17 @@ kresult vmm_resize_vma(process *owner, vmm_tree *node, signed int change)
       vma->size -= bytes; /* do the actual size change */
       VMM_DEBUG("[vmm:%i] reduced vma %p (base %x) in process %i by %i bytes\n",
                 CPU_ID, vma, node->base, owner->pid, bytes);
+
+      /* don't release any mapped physical pages if there are multiple
+         processes sharing this vma */
+      if((vma->flags & VMA_SHARED) && (vmm_count_pool_inuse(vma->mappings) > 1))
+         release_flag = 0;
       
       /* now we need to unmap any pages that might have been present or
          else the process can continue to access any previously mapped in
          pages.. and other processes will want to use the physical pages. */
       for(page_loop = 0; page_loop < bytes; page_loop += MEM_PGSIZE)
-         pg_remove_4K_mapping(owner->pgdir, node->base + vma->size + page_loop);
+         pg_remove_4K_mapping(owner->pgdir, node->base + vma->size + page_loop, release_flag);
    }
 
 vmm_resize_vma_exit:
@@ -1850,7 +1866,14 @@ vmm_decision vmm_fault(process *proc, unsigned int addr, unsigned char flags)
    {
       unsigned int thisphys, phys;
       vmm_area_mapping *search;
-
+    
+      /* if it's a shared vma then skip the copy-on-write system */
+      if(vma->flags & VMA_SHARED)
+      {
+         unlock_gate(&(vma->lock), LOCK_READ);
+         return newsharedpage;
+      }
+      
       /* if there's nothing to copy, then have a new private blank page */
       if(!(flags & VMA_HASPHYS))
          VMM_FAULT_RETURN_CHOICE(newwpage, newpage);

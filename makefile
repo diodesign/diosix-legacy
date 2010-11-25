@@ -46,7 +46,7 @@ LIBDIOSIXDIR = user/lib/libdiosix
 SVNDEF := -D'SVN_REV="$(shell svnversion -n .)"'
 
 MAKEFILE	= makefile
-MAKEDEP		= $(MAKEFILE) $(PORTDIR)/include/portdefs.h $(PORTDIR)/include/processes.h $(PORTDIR)/include/boot.h $(PORTDIR)/include/cpu.h $(PORTDIR)/include/buses.h $(PORTDIR)/include/debug.h $(PORTDIR)/include/elf.h $(PORTDIR)/include/interrupts.h $(PORTDIR)/include/ipc.h $(PORTDIR)/include/locks.h $(PORTDIR)/include/lowlevel.h $(PORTDIR)/include/memory.h $(PORTDIR)/include/multiboot.h $(PORTDIR)/include/sched.h $(PORTDIR)/include/sglib.h $(PORTDIR)/include/syscalls.h $(LIBDIOSIXDIR)/include/diosix.h $(LIBDIOSIXDIR)/include/signal.h $(LIBDIOSIXDIR)/libdiosix.a
+MAKEDEP		= $(MAKEFILE) $(PORTDIR)/include/portdefs.h $(PORTDIR)/include/processes.h $(PORTDIR)/include/boot.h $(PORTDIR)/include/cpu.h $(PORTDIR)/include/buses.h $(PORTDIR)/include/debug.h $(PORTDIR)/include/elf.h $(PORTDIR)/include/interrupts.h $(PORTDIR)/include/ipc.h $(PORTDIR)/include/locks.h $(PORTDIR)/include/lowlevel.h $(PORTDIR)/include/memory.h $(PORTDIR)/include/multiboot.h $(PORTDIR)/include/sched.h $(PORTDIR)/include/sglib.h $(PORTDIR)/include/syscalls.h $(LIBDIOSIXDIR)/include/diosix.h $(LIBDIOSIXDIR)/include/signal.h
 
 INCDIR		= $(PORTDIR)/include
 LDSCRIPT	= $(PORTDIR)/diosix.ld
@@ -195,7 +195,7 @@ $(OBJSDIR)/sys_proc.o:		$(PORTDIR)/syscalls/sys_proc.c		$(MAKEDEP)
 
 $(OBJSDIR)/sys_thread.o:	$(PORTDIR)/syscalls/sys_thread.c	$(MAKEDEP)
 				$(WRITE) '==> COMPILE: $<'
-				$(COMPILE.c)
+				$(COMPILE.c)				
 
 # explicit rules
 

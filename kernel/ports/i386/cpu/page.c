@@ -67,6 +67,71 @@ kresult pg_do_fault(thread *target, unsigned int faultaddr, unsigned int cpuflag
    /* ask the vmm for a decision */
    switch(vmm_fault(proc, faultaddr, errflags))
    {
+      case newsharedpage:
+      {
+         unsigned int physical = 0;
+         unsigned int offset;
+         vmm_area_mapping *search = NULL;
+         vmm_tree *node = vmm_find_vma(proc, faultaddr, sizeof(char));
+         
+         /* each process will map a vma at potentially different virtual addresses
+            so resolve the faulting address into an offset from a vma mapping base */
+         offset = faultaddr - node->base;
+         
+         /* scan through a vma's process mappings to find a physical page */
+         for(;;)
+         {
+            search = vmm_next_in_pool(search, node->area->mappings);
+            if(search)
+            {
+               /* don't bother checking this current process for a present mapping */
+               if(search->proc != proc)
+                  if(pg_user2phys(&physical, search->proc->pgdir, search->base + offset) == success)
+                     break;
+            }
+            else break;
+         }
+         
+         /* if physical is still zero then a physical page must be found for all processes */
+         if(!physical)
+         {
+            if(vmm_req_phys_pg((void **)&physical, 1))
+               return e_failure; /* bail out if we can't get a phys page */
+            
+            /* run back through all the processes linked to the vma... */
+            search = NULL;
+            for(;;)
+            {
+               search = vmm_next_in_pool(search, node->area->mappings);
+               if(search)
+               {
+                  /* ...and map the physical page in for them all right now */
+                  pg_add_4K_mapping(search->proc->pgdir, (search->base + offset) & PG_4K_MASK,
+                                    physical, PG_PRESENT | PG_RW | PG_PRIVLVL | PG_PRIVATE);
+                  
+                  if(search->proc == proc)
+                     /* tell this processor to reload the page tables */
+                     x86_load_cr3(KERNEL_LOG2PHYS(proc->pgdir));
+                  else
+                     /* warn any cores running the process of the page table changes */
+                    mp_interrupt_process(search->proc, INT_IPI_FLUSHTLB);
+               }
+               else break;
+            }
+         }
+         else
+         {
+            /* found an existing physical page from another process so map it in */
+            pg_add_4K_mapping(proc->pgdir, faultaddr & PG_4K_MASK,
+                              physical, PG_PRESENT | PG_RW | PG_PRIVLVL);
+            
+            /* tell the processor to reload the page tables */
+            x86_load_cr3(KERNEL_LOG2PHYS(proc->pgdir));
+         }
+         
+         return success;
+      }
+         
       case newpage:
       { 
          unsigned int new_phys;
@@ -77,15 +142,16 @@ kresult pg_do_fault(thread *target, unsigned int faultaddr, unsigned int cpuflag
          
          /* map this new physical page in, remembering to set write access */
          pg_add_4K_mapping(proc->pgdir, faultaddr & PG_4K_MASK,
-                           new_phys, PG_PRESENT | PG_RW | PG_PRIVLVL);
+                           new_phys, PG_PRESENT | PG_RW | PG_PRIVLVL | PG_PRIVATE);
          
          /* tell the processor to reload the page tables */
          x86_load_cr3(KERNEL_LOG2PHYS(proc->pgdir));
          
          PAGE_DEBUG("[page:%i] mapped new page for process %i: virtual %x -> physical %x\n",
                     CPU_ID, proc->pid, faultaddr & PG_4K_MASK, new_phys);
-      }
+         
          return success;
+      }
          
       case clonepage:
       {
@@ -102,29 +168,31 @@ kresult pg_do_fault(thread *target, unsigned int faultaddr, unsigned int cpuflag
          
          /* map this new physical page in, remembering to set write access */
          pg_add_4K_mapping(proc->pgdir, faultaddr & PG_4K_MASK,
-                           new_phys, PG_PRESENT | PG_RW | PG_PRIVLVL);
+                           new_phys, PG_PRESENT | PG_RW | PG_PRIVLVL | PG_PRIVATE);
          
          /* tell the processor to reload the page tables */
          x86_load_cr3(KERNEL_LOG2PHYS(proc->pgdir));
          
          PAGE_DEBUG("[page:%i] cloned page for process %i: virtual %x -> physical %x\n",
                     CPU_ID, proc->pid, faultaddr & PG_4K_MASK, new_phys);
-      }
+         
          return success;
+      }
          
       case makewriteable:
       {            
          /* it's safe to just set write access on this page */
          pg_add_4K_mapping(proc->pgdir, faultaddr & PG_4K_MASK,
-                           pgentry & PG_4K_MASK, PG_PRESENT | PG_RW | PG_PRIVLVL);
+                           pgentry & PG_4K_MASK, PG_PRESENT | PG_RW | PG_PRIVLVL | PG_PRIVATE);
          
          /* tell the processor to reload the page tables */
          x86_load_cr3(KERNEL_LOG2PHYS(proc->pgdir));
          
          PAGE_DEBUG("[page:%i] made page writeable for process %i: virtual %x -> physical %x\n",
                     CPU_ID, proc->pid, faultaddr & PG_4K_MASK, pgentry & PG_4K_MASK);
-      }
+         
          return success;
+      }
          
       case external:
          goto pg_fault_external;
@@ -288,10 +356,10 @@ unsigned int **pg_clone_pgdir(unsigned int **source)
             if(pgtable[page] & PG_RW)
             {
                /* in the child */
-               pgtable[page] = pgtable[page] & (~PG_RW); /* clear R/W */
+               pgtable[page] = pgtable[page] & (~(PG_RW | PG_PRIVATE)); /* clear R/W + private flags */
                
                /* in the parent */
-               src_table[page] = src_table[page] & (~PG_RW); /* clear R/W */
+               src_table[page] = src_table[page] & (~(PG_RW | PG_PRIVATE)); /* clear R/W + private flags */
                source_touched = 1;
             }
          }
@@ -472,13 +540,14 @@ kresult pg_user2kernel(unsigned int *kaddr, unsigned int uaddr, process *proc)
 }
 
 /* pg_remove_4K_mapping
-   Remove a 4K mapping from a page directory (if present) and release the physical
-   page frame (if present).
+   Remove a 4K mapping from a page directory (if present). Release the page to the free stack
+   if it is marked private and release_flag is zero
    => pgdir pointer to page directory to remove the 4K mapping from
       virtual = the full virtual address for the start of the 4K page
+      release_flag = 0 to keep it from the free stack or 1 to obey the PG_PRIVATE flag
    <= 0 for success or an error code
 */
-kresult pg_remove_4K_mapping(unsigned int **pgdir, unsigned int virtual)
+kresult pg_remove_4K_mapping(unsigned int **pgdir, unsigned int virtual, unsigned int release_flag)
 {
    unsigned int pgdir_index = (virtual >> PG_DIR_BASE) & PG_INDEX_MASK;
    unsigned int pgtable_index = (virtual >> PG_TBL_BASE) & PG_INDEX_MASK;
@@ -522,7 +591,11 @@ kresult pg_remove_4K_mapping(unsigned int **pgdir, unsigned int virtual)
       PAGE_DEBUG("[page:%i] removing 4K page at %x in pd %p, freeing physical frame %x\n",
                  CPU_ID, virtual, pgdir, physical);
       
-      return vmm_return_phys_pg((void *)physical); /* release the physical frame */
+      /* only obey the PG_PRIVATE flag if release_flag is set */
+      if(release_flag && (pgtbl[pgtable_index] & PG_PRIVATE))
+         return vmm_return_phys_pg((void *)physical); /* release the physical frame */
+      else
+         return success;
    }
    
    return success;

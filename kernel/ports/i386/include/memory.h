@@ -125,24 +125,19 @@ struct kpool
    ask the page code to carry out */
 typedef enum
 {
-   clonepage,      /* grab a blank phys page, map it in at same virtual addr, copy the data, mark read-only */
-   clonewpage,     /* grab a blank phys page, map it in at same virtual addr, copy the data, mark writeable */
- 
-   newpage,        /* grab a blank phys page, map it in as read-only and continue */
-   newwpage,       /* grab a blank phys page, map it in as read-write and continue */
-   
-   newsharedpage,  /* grab a blank phys page, map it into all owning processes as read-only */
-   newwsharedpage, /* grab a blank phys page, map it into all owning processes as read-write */
-   
-   makewriteable,  /* it's safe to mark the page as writeable and continue */
-   external,       /* get the external page manage to fix up this access */
-   badaccess       /* the fault can't be handled */
+   clonepage,     /* grab a blank phys page, map it in at same virtual addr, copy the data, mark writeable */
+   makewriteable, /* it's safe to mark the page as writeable and continue */
+   newpage,       /* grab a blank phys page, map it in and continue */
+   newsharedpage, /* find an existing mapping or map in a blank page for all processes */
+   external,      /* get the external page manage to fix up this access */
+   badaccess      /* the fault can't be handled */
 } vmm_decision;
 
 /* link a vma to processes through one or more of these mappings */
 typedef struct
 {
-   process *proc;
+   process *proc;     /* process linked to this vma */
+   unsigned int base; /* base address of the mapping in the linked process */
 } vmm_area_mapping;
 
 /* a virtual memory area - arranged as a tree. flags are defined in <diosix.h> */
@@ -226,7 +221,8 @@ extern unsigned int *phys_pg_stack_high_ptr;
 #define PG_SIZE       (1<<7)  /* set for 4MB page dir entries, 4KB otherwise */
 #define PG_GLOBAL     (1<<8)  /* set to map in globally */
 
-#define PG_EXTERNAL   (1<<9)   /* set to bump the page manager on fault, unset to use the vma's setting */
+#define PG_EXTERNAL   (1<<9)  /* set to bump the page manager on fault, unset to use the vma's setting */
+#define PG_PRIVATE    (1<<10) /* set to indicate this page is private to the process and can be released */
 
 #define PG_DIR_BASE   (22)    /* physical addr in bits 22-31 */
 #define PG_TBL_BASE   (12)    /* table index in bits 12-21 */
@@ -248,6 +244,6 @@ kresult pg_do_fault(thread *target, unsigned int addr, unsigned int cpuflags);
 void pg_postmortem(int_registers_block *regs);
 kresult pg_user2phys(unsigned int *paddr, unsigned int **pgdir, unsigned int vaddr);
 kresult pg_user2kernel(unsigned int *kaddr, unsigned int uaddr, process *proc);
-kresult pg_remove_4K_mapping(unsigned int **pgdir, unsigned int virtual);
+kresult pg_remove_4K_mapping(unsigned int **pgdir, unsigned int virtual, unsigned int release_flag);
 
 #endif
