@@ -81,7 +81,7 @@ kresult pg_do_fault(thread *target, unsigned int faultaddr, unsigned int cpuflag
          /* each process will map a vma at potentially different virtual addresses
             so resolve the faulting address into an offset from a vma mapping base */
          offset = faultaddr - node->base;
-         
+
          /* scan through a vma's process mappings to find a physical page */
          for(;;)
          {

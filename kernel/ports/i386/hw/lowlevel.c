@@ -96,7 +96,7 @@ kresult lock_gate(rw_gate *gate, unsigned int flags)
       LOCK_DEBUG("[lock:%i] -> lock_gate(%p, %x) during boot\n", CPU_ID, gate, flags);
    }
 #endif
-
+   
    /* cpu_table[CPU_ID].current cannot be lower than the kernel virtual base 
       so it won't collide with the processor's CPU_ID, which is used to
       identify the owner if no thread is running */

@@ -103,7 +103,7 @@ void syscall_do_driver(int_registers_block *regs)
                SYSCALL_RETURN(e_vma_exists);
                         
             /* sanatise the settings flags */
-            flags = req->flags & (VMA_WRITEABLE | VMA_NOCACHE | VMA_FIXED);
+            flags = req->flags & (VMA_WRITEABLE | VMA_NOCACHE | VMA_FIXED | VMA_SHARED);
             
             lock_gate(&(current->proc->lock), LOCK_WRITE);
             

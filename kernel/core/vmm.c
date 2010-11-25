@@ -1601,7 +1601,7 @@ kresult vmm_resize_vma(process *owner, vmm_tree *node, signed int change)
    }
 
 vmm_resize_vma_exit:
-   unlock_gate(&(node->area->lock), LOCK_WRITE);
+   unlock_gate(&(vma->lock), LOCK_WRITE);
    unlock_gate(&(owner->lock), LOCK_WRITE);
    return err;
 }
@@ -1633,7 +1633,7 @@ kresult vmm_alter_vma(process *owner, vmm_tree *node, unsigned int flags)
    else
       err = e_no_rights; /* permission denied */
    
-   unlock_gate(&(node->area->lock), LOCK_WRITE);
+   unlock_gate(&(vma->lock), LOCK_WRITE);
    unlock_gate(&(owner->lock), LOCK_WRITE);
    return err;
 }
@@ -1860,15 +1860,10 @@ vmm_decision vmm_fault(process *proc, unsigned int addr, unsigned char flags, un
       vmm_area_mapping *search;
     
       /* if it's a shared vma then skip the copy-on-write system */
-      if(vma->flags & VMA_SHARED)
-      {
-         unlock_gate(&(vma->lock), LOCK_READ);
-         return newsharedpage;
-      }
+      if(vma->flags & VMA_SHARED) VMM_FAULT_RETURN(newsharedpage);
       
       /* if there's nothing to copy, then have a new private blank page */
-      if(!(flags & VMA_HASPHYS))
-         VMM_FAULT_RETURN(newpage);
+      if(!(flags & VMA_HASPHYS)) VMM_FAULT_RETURN(newpage);
 
       /* to avoid leaking a page of phys mem, only clone if there are two
          or more processes (including this one) sharing one physical page */
@@ -1904,8 +1899,7 @@ vmm_decision vmm_fault(process *proc, unsigned int addr, unsigned char flags, un
    if(vmm_count_pool_inuse(vma->mappings) == 1)
    {   
       /* but only if there's physical memory to write onto */
-      if(flags & VMA_HASPHYS)
-         VMM_FAULT_RETURN(makewriteable);
+      if(flags & VMA_HASPHYS) VMM_FAULT_RETURN(makewriteable);
    
       /* but if there's no physical memory and it's single-linked 
          then allocate some memory for this page */

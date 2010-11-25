@@ -408,7 +408,6 @@ kresult msg_share_mem(process *target, diosix_share_request *target_mem,
                       "process %i at %x [result = %i]\n",
                       CPU_ID, vma, source_mem->base, source_mem->size, source->pid,
                       target->pid, target_mem->base, result);
-            goto msg_share_mem_return;
          }
          else result = e_bad_target_address;
       }
@@ -417,7 +416,6 @@ kresult msg_share_mem(process *target, diosix_share_request *target_mem,
    }
    else result = e_bad_source_address;
 
-msg_share_mem_return:
    unlock_gate(&(target->lock), LOCK_READ);
    unlock_gate(&(source->lock), LOCK_READ);
       
