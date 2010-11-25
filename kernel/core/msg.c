@@ -405,9 +405,10 @@ kresult msg_share_mem(process *target, diosix_share_request *target_mem,
             
             /* Discovery has cleared the tower */
             MSG_DEBUG("[msg:%i] sharing vma %p (base %x size %i) in process %i with "
-                      "process %i at %x\n [result = %i]",
+                      "process %i at %x [result = %i]\n",
                       CPU_ID, vma, source_mem->base, source_mem->size, source->pid,
                       target->pid, target_mem->base, result);
+            goto msg_share_mem_return;
          }
          else result = e_bad_target_address;
       }
@@ -416,6 +417,7 @@ kresult msg_share_mem(process *target, diosix_share_request *target_mem,
    }
    else result = e_bad_source_address;
 
+msg_share_mem_return:
    unlock_gate(&(target->lock), LOCK_READ);
    unlock_gate(&(source->lock), LOCK_READ);
       
@@ -548,6 +550,7 @@ kresult msg_send(thread *sender, diosix_msg_info *msg)
       
       /* take a copy of the message block */
       vmm_memcpy(&(sender->msg), msg, sizeof(diosix_msg_info));
+      sender->msg_src = msg;
       
       /* did the message include a share request? */
       if(msg->flags & DIOSIX_MSG_SHAREVMA)
@@ -651,6 +654,7 @@ kresult msg_recv(thread *receiver, diosix_msg_info *msg)
    
    /* grab a copy of the user's message block, we'll fault the thread if the address is dodgy */
    vmm_memcpy(&(receiver->msg), msg, sizeof(diosix_msg_info));
+   receiver->msg_src = msg;
    
    unlock_gate(&(receiver->lock), LOCK_WRITE);
 

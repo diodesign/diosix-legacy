@@ -164,6 +164,7 @@ struct thread
    thread_state state;  /* the running state of the thread */
    thread *replysource; /* thread awaiting reply from */
    diosix_msg_info msg; /* copy of the message block ptr submitted to syscall msg_send/recv */
+   diosix_msg_info *msg_src; /* pointer to the user-supplied msg block ptr */
    
    /* simple thread locking mechanism - acquire a lock before modifying
     or reading the thread's structure */

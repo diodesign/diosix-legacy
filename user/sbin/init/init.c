@@ -112,21 +112,10 @@ void vbe_set_mode(unsigned short width, unsigned short height, unsigned char bpp
              VBE_DISPI_ENABLED | VBE_DISPI_LFB_ENABLED);
 }
 
-void do_idle(void)
-{     
-   /* always give the processor something to do */
-   while(1)
-   {
-      __asm__ __volatile__("pause");
-      // diosix_thread_yield();
-   }
-}
-
 void do_listen(void)
 {
    unsigned int buffer = 0;
    unsigned int px;
-   unsigned int state = 0;
    diosix_msg_info msg;
    diosix_phys_request req;
    
@@ -140,104 +129,72 @@ void do_listen(void)
    req.paddr = (void *)FB_PHYS_BASE; /* VBE frame buffer */
    req.vaddr = (void *)FB_LOG_BASE;
    req.size  = DIOSIX_PAGE_ROUNDUP(FB_MAX_SIZE);
-   req.flags = VMA_WRITEABLE | VMA_NOCACHE | VMA_FIXED;
+   req.flags = VMA_WRITEABLE | VMA_NOCACHE | VMA_FIXED | VMA_SHARED;
    diosix_driver_map_phys(&req);
    
-   /* listen and reply */
+   /* accept any message from any thread/process */
+   msg.tid = DIOSIX_MSG_ANY_THREAD;
+   msg.pid = DIOSIX_MSG_ANY_PROCESS;
+   msg.flags = DIOSIX_MSG_GENERIC;
+   msg.recv = &buffer;
+   msg.recv_max_size = sizeof(unsigned int);
+
+   while(diosix_msg_receive(&msg) != success)
+      diosix_thread_yield();
+   
+   if(buffer == 0) buffer = 0xffffffff; /* prove we're swapping data */
+   
+   msg.flags = DIOSIX_MSG_GENERIC | DIOSIX_MSG_SHAREVMA | DIOSIX_MSG_REPLY;
+   msg.mem_req.base = FB_LOG_BASE;
+   msg.mem_req.size = DIOSIX_PAGE_ROUNDUP(FB_MAX_SIZE);
+   msg.send = &buffer;
+   msg.send_size = sizeof(unsigned int);
+   
+   while(diosix_msg_reply(&msg) != success);
+      
    while(1)
-   {      
-      /* accept any message from any thread/process */
-      msg.tid = DIOSIX_MSG_ANY_THREAD;
-      msg.pid = DIOSIX_MSG_ANY_PROCESS;
-      msg.flags = DIOSIX_MSG_GENERIC;
-      msg.recv = &buffer;
-      msg.recv_max_size = sizeof(unsigned int);
-
-      if(diosix_msg_receive(&msg) == success)
-      {
-         /* change screen colour */
-         for(px = 0; px < FB_MAX_SIZE; px += sizeof(unsigned int))
-            *((unsigned int *)(FB_LOG_BASE + px)) = buffer & 0xffffff;
+   {
+      for(px = 0; px < FB_MAX_SIZE >> 1; px += sizeof(unsigned int))
+         *((volatile unsigned int *)(FB_LOG_BASE + px)) = (buffer & 0xff) << 16;
          
-         state++;
-         if(state < 0x0ff)
-            buffer += 0x00000001;
-         if(state >= 0x0ff && state < 0x1ff)
-            buffer += 0x00000100;
-         if(state >= 0x1ff && state < 0x2ff)
-            buffer += 0x00010000;
-         if(state >= 0x2ff && state < 0x3ff)
-            buffer -= 0x00000001;
-         if(state >= 0x3ff && state < 0x4ff)
-            buffer -= 0x00000100;
-         if(state >= 0x4ff && state < 0x5ff)
-            buffer -= 0x00010000;
-         
-         if(state > 0x5ff) state = buffer = 0;
-
-         msg.flags = DIOSIX_MSG_GENERIC;
-         msg.send = &buffer;
-         msg.send_size = sizeof(unsigned int);
-         diosix_msg_reply(&msg);
-      }
+      buffer += 1;
    }
 }
 
 void main(void)
 {
-   diosix_msg_info msg, sig;
+   diosix_msg_info msg;
    unsigned int child;
-   unsigned int message = 0;
-
-   /* create a new thread that'll idle for us */
-   child = diosix_thread_fork();
-   if(child == 0) do_idle(); /* child can idle */
+   unsigned int buffer = 0, message = 0;
+   unsigned int px;
 
    /* create new process to receive */
    child = diosix_fork();
    if(child == 0) do_listen(); /* child does the listening */
-   
-   /* move into driver layer and get access to the keyboard IRQ */
+
+   /* move into driver layer and get access to IO ports */
    diosix_priv_layer_up();
    diosix_driver_register();
-   diosix_signals_kernel(SIG_ACCEPT_KERNEL(SIGXIRQ));
-   diosix_driver_register_irq(KEYBOARD_IRQ);
    
-   /* wait for IRQ signal */
-   sig.tid = DIOSIX_MSG_ANY_THREAD;
-   sig.pid = DIOSIX_MSG_ANY_PROCESS;
-   sig.flags = DIOSIX_MSG_SIGNAL | DIOSIX_MSG_KERNELONLY;
-   sig.recv = NULL;
-   sig.recv_max_size = 0;
+   /* ask to share some memory with the child */
+   msg.tid = DIOSIX_MSG_ANY_THREAD;
+   msg.pid = child;
+   msg.flags = DIOSIX_MSG_GENERIC | DIOSIX_MSG_SENDASUSR | DIOSIX_MSG_SHAREVMA;
+   msg.send = &message;
+   msg.send_size = sizeof(unsigned int);
+   msg.recv = &message;
+   msg.recv_max_size = sizeof(unsigned int);
+   msg.mem_req.base = 0x200000;
+   msg.mem_req.size = DIOSIX_PAGE_ROUNDUP(FB_MAX_SIZE);
    
-   /* wait for keyboard IRQ */
+   /* send message any listening thread */
+   while(diosix_msg_send(&msg) != success);
+
    while(1)
    {
-      if(diosix_msg_receive(&sig) == success)
-      {
-         unsigned char control_bits;
-         
-         if(sig.signal.extra == KEYBOARD_IRQ)
-            /* deal with the keyboard interrupt */
-            message += read_port_byte(KEYBOARD_DATA);
-
-         control_bits = read_port_byte(KEYBOARD_CTRL);
-         write_port_byte(KEYBOARD_CTRL, control_bits | 0x80);  /* disable intr */
-         write_port_byte(KEYBOARD_CTRL, control_bits & 0x7F);  /* re-enable intr */
-         
-         /* set up message block to poke the child */
-         msg.tid = DIOSIX_MSG_ANY_THREAD;
-         msg.pid = child;
-         msg.flags = DIOSIX_MSG_GENERIC | DIOSIX_MSG_SENDASUSR;
-         msg.send = &message;
-         msg.send_size = sizeof(unsigned int);
-         msg.recv = &message;
-         msg.recv_max_size = sizeof(unsigned int);
-         
-         /* send message any listening thread, block if successfully
-            found a receiver */ 
-         if(diosix_msg_send(&msg))
-            diosix_thread_yield();
-      }
+      for(px = FB_MAX_SIZE >> 1; px < FB_MAX_SIZE; px += sizeof(unsigned int))
+         *((volatile unsigned int *)(0x200000 + px)) = buffer & 0xff;
+      
+      buffer += 1;
    }
 }

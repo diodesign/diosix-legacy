@@ -105,8 +105,10 @@ void syscall_post_msg_recv(thread *receiver, kresult result)
    
    if(!receiver) return; /* sanity check */
    
-   /* get the address of the receiver's block - it's been verified by this point */
-   msg = (diosix_msg_info *)receiver->regs.eax;
+   /* get the address of the receiver's block - it's been verified by this point.
+      FIXME: what if the process pulls the rug from under our feet, having one thread
+      block with this msg ptr and another thread marking it invalid immediately after? :-( */
+   msg = receiver->msg_src;
    
    MSG_DEBUG("[msg:%i] updating receiver %p (tid %i pid %i) msg %p result %i\n",
              CPU_ID, receiver, receiver->tid, receiver->proc->pid, msg, result);
