@@ -442,10 +442,41 @@ do_proc_kill:
       vmm_free(victim->children);
    }
    
+   /* remove the message pools */
+   if(victim->system_signals) vmm_destroy_pool(victim->system_signals);
+   if(victim->user_signals) vmm_destroy_pool(victim->user_signals);
+   if(victim->msg_queue)
+   {
+      /* wake up each waiting process to tell them it's game over */
+      queued_sender *sender = NULL;
+      for(;;)
+      {
+         sender = vmm_next_in_pool(sender, victim->msg_queue);
+         if(sender)
+         {
+            process *sender_proc = proc_find_proc(sender->pid);
+            if(sender_proc)
+            {
+               thread *sender_thread = thread_find_thread(sender_proc, sender->tid);
+               if(sender_thread)
+               {
+                  syscall_post_msg_send(sender_thread, e_no_receiver);
+                  sched_add(sender_thread->cpu, sender_thread);
+               }
+            }
+         }
+         else break; /* no more senders queued */
+      }
+      
+      vmm_destroy_pool(victim->msg_queue);
+   }
+   
    /* teardown the process's virtual memory structures */
    vmm_destroy_vmas(victim);
    pg_destroy_process(victim);
-   while(victim->interrupts) /* strip away any registered irq handlers */
+   
+   /* strip away any registered irq handlers */
+   while(victim->interrupts)
    {
       irq_driver_entry *entry = victim->interrupts;
       irq_deregister_driver(entry->irq_num, entry->flags & IRQ_DRIVER_TYPEMASK,

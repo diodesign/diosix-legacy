@@ -75,6 +75,12 @@ typedef struct
    unsigned int sender_pid, sender_tid; /* process & thread IDs of the sender */
 } queued_signal;
 
+/* a queued synchronous message sender */
+typedef struct
+{
+   unsigned int pid, tid; /* process & thread IDs of the sender */
+} queued_sender;
+
 /* the x86 cpu's TSS, one needed per thread */
 typedef struct
 {
@@ -171,7 +177,6 @@ struct thread
    thread *replysource; /* thread awaiting reply from */
    diosix_msg_info msg; /* copy of the message block ptr submitted to syscall msg_send/recv */
    diosix_msg_info *msg_src; /* pointer to the user-supplied msg block ptr */
-   kpool *msg_queue; /* queue of messages waiting to be delivered to the thread */
    
    /* simple thread locking mechanism - acquire a lock before modifying
     or reading the thread's structure */
@@ -272,6 +277,7 @@ struct process
    unsigned int kernel_signals_accepted; /* bitfield for the kernel's signals */
    kpool *system_signals; /* queue of UNIX-compatible and kernel signals */
    kpool *user_signals; /* queue of user defined signals */
+   kpool *msg_queue; /* queue of synchronous messages waiting to be delivered to the process */
 };
 
 #define LAYER_MAX        (255)

@@ -73,6 +73,22 @@ void syscall_do_msg_send(int_registers_block *regs)
    }
 }
 
+/* syscall_post_msg_send
+   This is used just before a blocked process is woken if
+   the receiver has unexpectantly failed in some way.
+   => sender = sender being woken up
+      result = value to put in eax
+*/
+void syscall_post_msg_send(thread *sender, kresult result)
+{
+   /* sanity checks */
+   if(!sender) return;
+   
+   /* only update threads that are actually asleep */
+   if(sender->state == waitingforreply)
+      sender->regs.eax = result;
+}
+
 /* syscall:msg_recv - receive a message or block until a message is received
    => eax = pointer to message description block
    <= eax = 0 for success or a diosix-specific error code
