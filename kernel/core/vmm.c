@@ -1493,9 +1493,13 @@ kresult vmm_unlink_vma(process *owner, vmm_tree *victim)
    unlock_gate(&(owner->lock), LOCK_WRITE);
    
    /* remove any page mappings associated with this vma in this process.
-      release the pages if we're the last linked process. */
-   if((vma->flags & VMA_SHARED) && (vmm_count_pool_inuse(vma->mappings) > 1))
+      release the pages if they are shared and we're the last linked process -
+      but only if the pages aren't in a direct physical mapping */
+   if(vma->flags & VMA_FIXED)
       release_flag = 0;
+   else
+      if((vma->flags & VMA_SHARED) && (vmm_count_pool_inuse(vma->mappings) > 1))
+         release_flag = 0;
    
    for(page_loop = 0; page_loop < vma->size; page_loop += MEM_PGSIZE)
       pg_remove_4K_mapping(owner->pgdir, victim->base + page_loop, release_flag);
@@ -1589,9 +1593,12 @@ kresult vmm_resize_vma(process *owner, vmm_tree *node, signed int change)
                 CPU_ID, vma, node->base, owner->pid, bytes);
 
       /* don't release any mapped physical pages if there are multiple
-         processes sharing this vma */
-      if((vma->flags & VMA_SHARED) && (vmm_count_pool_inuse(vma->mappings) > 1))
+         processes sharing this vma or if it's a direct physical mapping */
+      if(vma->flags & VMA_FIXED)
          release_flag = 0;
+      else
+         if((vma->flags & VMA_SHARED) && (vmm_count_pool_inuse(vma->mappings) > 1))
+            release_flag = 0;
       
       /* now we need to unmap any pages that might have been present or
          else the process can continue to access any previously mapped in

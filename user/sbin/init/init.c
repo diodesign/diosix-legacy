@@ -129,7 +129,7 @@ void do_listen(void)
    req.paddr = (void *)FB_PHYS_BASE; /* VBE frame buffer */
    req.vaddr = (void *)FB_LOG_BASE;
    req.size  = DIOSIX_PAGE_ROUNDUP(FB_MAX_SIZE);
-   req.flags = VMA_WRITEABLE | VMA_NOCACHE | VMA_FIXED | VMA_SHARED;
+   req.flags = VMA_WRITEABLE | VMA_NOCACHE | VMA_SHARED;
    diosix_driver_map_phys(&req);
    
    /* accept any message from any thread/process */
@@ -139,8 +139,7 @@ void do_listen(void)
    msg.recv = &buffer;
    msg.recv_max_size = sizeof(unsigned int);
 
-   while(diosix_msg_receive(&msg) != success)
-      diosix_thread_yield();
+   while(diosix_msg_receive(&msg) != success);
    
    if(buffer == 0) buffer = 0xffffffff; /* prove we're swapping data */
    
