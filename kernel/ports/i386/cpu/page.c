@@ -443,9 +443,8 @@ kresult pg_new_process(process *new, process *current)
 }
 
 /* pg_destroy_process
-   Called to deconstruct a process's memory map and
-   release the memory claimed by it, if necessary, 
-   effectively reversing the operation of clonedir()
+   Called to deconstruct a process's memory map by releasing
+   the pages holding the page directory and page tables.
    => victim = process to tear down
    <= success or e_failure if something went wrong
 */

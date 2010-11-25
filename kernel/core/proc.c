@@ -442,8 +442,8 @@ do_proc_kill:
       vmm_free(victim->children);
    }
    
-   /* destroy the architecture-specific part of the process */
-   vmm_destroy_vmas(victim); /* unlink the vmas */
+   /* teardown the process's virtual memory structures */
+   vmm_destroy_vmas(victim);
    pg_destroy_process(victim);
    while(victim->interrupts) /* strip away any registered irq handlers */
    {
@@ -533,7 +533,7 @@ kresult proc_initialise(void)
             }
             
             vmm_add_vma(new, (unsigned int)payload.areas[PAYLOAD_CODE].virtual,
-                        payload.areas[PAYLOAD_CODE].memsize, VMA_READABLE, 0);
+                        payload.areas[PAYLOAD_CODE].memsize, VMA_READABLE | VMA_FIXED, 0);
          }
          if(payload.areas[PAYLOAD_DATA].flags & (PAYLOAD_READ))
          {
@@ -558,7 +558,7 @@ kresult proc_initialise(void)
             }
             
             vmm_add_vma(new, (unsigned int)payload.areas[PAYLOAD_DATA].virtual,
-                        payload.areas[PAYLOAD_DATA].memsize, VMA_WRITEABLE, 0);
+                        payload.areas[PAYLOAD_DATA].memsize, VMA_WRITEABLE | VMA_FIXED, 0);
          }
          
          if(!(new->threads[FIRST_TID]))
