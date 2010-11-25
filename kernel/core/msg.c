@@ -640,7 +640,7 @@ kresult msg_recv(thread *receiver, diosix_msg_info *msg)
    if(!receiver || !msg) return e_bad_address;
    if((unsigned int)msg + MEM_CLIP(msg, sizeof(diosix_msg_info)) >= KERNEL_SPACE_BASE)
       return e_bad_address;
-   
+
    if(lock_gate(&(receiver->lock), LOCK_WRITE)) return e_failure;
    
    /* if receiving a signal, return immediately if one's queued and ready to go */
@@ -687,6 +687,7 @@ kresult msg_recv(thread *receiver, diosix_msg_info *msg)
          vmm_free_pool(sig, pool);
          
          /* unlock and return immediately */
+         unlock_gate(&(receiver->lock), LOCK_WRITE);
          MSG_DEBUG("[msg:%i] returned queued signal %i to tid %i pid %i\n",
                    CPU_ID, receiver->msg.signal.number, receiver->tid,
                    receiver->proc->pid);
@@ -694,6 +695,11 @@ kresult msg_recv(thread *receiver, diosix_msg_info *msg)
          return success;
       }
    }
+
+   /* if not a signal, then check to see if a message is queued */
+   
+   
+   /* if we're still here then block and wait for a message to arrive */
    
    /* grab a copy of the user's message block, we'll fault the thread if the address is dodgy */
    vmm_memcpy(&(receiver->msg), msg, sizeof(diosix_msg_info));
