@@ -1477,7 +1477,7 @@ kresult vmm_link_vma(process *proc, unsigned int baseaddr, vmm_area *vma)
    => owner = process to unlink the vma from
       victim = the vma to unlink
    <= success or a failure code
- */
+*/
 kresult vmm_unlink_vma(process *owner, vmm_tree *victim)
 {
    lock_gate(&(owner->lock), LOCK_WRITE);

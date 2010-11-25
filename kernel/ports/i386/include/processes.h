@@ -140,6 +140,11 @@ typedef struct
 #define THREAD_FLAG_ISDRIVER         (1 << 1)
 #define THREAD_FLAG_HASIOBITMAP      (1 << 2)
 
+/* needed in the process and thread structs */
+typedef struct kpool kpool;
+typedef struct kpool_block kpool_block;
+typedef struct vmm_tree vmm_tree;
+
 typedef struct process process; /* keep the compiler nice and sweet */
 typedef struct thread thread;
 
@@ -162,9 +167,11 @@ struct thread
                                     then it is bumped up a priority level and rescheduled. */
    
    thread_state state;  /* the running state of the thread */
+   
    thread *replysource; /* thread awaiting reply from */
    diosix_msg_info msg; /* copy of the message block ptr submitted to syscall msg_send/recv */
    diosix_msg_info *msg_src; /* pointer to the user-supplied msg block ptr */
+   kpool *msg_queue; /* queue of messages waiting to be delivered to the thread */
    
    /* simple thread locking mechanism - acquire a lock before modifying
     or reading the thread's structure */
@@ -198,11 +205,6 @@ struct thread
 
 /* needed in the process struct */
 typedef struct irq_driver_entry irq_driver_entry;
-
-/* needed in the process struct */
-typedef struct kpool kpool;
-typedef struct kpool_block kpool_block;
-typedef struct vmm_tree vmm_tree;
 
 /* describe each process */
 struct process

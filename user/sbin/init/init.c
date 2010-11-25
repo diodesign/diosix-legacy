@@ -178,7 +178,7 @@ void main(void)
    /* ask to share some memory with the child */
    msg.tid = DIOSIX_MSG_ANY_THREAD;
    msg.pid = child;
-   msg.flags = DIOSIX_MSG_GENERIC | DIOSIX_MSG_SENDASUSR | DIOSIX_MSG_SHAREVMA;
+   msg.flags = DIOSIX_MSG_GENERIC | DIOSIX_MSG_SENDASUSR | DIOSIX_MSG_SHAREVMA | DIOSIX_MSG_QUEUEME;
    msg.send = &message;
    msg.send_size = sizeof(unsigned int);
    msg.recv = &message;
@@ -187,7 +187,8 @@ void main(void)
    msg.mem_req.size = DIOSIX_PAGE_ROUNDUP(FB_MAX_SIZE);
    
    /* send message any listening thread */
-   while(diosix_msg_send(&msg) != success);
+   if(diosix_msg_send(&msg) != success)
+      while(1) diosix_thread_yield();
 
    while(1)
    {

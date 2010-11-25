@@ -78,10 +78,11 @@ typedef enum
 #define DIOSIX_MSG_SENDASUSR   (1 << 28) /* send message as an unpriv'd user process */
 #define DIOSIX_MSG_KERNELONLY  (1 << 27) /* accept signals from the kernel only */
 #define DIOSIX_MSG_SHAREVMA    (1 << 26) /* share a VMA in reply message */
+#define DIOSIX_MSG_QUEUEME     (1 << 25) /* queue a non-reply non-signal message and block until received */
 /* simple type bits low (bits 0-3) */
 #define DIOSIX_MSG_GENERIC     (1)
 #define DIOSIX_MSG_SIGNAL      (2)
-#define DIOSIX_MSG_TYPEMASK    ((1 << 3) - 1)
+#define DIOSIX_MSG_TYPEMASK    (DIOSIX_MSG_GENERIC | DIOSIX_MSG_SIGNAL)
 /* zero is a reserved tid/pid */
 #define DIOSIX_MSG_ANY_THREAD  (0)
 #define DIOSIX_MSG_ANY_PROCESS (0)

@@ -328,6 +328,9 @@ kresult thread_kill(process *owner, thread *victim)
       
    if(victim)
    {
+      unsigned int stackbase;
+      vmm_tree *stack_node;
+      
       /* bail out if we're trying to kill a thread outside of the
          process */
       if(victim->proc != owner) return e_failure;
@@ -347,21 +350,11 @@ kresult thread_kill(process *owner, thread *victim)
       if(lock_gate(&(victim->lock), LOCK_WRITE | LOCK_SELFDESTRUCT))
          return e_failure;
       
-      /* free the thread's user stack' physical pages and unset the table entries */
-      if(pg_user2phys(&physaddr, owner->pgdir, victim->stackbase - MEM_PGSIZE) == success)
-      {
-         if(vmm_return_phys_pg((unsigned int *)physaddr) == success)
-         {
-            pg_add_4K_mapping(owner->pgdir, victim->stackbase - MEM_PGSIZE, NULL, 0);
-         }
-         else
-         {
-            KOOPS_DEBUG("[thread:%i] OMGWTF returning physical page from dying thread's stack failed\n"
-                         "            thread %i (%p) process %i (%p) usr %x phys %x\n",
-                         CPU_ID, victim->tid, victim, owner->pid, owner, victim->stackbase, physaddr);
-            debug_stacktrace();
-         }
-      }
+      /* destroy the thread's user stack vma */
+      stackbase = KERNEL_SPACE_BASE - (THREAD_MAX_STACK * MEM_PGSIZE * victim->tid);
+      stack_node = vmm_find_vma(victim->proc, stackbase - (THREAD_MAX_STACK * MEM_PGSIZE),
+                                THREAD_MAX_STACK * MEM_PGSIZE);
+      if(stack_node) vmm_unlink_vma(victim->proc, stack_node);
 
       /* unlink thread from the process's thread hash table */
       lock_gate(&(owner->lock), LOCK_WRITE);
