@@ -74,8 +74,8 @@ void syscall_do_msg_send(int_registers_block *regs)
 }
 
 /* syscall_post_msg_send
-   This is used just before a blocked process is woken if
-   the receiver has unexpectantly failed in some way.
+   This is used just before a blocked process is woken up because
+   its queued message was successfully delivered or delivery failed.
    => sender = sender being woken up
       result = value to put in eax
 */

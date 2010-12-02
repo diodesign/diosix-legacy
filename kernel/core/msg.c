@@ -350,6 +350,74 @@ kresult msg_copy(thread *receiver, void *data, unsigned int size, unsigned int *
    return success;
 }
 
+/* msg_deliver
+   Deliver a message between two processes by copying any data and fixing up the
+   source and destination pid+tid fields.
+   => receiver = pointer to receiving thread
+      rmsg = pointer to the receiving thread's recv block
+      sender = pointer to sending thread
+      smsg = pointer to the sending thread's msg block
+   <= 0 for success, or an error code
+*/
+kresult msg_deliver(thread *receiver, diosix_msg_info *rmsg, thread *sender, diosix_msg_info *smsg)
+{
+   kresult err;
+   unsigned int bytes_copied;
+   
+   /* assumes locks are in place */
+   
+   if(smsg->flags & DIOSIX_MSG_MULTIPART)
+   {
+      /* gather the multipart message blocks */
+      unsigned int loop;
+      
+      diosix_msg_multipart *parts = smsg->send;
+      
+      /* check that the multipart pointer isn't bogus */
+      if((unsigned int)parts + MEM_CLIP(parts, smsg->send_size * sizeof(diosix_msg_multipart)) >= KERNEL_SPACE_BASE)
+         return e_bad_address;
+      
+      /* do the multipart copy */
+      for(loop = 0; loop < smsg->send_size; loop++)
+      {
+         err = msg_copy(receiver, parts[loop].data, parts[loop].size, &bytes_copied, sender);
+         if(err || (bytes_copied > DIOSIX_MSG_MAX_SIZE)) break;
+      }
+   }
+   else
+      /* do a simple message copy */
+      err = msg_copy(receiver, smsg->send, smsg->send_size, &bytes_copied, sender);
+   
+   if(err) return err;
+   
+   /* update the sender's and receiver's message block */
+   smsg->pid = receiver->proc->pid;
+   smsg->tid = receiver->tid;
+   
+   rmsg->recv_size = bytes_copied;
+   rmsg->pid = sender->proc->pid;
+   rmsg->tid = sender->tid;
+   
+   /* did the message include a share request? */
+   if(smsg->flags & DIOSIX_MSG_SHAREVMA)
+   {
+      /* notify the receiver of the request, the context should be in the message payload */
+      rmsg->mem_req.size = smsg->mem_req.size;
+      rmsg->mem_req.base = 0; /* don't reveal the requester's memory map */
+      rmsg->flags |= DIOSIX_MSG_SHAREVMA;
+   }
+   
+   /* bump the receiver's priority up if the sender has a higher priority to
+    avoid priority inversion */
+   if(sender->priority < receiver->priority)
+      receiver->priority_granted = sender->priority;
+   else
+      receiver->priority_granted = SCHED_PRIORITY_INVALID;
+   sched_priority_calc(receiver, priority_check);
+   
+   return success;
+}
+
 /* msg_share_mem
    Link a virtual memory area in one process with another process through the inter-process
    messaging system. The entire vma must be linked and it must not collide with any other vmas.
@@ -436,7 +504,6 @@ kresult msg_send(thread *sender, diosix_msg_info *msg)
 {
    thread *receiver;
    kresult err;
-   unsigned int bytes_copied = 0;
    diosix_msg_info *rmsg;
 
    /* sanity check the msg data */
@@ -482,6 +549,7 @@ kresult msg_send(thread *sender, diosix_msg_info *msg)
                return success;
             }
 
+            /* if we're still here then something went wrong */
             unlock_gate(&(target->lock), LOCK_WRITE);
             return e_failure;
          }
@@ -492,7 +560,6 @@ kresult msg_send(thread *sender, diosix_msg_info *msg)
    }
 
    /* protect us from changes to the receiver's memory structure */
-   lock_gate(&(receiver->proc->lock), LOCK_READ);
    lock_gate(&(receiver->lock), LOCK_WRITE);
    
    rmsg = &(receiver->msg);
@@ -516,48 +583,17 @@ kresult msg_send(thread *sender, diosix_msg_info *msg)
    lock_gate(&(sender->lock), LOCK_WRITE);
    
    /* copy the message data */
-   if(msg->flags & DIOSIX_MSG_MULTIPART)
-   {
-      /* gather the multipart message blocks */
-      unsigned int loop;
-      
-      diosix_msg_multipart *parts = msg->send;
-      
-      /* check that the multipart pointer isn't bogus */
-      if((unsigned int)parts + MEM_CLIP(parts, msg->send_size * sizeof(diosix_msg_multipart)) >= KERNEL_SPACE_BASE)
-      {
-         unlock_gate(&(sender->lock), LOCK_WRITE);
-         unlock_gate(&(receiver->lock), LOCK_WRITE);
-         unlock_gate(&(receiver->proc->lock), LOCK_READ); /* give up the process lock */
-         return e_bad_address;
-      }
-      
-      /* do the multipart copy */
-      for(loop = 0; loop < msg->send_size; loop++)
-      {
-         err = msg_copy(receiver, parts[loop].data, parts[loop].size, &bytes_copied, sender);
-         if(err || (bytes_copied > DIOSIX_MSG_MAX_SIZE)) break;
-      }
-   }
-   else
-      /* do a simple message copy */
-      err = msg_copy(receiver, msg->send, msg->send_size, &bytes_copied, sender);
-      
+   err = msg_deliver(receiver, &(receiver->msg), sender, msg);
    if(err)
    {
+      MSG_DEBUG("[msg:%i] attempt to deliver non-queued message %x from thread %i process %i to "
+                "thread %i process %i (%x) failed with error code %i\n", CPU_ID,
+                msg, sender->tid, sender->proc->pid, receiver->tid, receiver->proc->pid, receiver->msg_src, err);
+      
       unlock_gate(&(sender->lock), LOCK_WRITE);
       unlock_gate(&(receiver->lock), LOCK_WRITE);
-      unlock_gate(&(receiver->proc->lock), LOCK_READ); /* give up the process lock */
       return err;
    }
-   
-   /* update the sender's and receiver's message block*/
-   msg->pid = receiver->proc->pid;
-   msg->tid = receiver->tid;
-   
-   rmsg->recv_size = bytes_copied;
-   rmsg->pid = sender->proc->pid;
-   rmsg->tid = sender->tid;
    
    /* was the send a reply or an actual send? */
    if(msg->flags & DIOSIX_MSG_REPLY)
@@ -594,28 +630,10 @@ kresult msg_send(thread *sender, diosix_msg_info *msg)
       /* take a copy of the message block */
       vmm_memcpy(&(sender->msg), msg, sizeof(diosix_msg_info));
       sender->msg_src = msg;
-      
-      /* did the message include a share request? */
-      if(msg->flags & DIOSIX_MSG_SHAREVMA)
-      {
-         /* notify the receiver of the request, the context should be in the message payload */
-         rmsg->mem_req.size = msg->mem_req.size;
-         rmsg->mem_req.base = 0; /* don't reveal the requester's memory map */
-         rmsg->flags |= DIOSIX_MSG_SHAREVMA;
-      }
-      
-      /* bump the receiver's priority up if the sender has a higher priority to
-         avoid priority inversion */
-      if(sender->priority < receiver->priority)
-         receiver->priority_granted = sender->priority;
-      else
-         receiver->priority_granted = SCHED_PRIORITY_INVALID;
-      sched_priority_calc(receiver, priority_check);
    }
 
    unlock_gate(&(sender->lock), LOCK_WRITE);
    unlock_gate(&(receiver->lock), LOCK_WRITE);
-   unlock_gate(&(receiver->proc->lock), LOCK_READ); /* give up the process lock */
 
    /* wake up the receiving thread */
    syscall_post_msg_recv(receiver, success);
@@ -688,6 +706,7 @@ kresult msg_recv(thread *receiver, diosix_msg_info *msg)
          
          /* unlock and return immediately */
          unlock_gate(&(receiver->lock), LOCK_WRITE);
+         
          MSG_DEBUG("[msg:%i] returned queued signal %i to tid %i pid %i\n",
                    CPU_ID, receiver->msg.signal.number, receiver->tid,
                    receiver->proc->pid);
@@ -695,13 +714,108 @@ kresult msg_recv(thread *receiver, diosix_msg_info *msg)
          return success;
       }
    }
+   /* if not a signal, then check to see if a non-reply message is queued */
+   else if((msg->flags & DIOSIX_MSG_TYPEMASK) == DIOSIX_MSG_GENERIC)
+   {
+      queued_sender *queued = NULL;
+      process *sender_proc = NULL;
+      thread *sender = NULL;
+      diosix_msg_info *smsg;
+      unsigned char search_done = 0; /* set to non-zero to end search */
+      
+      /* search for a suitable message */
+      while(!search_done)
+      {
+         queued = vmm_next_in_pool(queued, receiver->proc->msg_queue);
+         if(queued)
+         {
+            /* translate pid+tid into a thread structure pointer */
+            sender_proc = proc_find_proc(queued->pid);
+            if(!sender_proc)
+            {
+               /* bin the duff queued sender block */
+               vmm_free_pool(queued, receiver->proc->msg_queue);
+               queued = NULL; /* continue searching from the head */
+            }
+            else
+            {
+               sender = thread_find_thread(sender_proc, queued->tid);
+               if(!sender)
+               {
+                  /* bin the duff queued sender block */
+                  vmm_free_pool(queued, receiver->proc->msg_queue);
+                  queued = NULL; /* continue searching from the head */
+               }
+               else
+                  /* time to test the sender v receiver */
+                  if(msg_test_receiver(sender, receiver, &(sender->msg)) == success)
+                     search_done = 1;
+            }
+         } else break; /* exit loop if vmm_next_in_pool() returns NULL */
+      }
+      
+      /* queued is either NULL for no queued message found or a suitable pointer */
+      if(queued)
+      {
+         kresult err;
+         
+         /* don't forget to free the queued_sender block */
+         vmm_free_pool(queued, receiver->proc->msg_queue);
+         
+         /* we've found the sending thread but the message hasn't been
+            delivered yet. we need to send the message but from the 
+            context of the receiver... */
+         lock_gate(&(sender->lock), LOCK_READ);
+         smsg = &(sender->msg);
+         
+         /* sanatise the sender's msg data pointer we're about to use */
+         if(pg_preempt_fault(sender, (unsigned int)(smsg->send), smsg->send_size, VMA_READABLE))
+         {
+            unlock_gate(&(sender->lock), LOCK_READ);
+            unlock_gate(&(receiver->lock), LOCK_WRITE);
+            
+            /* let the sender know about its buffer screw up and wake it up */
+            syscall_post_msg_send(sender, e_bad_source_address);
+            sched_add(sender->cpu, sender);
+            
+            MSG_DEBUG("[msg:%i] sender %p (tid %i pid %i) tried to use invalid address %p for its msg data ptr\n",
+                      CPU_ID, sender, sender->tid, sender->proc->pid, smsg->send);
+            goto msg_recv_block; /* bail out */
+         }
+         
+         /* bear in mind only non-reply messages are queued because there's no need to queue a reply - 
+            a thread should already be blocked by the kernel awaiting a reply. Tell the sender
+            the result of a delivery attempt and wake it up. */
+         err = msg_deliver(receiver, msg, sender, smsg);
+         if(err)
+         {
+            MSG_DEBUG("[msg:%i] attempt to deliver queued message %x from thread %i process %i to "
+                      "thread %i process %i (%x) failed with error code %i\n", CPU_ID,
+                      sender->msg_src, sender->tid, sender->proc->pid,
+                      receiver->tid, receiver->proc->pid, msg, err);
 
-   /* if not a signal, then check to see if a message is queued */
-   
+            syscall_post_msg_send(sender, err);
+            sched_add(sender->cpu, sender);
+         }
+         else
+         {
+            MSG_DEBUG("[msg:%i] thread %i process %i received queued %p message from thread %i process %i "
+                      "[result = %i]\n", CPU_ID, receiver->tid, receiver->proc->pid, sender->msg_src,
+                      sender->tid, sender->proc->pid, err);
+         }
+         
+         unlock_gate(&(sender->lock), LOCK_READ);
+         unlock_gate(&(receiver->lock), LOCK_WRITE);
+         
+         /* don't block, return the result immediately to the receiver */
+         return err;
+      }
+   }
    
    /* if we're still here then block and wait for a message to arrive */
    
-   /* grab a copy of the user's message block, we'll fault the thread if the address is dodgy */
+msg_recv_block:
+   /* grab a copy of the receiver's details */
    vmm_memcpy(&(receiver->msg), msg, sizeof(diosix_msg_info));
    receiver->msg_src = msg;
    
@@ -710,7 +824,7 @@ kresult msg_recv(thread *receiver, diosix_msg_info *msg)
    /* remove receiver from the queue until a message comes in */
    sched_remove(receiver, waitingformsg);
 
-   MSG_DEBUG("[msg:%i] tid %i pid %i now receiving (%p)\n",
+   MSG_DEBUG("[msg:%i] tid %i pid %i blocked and waiting to receive (%p)\n",
              CPU_ID, receiver->tid, receiver->proc->pid, msg);
 
    return success;
