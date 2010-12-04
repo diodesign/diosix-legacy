@@ -189,11 +189,15 @@ void main(void)
    /* send message any listening thread */
    if(diosix_msg_send(&msg) != success) while(1);
 
-   while(1)
-   {
-      for(px = FB_MAX_SIZE >> 1; px < FB_MAX_SIZE; px += sizeof(unsigned int))
-         *((volatile unsigned int *)(0x200000 + px)) = buffer & 0xff;
+   /* if memory share worked then write to video memory */
+   if(msg.flags & DIOSIX_MSG_SHAREVMA)
+      while(1)
+      {
+         for(px = FB_MAX_SIZE >> 1; px < FB_MAX_SIZE; px += sizeof(unsigned int))
+            *((volatile unsigned int *)(0x200000 + px)) = buffer & 0xff;
       
-      buffer += 1;
-   }
+         buffer += 1;
+      }
+
+   while(1); /* halt */
 }
