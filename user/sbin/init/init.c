@@ -149,7 +149,7 @@ void do_listen(void)
    msg.send = &buffer;
    msg.send_size = sizeof(unsigned int);
    
-   while(diosix_msg_reply(&msg) != success);
+   if(diosix_msg_reply(&msg) != success) while(1);
       
    while(1)
    {
@@ -187,8 +187,7 @@ void main(void)
    msg.mem_req.size = DIOSIX_PAGE_ROUNDUP(FB_MAX_SIZE);
    
    /* send message any listening thread */
-   if(diosix_msg_send(&msg) != success)
-      while(1) diosix_thread_yield();
+   if(diosix_msg_send(&msg) != success) while(1);
 
    while(1)
    {

@@ -316,13 +316,16 @@ kresult msg_copy(thread *receiver, void *data, unsigned int size, unsigned int *
    
    rmsg = &(receiver->msg);
    recv = (unsigned int)rmsg->recv;
+   
    if(!recv)
    {
       /* protect us from NULL pointers */
       unlock_gate(&(receiver->lock), LOCK_READ);
-      return e_bad_address;
+      return e_bad_target_address;
    }
-   recv_base = recv + (*(offset));
+   
+   /* calculate the base address in the receiver's buffer */
+   recv_base = recv + *offset;
    
    /* stop abusive processes trying to smash out of a recv buffer */
    if((size > DIOSIX_MSG_MAX_SIZE) ||
@@ -333,7 +336,7 @@ kresult msg_copy(thread *receiver, void *data, unsigned int size, unsigned int *
    }
    
    lock_gate(&(sender->lock), LOCK_READ);
-   
+
    /* hand it over to the vmm to copy process-to-process - it'll sanity check the addresses */
    if(vmm_memcpyuser((void *)recv_base, receiver->proc, data, sender->proc, size))
    {      
@@ -362,9 +365,11 @@ kresult msg_copy(thread *receiver, void *data, unsigned int size, unsigned int *
 kresult msg_deliver(thread *receiver, diosix_msg_info *rmsg, thread *sender, diosix_msg_info *smsg)
 {
    kresult err;
-   unsigned int bytes_copied;
+   unsigned int bytes_copied = 0;
    
    /* assumes locks are in place */
+   MSG_DEBUG("[msg:%i] msg_deliver: recvr tid %i pid %i msg %p <- sendr tid %i pid %i msg %p\n",
+             CPU_ID, receiver->tid, receiver->proc->pid, rmsg, sender->tid, sender->proc->pid, smsg);
    
    if(smsg->flags & DIOSIX_MSG_MULTIPART)
    {
@@ -388,7 +393,11 @@ kresult msg_deliver(thread *receiver, diosix_msg_info *rmsg, thread *sender, dio
       /* do a simple message copy */
       err = msg_copy(receiver, smsg->send, smsg->send_size, &bytes_copied, sender);
    
-   if(err) return err;
+   if(err)
+   {
+      MSG_DEBUG("[msg:%i] msg_deliver: msg_copy() failed with code %i\n", CPU_ID, err);
+      return err;
+   }
    
    /* update the sender's and receiver's message block */
    smsg->pid = receiver->proc->pid;
