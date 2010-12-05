@@ -105,8 +105,9 @@ void syscall_do_msg_recv(int_registers_block *regs)
    /* sanitise the input data while we're here */
    if(!msg || ((unsigned int)msg >= KERNEL_SPACE_BASE)) SYSCALL_RETURN(e_bad_address);
    
-   /* do the actual receiving, syscall_post_msg_recv() will set return code in eax */
-   msg_recv(current, msg);
+   /* do the actual receiving. syscall_post_msg_recv() will update the receiver later
+      if necessary, otherwise return an immediate status code */
+   regs->eax = msg_recv(current, msg);
 }
 
 /* syscall_post_msg_recv

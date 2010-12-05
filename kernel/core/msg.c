@@ -550,7 +550,7 @@ kresult msg_send(thread *sender, diosix_msg_info *msg)
 
    /* sanity check the msg data */
    if(!msg || !sender) return e_bad_address;
-   
+
    /* identify the receiver */
    receiver = msg_find_receiver(sender, msg);
    if(!receiver)
@@ -737,7 +737,7 @@ kresult msg_recv(thread *receiver, diosix_msg_info *msg)
          MSG_DEBUG("[msg:%i] returned queued signal %i to tid %i pid %i\n",
                    CPU_ID, receiver->msg.signal.number, receiver->tid,
                    receiver->proc->pid);
-         
+         syscall_post_msg_recv(receiver, success); /* update the receiver */
          return success;
       }
    }
@@ -820,7 +820,6 @@ kresult msg_recv(thread *receiver, diosix_msg_info *msg)
                       "thread %i process %i (%x) failed with error code %i\n", CPU_ID,
                       sender->msg_src, sender->tid, sender->proc->pid,
                       receiver->tid, receiver->proc->pid, msg, err);
-
             syscall_post_msg_send(sender, err);
             sched_add(sender->cpu, sender);
          }
@@ -829,8 +828,10 @@ kresult msg_recv(thread *receiver, diosix_msg_info *msg)
             MSG_DEBUG("[msg:%i] thread %i process %i received queued %p message from thread %i process %i "
                       "[result = %i]\n", CPU_ID, receiver->tid, receiver->proc->pid, sender->msg_src,
                       sender->tid, sender->proc->pid, err);
+            /* record in the sender that it's waiting for a reply from this process */
+            sender->replysource = receiver;
          }
-         
+
          unlock_gate(&(sender->lock), LOCK_READ);
          unlock_gate(&(receiver->lock), LOCK_WRITE);
          
