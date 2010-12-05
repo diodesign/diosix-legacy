@@ -18,10 +18,11 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #ifndef _PROCESSES_H
 #define   _PROCESSES_H
 
-/* PID and TID 0 are reserved for the kernel */
+/* PID and TID 0 are reserved for the kernel, UID/GID 0 for the superuser */
 #define RESERVED_PID (0)
 #define FIRST_PID    (RESERVED_PID + 1)
 #define FIRST_TID    (FIRST_PID)
+#define SUPERUSER_ID (0)
 
 /* thread states */
 typedef enum
@@ -73,6 +74,7 @@ typedef struct
 {
    diosix_signal signal; /* the signal number and code */
    unsigned int sender_pid, sender_tid; /* process & thread IDs of the sender */
+   unsigned int sender_uid, sender_gid; /* POSIX-conformant user and group ids of the sender */
 } queued_signal;
 
 /* a queued synchronous message sender */
@@ -211,6 +213,18 @@ struct thread
 /* needed in the process struct */
 typedef struct irq_driver_entry irq_driver_entry;
 
+/* comtains the POSIX-defined real, effective and saved-set ids for processes */
+typedef struct
+{
+   unsigned int real, effective, saved;
+} posix_id_set;
+
+/* defines a supplementary group entry */
+typedef struct
+{
+   unsigned int gid;
+} posix_supplementary_group;
+
 /* describe each process */
 struct process
 {
@@ -263,6 +277,15 @@ struct process
       7 = reserved for user programs */
    unsigned char layer; /* this process's layer */
    
+   /* POSIX-conformant user and group ids for this process */
+   posix_id_set uid, gid;
+   
+   /* POSIX-conformant process group and session ids */
+   unsigned int proc_group_id, session_id;
+   
+   /* pool of POSIX-conformant supplementary group ids */
+   kpool *supplementary_groups;
+
    /* x86 IO port access - a pointer to a 2^16-bit bitmap where each bit corresponds 
       to an IO port. A set bit indicates access is denied. A NULL pointer here means
       the process has no IO port access */

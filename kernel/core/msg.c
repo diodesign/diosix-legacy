@@ -117,9 +117,14 @@ kresult msg_send_signal(process *target, thread *sender, unsigned int signum, un
       {
          towake->msg.pid = sender->proc->pid;
          towake->msg.tid = sender->tid;
+         towake->msg.uid = sender->proc->uid.effective;
+         towake->msg.gid = sender->proc->gid.effective;
       }
       else
+      {
          towake->msg.pid = towake->msg.tid = RESERVED_PID;
+         towake->msg.uid = towake->msg.gid = SUPERUSER_ID;
+      }
       
       towake->msg.signal.number = signum;
       towake->msg.signal.extra = sigcode;
@@ -147,10 +152,15 @@ kresult msg_send_signal(process *target, thread *sender, unsigned int signum, un
          /* sender is a user thread */
          newsig->sender_pid = sender->proc->pid;
          newsig->sender_tid = sender->tid;
+         newsig->sender_uid = sender->proc->uid.effective;
+         newsig->sender_gid = sender->proc->gid.effective;
       }
       else
-      /* sender is the kernel */
+      {
+         /* sender is the kernel */
          newsig->sender_pid = newsig->sender_tid = RESERVED_PID;
+         newsig->sender_uid = newsig->sender_gid = SUPERUSER_ID;
+      }
       
       MSG_DEBUG("[msg:%i] queued signal %i:0x%x to pid %i from process %x\n",
                 CPU_ID, signum, sigcode, target->pid, sender);      
@@ -180,10 +190,10 @@ kresult msg_test_receiver(thread *sender, thread *target, diosix_msg_info *msg)
                   CPU_ID, sender, target, msg);
       return e_failure;
    }
-   
+
    /* protect us from changes to the target's metadata */
    lock_gate(&(target->lock), LOCK_READ);
-   
+
    switch(msg->flags & DIOSIX_MSG_TYPEMASK)
    {
       case DIOSIX_MSG_SIGNAL:
@@ -195,7 +205,7 @@ kresult msg_test_receiver(thread *sender, thread *target, diosix_msg_info *msg)
       
       case DIOSIX_MSG_GENERIC:
          if(!sender) goto msg_test_receiver_failure;
-         
+
          /* calculate layer - if DIOSIX_MSG_SENDASUSR is set then the message is
             being sent as an unprivileged user program */
          if((sender->proc->flags & PROC_FLAG_CANMSGASUSR) &&
@@ -203,18 +213,18 @@ kresult msg_test_receiver(thread *sender, thread *target, diosix_msg_info *msg)
             layer = LAYER_MAX;
          else
             layer = sender->proc->layer;
-
+         
          /* threads can only recieve messages if they are in a layer below the sender - unless it's a 
             reply. we check below whether this is a legit reply */
          if((target->proc->layer >= layer) && !(msg->flags & DIOSIX_MSG_REPLY))
             goto msg_test_receiver_failure;
-
+         
          /* is this message waiting on a reply from this thread? */
          if((target->state == waitingforreply) &&
             (msg->flags & DIOSIX_MSG_REPLY) &&
             (target->replysource == sender))
             goto msg_test_receiver_success;
-         
+
          /* is the target thread either blocked waiting for a message or running and this is a queued message,
              and is willing to accept the message type? */
          if((target->state == waitingformsg) ||
@@ -481,10 +491,12 @@ kresult msg_deliver(thread *receiver, diosix_msg_info *rmsg, thread *sender, dio
    /* update the sender's and receiver's message block */
    smsg->pid = receiver->proc->pid;
    smsg->tid = receiver->tid;
-   
+
    rmsg->recv_size = bytes_copied;
    rmsg->pid = sender->proc->pid;
    rmsg->tid = sender->tid;
+   rmsg->uid = sender->proc->uid.effective;
+   rmsg->gid = sender->proc->gid.effective;
 
    /* did the message include a share request? */
    if(smsg->flags & DIOSIX_MSG_SHAREVMA)
@@ -665,9 +677,9 @@ kresult msg_send(thread *sender, diosix_msg_info *msg)
    syscall_post_msg_recv(receiver, success);
    sched_add(receiver->cpu, receiver);
    
-   MSG_DEBUG("[msg:%x] thread %i of process %i sent message %x (%i bytes first word %x) to thread %i of process %i\n",
-             CPU_ID, sender->tid, sender->proc->pid, msg->send, msg->send_size, *((unsigned int *)msg->send),
-             receiver->tid, receiver->proc->pid);
+   MSG_DEBUG("[msg:%x] thread %i of process %i (uid %i gid %i) sent message %x (%i bytes first word %x) to thread %i of process %i\n",
+             CPU_ID, sender->tid, sender->proc->pid, sender->proc->uid.effective, sender->proc->gid.effective,
+             msg->send, msg->send_size, *((unsigned int *)msg->send), receiver->tid, receiver->proc->pid);
    
    return success;
 }
@@ -730,6 +742,8 @@ kresult msg_recv(thread *receiver, diosix_msg_info *msg)
          receiver->msg.signal.extra = sig->signal.extra;
          receiver->msg.pid = sig->sender_pid;
          receiver->msg.tid = sig->sender_tid;
+         receiver->msg.uid = sig->sender_uid;
+         receiver->msg.gid = sig->sender_gid;
          
          /* free the block */
          vmm_free_pool(sig, pool);
@@ -828,8 +842,8 @@ kresult msg_recv(thread *receiver, diosix_msg_info *msg)
          else
          {
             MSG_DEBUG("[msg:%i] thread %i process %i received queued %p message from thread %i process %i "
-                      "[result = %i]\n", CPU_ID, receiver->tid, receiver->proc->pid, sender->msg_src,
-                      sender->tid, sender->proc->pid, err);
+                      "(uid %i gid %i) [result = %i]\n", CPU_ID, receiver->tid, receiver->proc->pid, sender->msg_src,
+                      sender->tid, sender->proc->pid, sender->proc->uid.effective, sender->proc->gid.effective, err);
             /* record in the sender that it's waiting for a reply from this process */
             sender->replysource = receiver;
          }

@@ -202,8 +202,6 @@ void main(void)
    {      
       while(1)
       {
-         diosix_thread_sleep(20);
-         
          for(px = FB_MAX_SIZE >> 1; px < FB_MAX_SIZE; px += sizeof(unsigned int))
             *((volatile unsigned int *)(0x200000 + px)) = buffer & 0xff;
       

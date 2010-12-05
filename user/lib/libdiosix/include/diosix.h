@@ -99,8 +99,8 @@ typedef enum
 /* describe a queued asynchronous message */
 typedef struct
 {
-   unsigned int number; /* the signal number */
-   unsigned int extra;  /* an extra word of information */
+   unsigned int number;   /* the signal number */
+   unsigned int extra;    /* an extra word of information */
 } diosix_signal;
 
 /* describe a memory share request */
@@ -121,6 +121,8 @@ typedef struct
 {
    unsigned int pid;        /* process pid sending to/receiving from, or 0 for any */
    unsigned int tid;        /* threasd tid sending to/receiving from, or 0 for any */
+   unsigned int uid;        /* POSIX-conformant effective user id for the message sender */
+   unsigned int gid;        /* POSIX-conformant effective group id for the message sender */
    unsigned int flags;      /* status flags and type for this message */
 
    unsigned int send_size;  /* size in bytes of the send message data, or number of multipart entries to send */

@@ -307,6 +307,12 @@ process *proc_new(process *current, thread *caller)
       new->priority_high = current->priority_high;
       new->next_tid      = current->next_tid;
       
+      /* preserve POSIX-conformant user and group ids */
+      new->proc_group_id = current->proc_group_id;
+      new->session_id    = current->session_id;
+      vmm_memcpy(&(new->uid), &(current->uid), sizeof(posix_id_set));
+      vmm_memcpy(&(new->gid), &(current->gid), sizeof(posix_id_set));
+      
       if(proc_attach_child(current, new))
       {
          unlock_gate(&(current->lock), LOCK_WRITE);
