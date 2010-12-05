@@ -321,9 +321,7 @@ thread *thread_new(process *proc)
    <= success or e_failure if something went wrong
 */
 kresult thread_kill(process *owner, thread *victim)
-{
-   unsigned int physaddr;
-   
+{   
    if(!owner) return e_failure;
       
    if(victim)

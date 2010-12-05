@@ -440,11 +440,14 @@ void sched_tick(int_registers_block *regs)
    }
    unlock_gate(&(cpu->lock), LOCK_READ);
    
-   SCHED_DEBUG("[sched:%i] tick for thread %i of process %i\n",
-               CPU_ID, cpu->current->tid, cpu->current->proc->pid);
+   SCHED_DEBUG("[sched:%i] tick for thread %i of process %i (state %i)\n",
+               CPU_ID, cpu->current->tid, cpu->current->proc->pid, cpu->current->state);
    
    lock_gate(&(cpu->current->lock), LOCK_WRITE);
    
+   if(cpu->current->state != running)
+      debug_panic("sched_tick: thread in non-running state");
+
    /* decrement timeslice */
    if(cpu->current->timeslice)
       cpu->current->timeslice--;
@@ -522,7 +525,16 @@ void sched_pick(int_registers_block *regs)
 
    /* keep with the currently running thread if it's
       the highest priority thread allowed to run */
-   if(next == now) return; /* easy quick switch back to where we were */
+   if(next == now)
+   {
+      /* ensure the thread's state variable reflects its condition */
+      lock_gate(&(next->lock), LOCK_WRITE);
+      next->state = running;
+      unlock_gate(&(next->lock), LOCK_WRITE);
+      
+      return; /* easy quick switch back to where we were */
+   }
+   
    if((next->priority > now->priority) &&
       (now->state == running)) return;
    

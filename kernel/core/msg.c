@@ -200,22 +200,27 @@ kresult msg_test_receiver(thread *sender, thread *target, diosix_msg_info *msg)
             layer = LAYER_MAX;
          else
             layer = sender->proc->layer;
-   
+
          /* threads can only recieve messages if they are in a layer below the sender - unless it's a 
             reply. we check below whether this is a legit reply */
          if((target->proc->layer >= layer) && !(msg->flags & DIOSIX_MSG_REPLY))
             goto msg_test_receiver_failure;
-   
+
          /* is this message waiting on a reply from this thread? */
          if((target->state == waitingforreply) &&
             (msg->flags & DIOSIX_MSG_REPLY) &&
             (target->replysource == sender))
             goto msg_test_receiver_success;
-   
-         /* is the target thread willing to accept the message type? */
-         if((target->state == waitingformsg) &&
-            ((target->msg.flags & DIOSIX_MSG_TYPEMASK) == DIOSIX_MSG_GENERIC))
-            goto msg_test_receiver_success;
+         
+         /* is the target thread either blocked waiting for a message or running and this is a queued message,
+             and is willing to accept the message type? */
+         dprintf("target->state = %i running = %i msg->flags = %x DIOSIX_MSG_QUEUEME = %x\n",
+                 target->state, running, msg->flags, DIOSIX_MSG_QUEUEME);
+         if((target->state == waitingformsg) ||
+            (target->state == running && msg->flags & DIOSIX_MSG_QUEUEME))
+            if((target->msg.flags & DIOSIX_MSG_TYPEMASK) == DIOSIX_MSG_GENERIC)
+               goto msg_test_receiver_success;
+         
    }
    
    /* give up */
@@ -367,10 +372,6 @@ kresult msg_share_mem(process *target, diosix_share_request *target_mem,
 {
    vmm_tree *source_node, *target_node;
    kresult result;
-   
-   dprintf("*** msg_share_mem: %x %x %x %x %x %x\n",
-           target, source, target_mem->size, target_mem->base, 
-           source_mem->size, source_mem->base);
    
    /* sanity checks - stop null pointers and zero-sized mappings */
    if(!target || !source || !target_mem->size || !target_mem->base ||
@@ -685,6 +686,10 @@ kresult msg_recv(thread *receiver, diosix_msg_info *msg)
 
    if(lock_gate(&(receiver->lock), LOCK_WRITE)) return e_failure;
    
+   /* grab a copy of the receiver's details */
+   vmm_memcpy(&(receiver->msg), msg, sizeof(diosix_msg_info));
+   receiver->msg_src = msg;
+
    /* if receiving a signal, return immediately if one's queued and ready to go */
    if((msg->flags & DIOSIX_MSG_TYPEMASK) == DIOSIX_MSG_SIGNAL)
    {
@@ -746,13 +751,13 @@ kresult msg_recv(thread *receiver, diosix_msg_info *msg)
       thread *sender = NULL;
       diosix_msg_info *smsg;
       unsigned char search_done = 0; /* set to non-zero to end search */
-      
+
       /* search for a suitable message */
       while(!search_done)
       {
          queued = vmm_next_in_pool(queued, receiver->proc->msg_queue);
          if(queued)
-         {
+         {            
             /* translate pid+tid into a thread structure pointer */
             sender_proc = proc_find_proc(queued->pid);
             if(!sender_proc)
@@ -782,7 +787,7 @@ kresult msg_recv(thread *receiver, diosix_msg_info *msg)
       if(queued)
       {
          kresult err;
-         
+
          /* don't forget to free the queued_sender block */
          vmm_free_pool(queued, receiver->proc->msg_queue);
          
@@ -839,10 +844,6 @@ kresult msg_recv(thread *receiver, diosix_msg_info *msg)
    /* if we're still here then block and wait for a message to arrive */
    
 msg_recv_block:
-   /* grab a copy of the receiver's details */
-   vmm_memcpy(&(receiver->msg), msg, sizeof(diosix_msg_info));
-   receiver->msg_src = msg;
-   
    unlock_gate(&(receiver->lock), LOCK_WRITE);
 
    /* remove receiver from the queue until a message comes in */

@@ -570,8 +570,8 @@ void x86_thread_switch(thread *now, thread *next, int_registers_block *regs)
 {
    tss_descr *new_tss = next->tss;
    
-   LOLVL_DEBUG("[x86:%i] switching thread %p for %p (regs %p) (ds/ss %x cs %x ss0 %x esp0 %x)\n",
-           CPU_ID, now, next, regs, new_tss->ss, new_tss->cs, new_tss->ss0, new_tss->esp0);
+   LOLVL_DEBUG("[x86:%i] switching thread %p for %p (regs %p state %i) (ds/ss %x cs %x ss0 %x esp0 %x)\n",
+           CPU_ID, now, next, regs, next->state, new_tss->ss, new_tss->cs, new_tss->ss0, new_tss->esp0);
    LOLVL_DEBUG("[x86:%i] PRE-SWAP: ds %x edi %x esi %x ebp %x esp %x ebx %x edx %x ecx %x eax %x\n"
            "      intnum %x errcode %x eip %x cs %x eflags %x useresp %x ss %x\n",
            CPU_ID, regs->ds, regs->edi, regs->esi, regs->ebp, regs->esp, regs->ebx, regs->edx, regs->ecx, regs->eax,
@@ -710,7 +710,8 @@ void x86_warm_kickstart(void)
                   cpu_table[CPU_ID].tssentry, next_tss,
                   next->flags & THREAD_FLAG_HASIOBITMAP);
    
-   /* this seems to be the only sensible place to set this state variable */
+   /* this seems to be the only sensible place to set these state variables */
+   next->state = running;
    cpu_table[CPU_ID].current = next;
    
 #ifdef LOLVL_DEBUG
