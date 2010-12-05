@@ -214,8 +214,6 @@ kresult msg_test_receiver(thread *sender, thread *target, diosix_msg_info *msg)
          
          /* is the target thread either blocked waiting for a message or running and this is a queued message,
              and is willing to accept the message type? */
-         dprintf("target->state = %i running = %i msg->flags = %x DIOSIX_MSG_QUEUEME = %x\n",
-                 target->state, running, msg->flags, DIOSIX_MSG_QUEUEME);
          if((target->state == waitingformsg) ||
             (target->state == running && msg->flags & DIOSIX_MSG_QUEUEME))
             if((target->msg.flags & DIOSIX_MSG_TYPEMASK) == DIOSIX_MSG_GENERIC)

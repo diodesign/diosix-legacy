@@ -444,9 +444,6 @@ void sched_tick(int_registers_block *regs)
                CPU_ID, cpu->current->tid, cpu->current->proc->pid, cpu->current->state);
    
    lock_gate(&(cpu->current->lock), LOCK_WRITE);
-   
-   if(cpu->current->state != running)
-      debug_panic("sched_tick: thread in non-running state");
 
    /* decrement timeslice */
    if(cpu->current->timeslice)
