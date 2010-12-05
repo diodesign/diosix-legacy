@@ -725,6 +725,7 @@ kresult vmm_free_pool(void *ptr, kpool *pool)
       KOOPS_DEBUG("[vmm:%i] OMGWTF vmm_free_pool: tried to free non-inuse block %x "
                   "in pool %p (magic %x)\n",
                   CPU_ID, block, pool, block->magic);
+      debug_stacktrace();
       unlock_gate(&(pool->lock), LOCK_WRITE);
       return e_bad_params;
    }
@@ -834,7 +835,8 @@ void *vmm_next_in_pool(void *ptr, kpool *pool)
    if(!ptr)
    {
       /* don't forget to fix up head pointer before returning it */
-      result = (void *)((unsigned int)pool->head + sizeof(kpool_block));
+      if(pool->head)
+         result = (void *)((unsigned int)pool->head + sizeof(kpool_block));
       goto vmm_next_in_pool_exit;
    }
    
@@ -852,7 +854,7 @@ void *vmm_next_in_pool(void *ptr, kpool *pool)
 
 vmm_next_in_pool_exit:
    unlock_gate(&(pool->lock), LOCK_READ);
-   return result;
+   return result; /* result still set to NULL unless otherwise modified */
 }
 
 /* vmm_count_pool_inuse
