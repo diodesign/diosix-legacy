@@ -168,6 +168,10 @@ void exception_handler(int_registers_block regs)
                syscall_do_thread_kill(&regs);
                break;
                
+            case SYSCALL_THREAD_SLEEP:
+               syscall_do_thread_sleep(&regs);
+               break;
+               
             case SYSCALL_MSG_SEND:
                syscall_do_msg_send(&regs);
                break;

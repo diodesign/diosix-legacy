@@ -98,10 +98,10 @@ void debug_assert(char *exp, char *file, char *basefile, unsigned int line)
 */
 void debug_panic(const char *str)
 {
-   dprintf("*** PANIC: %s -- halting core\n", str);
+   dprintf("*** PANIC: %s -- halting core %i\n", str, CPU_ID);
    
    x86_disable_interrupts();
-   while(1);
+   while(1); /* go for halt */
 }
 
 

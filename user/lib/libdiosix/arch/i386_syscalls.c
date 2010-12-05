@@ -94,6 +94,14 @@ unsigned int diosix_thread_kill(unsigned int tid)
    return retval;
 }
 
+unsigned int diosix_thread_sleep(unsigned int ticks)
+/* block for the given number of scheduler clock ticks. There are SCHED_FREQUENCY ticks a second */
+{
+   unsigned int retval;
+   __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (ticks), "d" (SYSCALL_THREAD_SLEEP));
+   return retval;
+}
+
 /* --------------- message basics -------------------- */
 
 unsigned int diosix_msg_send(diosix_msg_info *info)

@@ -154,10 +154,12 @@ void do_listen(void)
       
    while(1)
    {
+      diosix_thread_sleep(100);
+      
       for(px = 0; px < FB_MAX_SIZE >> 1; px += sizeof(unsigned int))
          *((volatile unsigned int *)(FB_LOG_BASE + px)) = (buffer & 0xff) << 16;
          
-      buffer += 1;
+      buffer += 4;
    }
 }
 
@@ -168,14 +170,19 @@ void main(void)
    unsigned int buffer = 0, message = 0;
    unsigned int px;
 
+   /* create idle thread */
+   child = diosix_thread_fork();
+   if(!child)
+   {
+      diosix_priv_layer_up();
+      diosix_priv_layer_up();
+      while(1);
+   }
+   
    /* create new process to receive */
    child = diosix_fork();
-   if(child == 0) do_listen(); /* child does the listening */
+   if(!child) do_listen(); /* child does the listening */
 
-   /* move into driver layer and get access to IO ports */
-   diosix_priv_layer_up();
-   diosix_driver_register();
-   
    /* ask to share some memory with the child */
    msg.tid = DIOSIX_MSG_ANY_THREAD;
    msg.pid = child;
@@ -192,21 +199,15 @@ void main(void)
 
    /* if memory share worked then write to video memory */
    if(msg.flags & DIOSIX_MSG_SHAREVMA)
-   {
-      diosix_signals_kernel(SIGXIRQ);
-      diosix_driver_register_irq(32); /* timer */
-
+   {      
       while(1)
       {
-         msg.tid = msg.pid = DIOSIX_MSG_ANY_THREAD;
-         msg.flags = DIOSIX_MSG_SIGNAL | DIOSIX_MSG_KERNELONLY;
-         if(diosix_msg_receive(&msg) == success)
-         {
-            for(px = FB_MAX_SIZE >> 1; px < FB_MAX_SIZE; px += sizeof(unsigned int))
-               *((volatile unsigned int *)(0x200000 + px)) = buffer & 0xff;
+         diosix_thread_sleep(50);
+         
+         for(px = FB_MAX_SIZE >> 1; px < FB_MAX_SIZE; px += sizeof(unsigned int))
+            *((volatile unsigned int *)(0x200000 + px)) = buffer & 0xff;
       
-            buffer += 1;
-         }
+         buffer += 4;
       }
    }
    while(1); /* halt */

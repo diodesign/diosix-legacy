@@ -146,3 +146,19 @@ void syscall_do_thread_kill(int_registers_block *regs)
       /* inform the system executive that a thread has been killed */
       msg_send_signal(proc_sys_executive, NULL, SIGXTHREADKILLED, owner->pid);
 }
+
+/* syscall: thread_sleep - block the current thread for a given number of scheduling ticks.
+   the thread is placed on the run queue again once the time has elapsed.
+   => eax = number of ticks to sleep for, or 0 to cancel any outstanding alarms
+   <= eax = 0 for success (after blocking), or an error code
+*/
+void syscall_do_thread_sleep(int_registers_block *regs)
+{
+   thread *current = cpu_table[CPU_ID].current;
+   
+   SYSCALL_DEBUG("[sys:%i] SYSCALL_THREAD_SLEEP(%i) called by process %i (%p) (thread %i)\n",
+                 CPU_ID, regs->eax, cpu_table[CPU_ID].current->proc->pid, cpu_table[CPU_ID].current->proc,
+                 cpu_table[CPU_ID].current->tid);
+   
+   SYSCALL_RETURN(sched_add_snoozer(current, regs->eax));
+}

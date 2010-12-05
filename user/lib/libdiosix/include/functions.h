@@ -36,6 +36,7 @@ void diosix_thread_yield(void);
 unsigned int diosix_thread_exit(unsigned int code);
 int diosix_thread_fork(void);
 unsigned int diosix_thread_kill(unsigned int tid);
+unsigned int diosix_thread_sleep(unsigned int ticks);
 
 /* message sending */
 unsigned int diosix_msg_send(diosix_msg_info *info);

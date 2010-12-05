@@ -29,6 +29,7 @@ void syscall_do_yield(int_registers_block *regs);
 void syscall_do_thread_exit(int_registers_block *regs);
 void syscall_do_thread_fork(int_registers_block *regs);
 void syscall_do_thread_kill(int_registers_block *regs);
+void syscall_do_thread_sleep(int_registers_block *regs);
 void syscall_do_msg_send(int_registers_block *regs);
 void syscall_post_msg_send(thread *sender, kresult result);
 void syscall_do_msg_recv(int_registers_block *regs);

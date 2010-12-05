@@ -333,6 +333,14 @@ kresult thread_kill(process *owner, thread *victim)
          process */
       if(victim->proc != owner) return e_failure;
       
+      /* stop this thread from running and lock it */
+      if(lock_gate(&(victim->lock), LOCK_WRITE | LOCK_SELFDESTRUCT))
+         return e_failure;
+      
+      /* if the victim is sleeping then make sure it gives up any 
+         timer blocks it may have held */
+      if(victim->state == sleeping) sched_remove_snoozer(victim);
+      
       /* if we can't lock then assume it's this thread that's dying */
       if(sched_lock_thread(victim)) sched_remove(victim, dead);
       
@@ -340,13 +348,7 @@ kresult thread_kill(process *owner, thread *victim)
          a thread if it's still running on another core so spin until 
          it's clear that the thread is no longer being run on the cpu
          it was last on */
-      lock_gate(&(victim->lock), LOCK_READ);
       while(cpu_table[victim->cpu].current != victim);
-      unlock_gate(&(victim->lock), LOCK_READ);
-
-      /* stop this thread from running and lock it */
-      if(lock_gate(&(victim->lock), LOCK_WRITE | LOCK_SELFDESTRUCT))
-         return e_failure;
       
       /* destroy the thread's user stack vma */
       stackbase = KERNEL_SPACE_BASE - (THREAD_MAX_STACK * MEM_PGSIZE * victim->tid);

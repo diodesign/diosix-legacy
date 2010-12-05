@@ -30,9 +30,15 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #define SCHED_PRIORITY_BASE_POINTS(a) (2 ^ (a))
 #define SCHED_PRIORITY_MAX_POINTS(a) (2 * (2 ^ (a)))
 
-#define SCHED_TIMESLICE           (5) /* 50ms timeslice */
-#define SCHED_FREQUENCY           (100) /* tick every 10ms */
+#define SCHED_TIMESLICE           (5) /* scheduling quantum for a thread in number of timeslice ticks */
+#define SCHED_FREQUENCY           (DIOSIX_SCHED_TICK) /* timeslice = 1/DIOSIX_SCHED_TICK */
 #define SCHED_CARETAKER           (1000) /* run maintainance every 1000 ticks */
+
+typedef struct
+{
+   thread *sleeper;
+   unsigned int timer;
+} snoozing_thread;
 
 typedef enum
 {
@@ -59,5 +65,7 @@ kresult sched_unlock_proc(process *proc);
 kresult sched_lock_thread(thread *victim);
 kresult sched_unlock_thread(thread *towake);
 unsigned char sched_pick_queue(unsigned char hint);
+kresult sched_remove_snoozer(thread *snoozer);
+kresult sched_add_snoozer(thread *snoozer, unsigned int timeout);
 
 #endif

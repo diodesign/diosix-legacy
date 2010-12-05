@@ -18,6 +18,7 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #include <portdefs.h>
 
 unsigned int tick = SCHED_CARETAKER;
+kpool *sched_bedroom; /* queued pool of sleeping threads waiting for an alarm timeout */
 
 /* provide spinlocking around critical sections */
 volatile unsigned int sched_next_queue_slock = 0;
@@ -196,14 +197,14 @@ void sched_priority_calc(thread *tocalc, sched_priority_request request)
 }
 
 /* sched_lock_thread
- Stop a thread from running, remove it from the queue and lock
- it out until it is unlocked. This will momentarily block until
- the scheduler is satisfied the thread is no longer running
- across the system. It is inappropriate for a thread to
- lock itself as this will leave the system in an unstable state
- on exit from this function.
- => victim = thread to pause
- <= success or a failure code
+   Stop a thread from running, remove it from the queue and lock
+   it out until it is unlocked. This will momentarily block until
+   the scheduler is satisfied the thread is no longer running
+   across the system. It is inappropriate for a thread to
+   lock itself as this will leave the system in an unstable state
+   on exit from this function.
+   => victim = thread to pause
+   <= success or a failure code
  */
 kresult sched_lock_thread(thread *victim)
 {
@@ -428,9 +429,38 @@ void sched_tick(int_registers_block *regs)
          sched_caretaker();
          tick = SCHED_CARETAKER;
       }
+      
+      /* are there any sleeping threads? */
+      if(vmm_count_pool_inuse(sched_bedroom))
+      {
+         snoozing_thread *snoozer = NULL;
+         
+         for(;;)
+         {
+            /* step through the sleeping threads and decrease their timer values */
+            snoozer = vmm_next_in_pool(snoozer, sched_bedroom);
+            if(snoozer)
+            {
+               snoozer->timer--;
+               if(snoozer->timer == 0)
+               {
+                  /* wake up the thread */
+                  sched_add(snoozer->sleeper->cpu, snoozer->sleeper);
+                  
+                  dprintf("[sched:%i] woke up snoozing thread %p (tid %i pid %i)\n",
+                          CPU_ID, snoozer->sleeper, snoozer->sleeper->tid, snoozer->sleeper->proc->pid);
+                  
+                  /* and bin the pool block */
+                  vmm_free_pool(snoozer, sched_bedroom);
+                  snoozer = NULL; /* pointer no longer valid */
+               }
+            } else break; /* escape the loop if no more sleepers */
+         }
+      }
    }
    
    lock_gate(&(cpu->lock), LOCK_READ);
+   
    /* bail out if we're not running anything */
    if(!(cpu->current))
    {
@@ -465,6 +495,74 @@ void sched_tick(int_registers_block *regs)
    }
    else
       unlock_gate(&(cpu->current->lock), LOCK_WRITE);
+}
+
+/* sched_remove_snoozer
+   Remove a snoozing thread from the queued pool of sleepers
+   => snoozer = sleeping thread
+   <= 0 for success, or an error code
+*/
+kresult sched_remove_snoozer(thread *snoozer)
+{
+   kresult result = e_not_found;
+   
+   /* sanity check */
+   if(!snoozer) return e_bad_params;
+   
+   snoozing_thread *search = NULL;
+   
+   for(;;)
+   {
+      /* step through the sleeping threads to find the given thread */
+      search = vmm_next_in_pool(search, sched_bedroom);
+      if(search)
+      {
+         if(search->sleeper == snoozer)
+         {
+            /* bin the pool block */
+            vmm_free_pool(search, sched_bedroom);
+            search = NULL; /* pointer no longer valid */
+            result = success;
+         }
+      } else break; /* escape the loop if no more sleepers */
+   }
+   
+   dprintf("[sched:%i] removed thread %p (tid %i pid %i) from bedroom (result %i)\n",
+           CPU_ID, snoozer, snoozer->tid, snoozer->proc->pid, result);
+   
+   return result;
+}
+
+/* sched_add_snoozer
+   Add a thread to the queued pool of threads waiting on the clock
+   => snoozer = thread to put to sleep
+      timeout = number of scheduling ticks to sleep for, or 0 to cancel
+   <= 0 for success, or an error code
+*/
+kresult sched_add_snoozer(thread *snoozer, unsigned int timeout)
+{
+   snoozing_thread *new;
+   kresult err;
+   
+   /* sanity check */
+   if(!snoozer) return e_bad_params;
+   
+   if(!timeout)
+      /* cancel all the timers for this thread */
+      return sched_remove_snoozer(snoozer);
+   
+   /* allocate the new block to store the thread's details */
+   err = vmm_alloc_pool((void **)&new, sched_bedroom);
+   if(err) return err;
+   
+   new->sleeper = snoozer;
+   new->timer = timeout;
+   
+   dprintf("[sched:%i] added thread %p (tid %i pid %i) to bedroom: will wake in %i ticks\n",
+           CPU_ID, snoozer, snoozer->tid, snoozer->proc->pid, timeout);
+   
+   sched_remove(snoozer, sleeping);
+   return success;
 }
 
 /* sched_rescan_queues
@@ -819,6 +917,11 @@ void sched_initialise(void)
 {
    BOOT_DEBUG("[sched:%i] starting operating system...\n", CPU_ID);
 
+   /* initialise pool of sleeping threads awaiting a clock wake-up */
+   sched_bedroom = vmm_create_pool(sizeof(snoozing_thread), 4);
+   if(!sched_bedroom)
+      debug_panic("unable to create queued pool for clock-held sleeping threads");
+   
    /* start running process 1, thread 1 in user mode, which
       should spawn system managers and continue the boot process */
    lowlevel_kickstart();
