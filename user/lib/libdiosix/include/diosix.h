@@ -72,6 +72,7 @@ typedef enum
 #define SYSCALL_MEMORY        (12)
 #define SYSCALL_THREAD_SLEEP  (13)
 #define SYSCALL_ALARM         (14)
+#define SYSCALL_SET_ID        (15)
 
 /* define the rate at which the scheduler is interrupted, the system-wide scheduling tick */
 #define DIOSIX_SCHED_TICK     (100) /* 100 times a second, one tick is 10ms */
@@ -199,6 +200,13 @@ typedef struct
    /* describe the owning process */
    unsigned int pid, parentpid;
    unsigned char flags, privlayer;
+   
+   /* POSIX-conformant real, effective and saved-set user and group ids */
+   unsigned int ruid, euid, ssuid;
+   unsigned int rgid, egid, ssgid;
+   
+   /* POSIX-conformant process group and session ids */
+   unsigned int proc_group_id, session_id;
 } diosix_process_info;
 
 typedef struct
