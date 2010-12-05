@@ -730,13 +730,6 @@ kresult vmm_free_pool(void *ptr, kpool *pool)
       return e_bad_params;
    }
    
-   /* add to the start of the free list */
-   if(pool->free)
-      pool->free->previous = block;
-   block->next = pool->free;
-   pool->free = block;
-   block->previous = NULL;
-   
    /* remove it from the in-use list */
    if(block->previous)
       block->previous->next = block->next;
@@ -753,13 +746,21 @@ kresult vmm_free_pool(void *ptr, kpool *pool)
       if(pool->tail) pool->tail->next = NULL;
    }
    
+   /* add to the start of the free list */
+   if(pool->free)
+      pool->free->previous = block;
+   block->next = pool->free;
+   pool->free = block;
+   block->previous = NULL;
+   
    /* update pool statistics */
    pool->inuse_blocks--;
    pool->free_blocks++;
  
    unlock_gate(&(pool->lock), LOCK_WRITE);
    
-   VMM_DEBUG("[vmm:%i] freed block %p (addr %x) in pool %p\n", CPU_ID, block, ptr, pool);
+   VMM_DEBUG("[vmm:%i] freed block %p (addr %x) in pool %p (head %p tail %p)\n",
+             CPU_ID, block, ptr, pool, pool->head, pool->tail);
    
    return success;
 }

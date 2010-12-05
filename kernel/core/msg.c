@@ -754,8 +754,9 @@ kresult msg_recv(thread *receiver, diosix_msg_info *msg)
       while(!search_done)
       {
          queued = vmm_next_in_pool(queued, receiver->proc->msg_queue);
+         dprintf("[%i] got queued = %p (%i)\n", CPU_ID, queued, vmm_count_pool_inuse(receiver->proc->msg_queue));
          if(queued)
-         {            
+         {
             /* translate pid+tid into a thread structure pointer */
             sender_proc = proc_find_proc(queued->pid);
             if(!sender_proc)
@@ -787,7 +788,9 @@ kresult msg_recv(thread *receiver, diosix_msg_info *msg)
          kresult err;
 
          /* don't forget to free the queued_sender block */
+         dprintf("[%i] free'ing queued = %p (%i)\n", CPU_ID, queued, vmm_count_pool_inuse(receiver->proc->msg_queue));
          vmm_free_pool(queued, receiver->proc->msg_queue);
+         dprintf("[%i] new inuse = %i\n", CPU_ID, vmm_count_pool_inuse(receiver->proc->msg_queue));
          
          /* we've found the sending thread but the message hasn't been
             delivered yet. we need to send the message but from the 
