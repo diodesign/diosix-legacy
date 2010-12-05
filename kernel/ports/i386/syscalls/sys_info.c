@@ -54,10 +54,10 @@ void syscall_do_info(int_registers_block *regs)
          block->data.p.privlayer = current->proc->layer;
          block->data.p.ruid      = current->proc->uid.real;
          block->data.p.euid      = current->proc->uid.effective;
-         block->data.p.ssuid     = current->proc->uid.saved_set;
+         block->data.p.ssuid     = current->proc->uid.saved;
          block->data.p.rgid      = current->proc->gid.real;
          block->data.p.egid      = current->proc->gid.effective;
-         block->data.p.ssgid     = current->proc->gid.saved_set;
+         block->data.p.ssgid     = current->proc->gid.saved;
          block->data.p.proc_group_id = current->proc->proc_group_id;
          block->data.p.session_id    = current->proc->session_id;
          SYSCALL_RETURN(success);
