@@ -192,13 +192,22 @@ void main(void)
 
    /* if memory share worked then write to video memory */
    if(msg.flags & DIOSIX_MSG_SHAREVMA)
+   {
+      diosix_signals_kernel(SIGXIRQ);
+      diosix_driver_register_irq(32); /* timer */
+
       while(1)
       {
-         for(px = FB_MAX_SIZE >> 1; px < FB_MAX_SIZE; px += sizeof(unsigned int))
-            *((volatile unsigned int *)(0x200000 + px)) = buffer & 0xff;
+         msg.tid = msg.pid = DIOSIX_MSG_ANY_THREAD;
+         msg.flags = DIOSIX_MSG_SIGNAL | DIOSIX_MSG_KERNELONLY;
+         if(diosix_msg_receive(&msg) == success)
+         {
+            for(px = FB_MAX_SIZE >> 1; px < FB_MAX_SIZE; px += sizeof(unsigned int))
+               *((volatile unsigned int *)(0x200000 + px)) = buffer & 0xff;
       
-         buffer += 1;
+            buffer += 1;
+         }
       }
-
+   }
    while(1); /* halt */
 }

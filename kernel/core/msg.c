@@ -61,6 +61,7 @@ kresult msg_send_signal(process *target, thread *sender, unsigned int signum, un
       {
          pool = vmm_create_pool(sizeof(queued_signal), 4);
          if(!pool) MSG_SIGNAL_REJECT(e_failure);
+         target->system_signals = pool;
       }
       else pool = target->system_signals;
       
@@ -75,12 +76,13 @@ kresult msg_send_signal(process *target, thread *sender, unsigned int signum, un
       /* is this kernel signal accepted? */
       if(!(target->kernel_signals_accepted & (1 << (signum - SIG_KERNEL_MIN))))
          MSG_SIGNAL_REJECT(e_no_receiver);
-      
+
       /* create a queued pool if one doesn't exist */
       if(!(target->system_signals))
       {
          pool = vmm_create_pool(sizeof(queued_signal), 4);
          if(!pool) MSG_SIGNAL_REJECT(e_failure);
+         target->system_signals = pool;
       }
       else pool = target->system_signals;
    }
@@ -93,6 +95,7 @@ kresult msg_send_signal(process *target, thread *sender, unsigned int signum, un
       {
          pool = vmm_create_pool(sizeof(queued_signal), 4);
          if(!pool) MSG_SIGNAL_REJECT(e_failure);
+         target->user_signals = pool;
       }
       else pool = target->user_signals;
    }      
@@ -687,7 +690,7 @@ kresult msg_recv(thread *receiver, diosix_msg_info *msg)
    /* grab a copy of the receiver's details */
    vmm_memcpy(&(receiver->msg), msg, sizeof(diosix_msg_info));
    receiver->msg_src = msg;
-
+   
    /* if receiving a signal, return immediately if one's queued and ready to go */
    if((msg->flags & DIOSIX_MSG_TYPEMASK) == DIOSIX_MSG_SIGNAL)
    {
@@ -696,7 +699,7 @@ kresult msg_recv(thread *receiver, diosix_msg_info *msg)
       
       /* check kernel and unix signals first */
       if(receiver->proc->system_signals)
-      {
+      {         
          /* are we looking for kernel-generated signals only? */
          if(msg->flags & DIOSIX_MSG_KERNELONLY)
          {
@@ -737,7 +740,6 @@ kresult msg_recv(thread *receiver, diosix_msg_info *msg)
          MSG_DEBUG("[msg:%i] returned queued signal %i to tid %i pid %i\n",
                    CPU_ID, receiver->msg.signal.number, receiver->tid,
                    receiver->proc->pid);
-         syscall_post_msg_recv(receiver, success); /* update the receiver */
          return success;
       }
    }
