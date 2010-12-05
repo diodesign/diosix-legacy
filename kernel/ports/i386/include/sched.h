@@ -34,10 +34,17 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #define SCHED_FREQUENCY           (DIOSIX_SCHED_TICK) /* timeslice = 1/DIOSIX_SCHED_TICK */
 #define SCHED_CARETAKER           (1000) /* run maintainance every 1000 ticks */
 
+typedef enum
+{
+   wake,  /* wake up a sleeping thread */
+   signal /* send SIGALARM to the thread owner */
+} sched_snooze_action;
+
 typedef struct
 {
    thread *sleeper;
    unsigned int timer;
+   sched_snooze_action action;
 } snoozing_thread;
 
 typedef enum
@@ -66,6 +73,6 @@ kresult sched_lock_thread(thread *victim);
 kresult sched_unlock_thread(thread *towake);
 unsigned char sched_pick_queue(unsigned char hint);
 kresult sched_remove_snoozer(thread *snoozer);
-kresult sched_add_snoozer(thread *snoozer, unsigned int timeout);
+kresult sched_add_snoozer(thread *snoozer, unsigned int timeout, sched_snooze_action action);
 
 #endif

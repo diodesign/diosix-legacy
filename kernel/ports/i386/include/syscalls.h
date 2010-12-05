@@ -25,6 +25,7 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 void syscall_do_exit(int_registers_block *regs);
 void syscall_do_fork(int_registers_block *regs);
 void syscall_do_kill(int_registers_block *regs);
+void syscall_do_alarm(int_registers_block *regs);
 void syscall_do_yield(int_registers_block *regs);
 void syscall_do_thread_exit(int_registers_block *regs);
 void syscall_do_thread_fork(int_registers_block *regs);

@@ -64,9 +64,6 @@ kresult msg_send_signal(process *target, thread *sender, unsigned int signum, un
          target->system_signals = pool;
       }
       else pool = target->system_signals;
-      
-      /* signal is in progress */
-      target->unix_signals_inprogress |= (1 << signum);
    }
    
    /* only kernel can send kernel signals */
@@ -132,7 +129,7 @@ kresult msg_send_signal(process *target, thread *sender, unsigned int signum, un
       /* wake the receiver */
       syscall_post_msg_recv(towake, success);
       sched_add(towake->cpu, towake);
-      
+
       MSG_DEBUG("[msg:%i] woke thread %p (tid %i pid %i) to receive signal %i\n",
                 CPU_ID, towake, towake->tid, towake->proc->pid, signum);
    }
@@ -161,6 +158,10 @@ kresult msg_send_signal(process *target, thread *sender, unsigned int signum, un
          newsig->sender_pid = newsig->sender_tid = RESERVED_PID;
          newsig->sender_uid = newsig->sender_gid = SUPERUSER_ID;
       }
+      
+      /* mark UNIX signal as in progress if need be */
+      if(signum <= SIG_UNIX_MAX)
+         target->unix_signals_inprogress |= (1 << signum);
       
       MSG_DEBUG("[msg:%i] queued signal %i:0x%x to pid %i from process %x\n",
                 CPU_ID, signum, sigcode, target->pid, sender);      
@@ -744,6 +745,10 @@ kresult msg_recv(thread *receiver, diosix_msg_info *msg)
          receiver->msg.tid = sig->sender_tid;
          receiver->msg.uid = sig->sender_uid;
          receiver->msg.gid = sig->sender_gid;
+         
+         /* if the signal is a UNIX one, then clear the pending flag */
+         if(sig->signal.number <= SIG_UNIX_MAX)
+            receiver->proc->unix_signals_inprogress &= ~(1 << sig->signal.number);
          
          /* free the block */
          vmm_free_pool(sig, pool);

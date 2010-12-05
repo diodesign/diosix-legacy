@@ -95,3 +95,17 @@ void syscall_do_kill(int_registers_block *regs)
       /* inform the system executive that a process has been killed */
       msg_send_signal(proc_sys_executive, NULL, SIGXPROCKILLED, victim);
 }
+
+/* syscall: alarm - send a SIGALRM signal to a process after the given number of
+   scheduling ticks have expired in the system.
+   => eax = number of scheduling ticks to wait for
+   <= 0 for success, or an error code
+*/
+void syscall_do_alarm(int_registers_block *regs)
+{
+   SYSCALL_DEBUG("[sys:%i] SYSCALL_ALARM(%i) called by process %i (%p) (thread %i)\n",
+                 CPU_ID, regs->eax, cpu_table[CPU_ID].current->proc->pid, cpu_table[CPU_ID].current->proc,
+                 cpu_table[CPU_ID].current->tid);
+   
+   SYSCALL_RETURN(sched_add_snoozer(cpu_table[CPU_ID].current, regs->eax, signal));
+}

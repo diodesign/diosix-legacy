@@ -151,15 +151,20 @@ void do_listen(void)
    
    /* reply to the share request */
    if(diosix_msg_reply(&msg) != success) while(1); /* halt if failed */
-      
+   
+   msg.flags = DIOSIX_MSG_SIGNAL | DIOSIX_MSG_KERNELONLY;
+   msg.tid = msg.pid = DIOSIX_MSG_ANY_THREAD;
+   diosix_signals_unix(1 << SIGALRM);
+   
    while(1)
    {
-      diosix_thread_sleep(50);
+      diosix_alarm(100);
+      diosix_msg_receive(&msg);
       
       for(px = 0; px < FB_MAX_SIZE >> 1; px += sizeof(unsigned int))
          *((volatile unsigned int *)(FB_LOG_BASE + px)) = (buffer & 0xff) << 16;
          
-      buffer += 4;
+      buffer += 0x11;
    }
 }
 

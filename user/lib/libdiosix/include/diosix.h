@@ -71,6 +71,7 @@ typedef enum
 #define SYSCALL_DRIVER        (11)
 #define SYSCALL_MEMORY        (12)
 #define SYSCALL_THREAD_SLEEP  (13)
+#define SYSCALL_ALARM         (14)
 
 /* define the rate at which the scheduler is interrupted, the system-wide scheduling tick */
 #define DIOSIX_SCHED_TICK     (100) /* 100 times a second, one tick is 10ms */

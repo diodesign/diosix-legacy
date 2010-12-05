@@ -160,5 +160,5 @@ void syscall_do_thread_sleep(int_registers_block *regs)
                  CPU_ID, regs->eax, cpu_table[CPU_ID].current->proc->pid, cpu_table[CPU_ID].current->proc,
                  cpu_table[CPU_ID].current->tid);
    
-   SYSCALL_RETURN(sched_add_snoozer(current, regs->eax));
+   SYSCALL_RETURN(sched_add_snoozer(current, regs->eax, wake));
 }

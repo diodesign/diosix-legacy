@@ -152,9 +152,13 @@ void exception_handler(int_registers_block regs)
                syscall_do_kill(&regs);
                break;
                
+            case SYSCALL_ALARM:
+               syscall_do_alarm(&regs);
+               break;
+               
             case SYSCALL_THREAD_YIELD:
                syscall_do_yield(&regs);
-               break; /* we will poke the scheduler below */
+               break;
                
             case SYSCALL_THREAD_EXIT:
                syscall_do_thread_exit(&regs);

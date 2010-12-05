@@ -54,6 +54,14 @@ unsigned int diosix_kill(unsigned int pid)
    return retval;
 }
 
+unsigned int diosix_alarm(unsigned int ticks)
+/* send a SIGALRM signal to the calling process after the given number of scheduler clock ticks */
+{
+   unsigned int retval;
+   __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (ticks), "d" (SYSCALL_ALARM));
+   return retval;
+}
+
 /* --------------- threading basics -------------------- */
 
 void diosix_thread_yield(void)

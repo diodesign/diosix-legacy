@@ -444,15 +444,31 @@ void sched_tick(int_registers_block *regs)
                snoozer->timer--;
                if(snoozer->timer == 0)
                {
-                  /* wake up the thread */
-                  sched_add(snoozer->sleeper->cpu, snoozer->sleeper);
-                  
-                  SCHED_DEBUG("[sched:%i] woke up snoozing thread %p (tid %i pid %i)\n",
-                              CPU_ID, snoozer->sleeper, snoozer->sleeper->tid, snoozer->sleeper->proc->pid);
-                  
+                  switch(snoozer->action)
+                  {
+                     case wake:
+                     {
+                        /* wake up the thread */
+                        sched_add(snoozer->sleeper->cpu, snoozer->sleeper);
+                        
+                        SCHED_DEBUG("[sched:%i] woke up snoozing thread %p (tid %i pid %i)\n",
+                                    CPU_ID, snoozer->sleeper, snoozer->sleeper->tid, snoozer->sleeper->proc->pid);
+                     }
+
+                     case signal:
+                     {
+                        /* poke the owning process as a SIGALARM signal from the kernel */
+                        msg_send_signal(snoozer->sleeper->proc, NULL, SIGALRM, 0);
+                        
+                        SCHED_DEBUG("[sched:%i] sent SIGALRM to pid %i\n",
+                                    CPU_ID, snoozer->sleeper, snoozer->sleeper->proc->pid);
+                     }
+                  }
+               
                   /* and bin the pool block */
                   vmm_free_pool(snoozer, sched_bedroom);
                   snoozer = NULL; /* pointer no longer valid */
+                  break;
                }
             } else break; /* escape the loop if no more sleepers */
          }
@@ -534,12 +550,14 @@ kresult sched_remove_snoozer(thread *snoozer)
 }
 
 /* sched_add_snoozer
-   Add a thread to the queued pool of threads waiting on the clock
-   => snoozer = thread to put to sleep
-      timeout = number of scheduling ticks to sleep for, or 0 to cancel
+   Add a thread to the queued pool of threads waiting on the scheduler clock
+   => snoozer = thread to work on
+      timeout = number of scheduling ticks to count down from, or 0 to cancel
+      action = wake: put calling thread to sleep and wake it when timeout reaches zero
+               signal: send a SIGALARM to the thread's owner process when timeout reaches zero
    <= 0 for success, or an error code
 */
-kresult sched_add_snoozer(thread *snoozer, unsigned int timeout)
+kresult sched_add_snoozer(thread *snoozer, unsigned int timeout, sched_snooze_action action)
 {
    snoozing_thread *new;
    kresult err;
@@ -556,12 +574,14 @@ kresult sched_add_snoozer(thread *snoozer, unsigned int timeout)
    if(err) return err;
    
    new->sleeper = snoozer;
-   new->timer = timeout;
+   new->timer   = timeout;
+   new->action  = action;
    
-   SCHED_DEBUG("[sched:%i] added thread %p (tid %i pid %i) to bedroom: will wake in %i ticks\n",
-               CPU_ID, snoozer, snoozer->tid, snoozer->proc->pid, timeout);
+   SCHED_DEBUG("[sched:%i] added thread %p (tid %i pid %i) to bedroom: timeout %i ticks action %i\n",
+               CPU_ID, snoozer, snoozer->tid, snoozer->proc->pid, timeout, action);
    
-   sched_remove(snoozer, sleeping);
+   if(action == wake) sched_remove(snoozer, sleeping);
+
    return success;
 }
 
