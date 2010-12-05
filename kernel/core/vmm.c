@@ -753,6 +753,9 @@ kresult vmm_free_pool(void *ptr, kpool *pool)
    pool->free = block;
    block->previous = NULL;
    
+   /* change the magic in the block */
+   block->magic = KPOOL_FREE;
+   
    /* update pool statistics */
    pool->inuse_blocks--;
    pool->free_blocks++;
