@@ -139,7 +139,6 @@ void do_listen(void)
    msg.recv = &buffer;
    msg.recv_max_size = sizeof(unsigned int);
 
-   while(1) diosix_msg_receive(&msg);
    if(diosix_msg_receive(&msg) != success) while(1); /* halt if failed */
    
    if(buffer == 0) buffer = 0xffffffff; /* prove we're swapping data */
