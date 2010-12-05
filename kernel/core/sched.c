@@ -447,8 +447,8 @@ void sched_tick(int_registers_block *regs)
                   /* wake up the thread */
                   sched_add(snoozer->sleeper->cpu, snoozer->sleeper);
                   
-                  dprintf("[sched:%i] woke up snoozing thread %p (tid %i pid %i)\n",
-                          CPU_ID, snoozer->sleeper, snoozer->sleeper->tid, snoozer->sleeper->proc->pid);
+                  SCHED_DEBUG("[sched:%i] woke up snoozing thread %p (tid %i pid %i)\n",
+                              CPU_ID, snoozer->sleeper, snoozer->sleeper->tid, snoozer->sleeper->proc->pid);
                   
                   /* and bin the pool block */
                   vmm_free_pool(snoozer, sched_bedroom);
@@ -527,8 +527,8 @@ kresult sched_remove_snoozer(thread *snoozer)
       } else break; /* escape the loop if no more sleepers */
    }
    
-   dprintf("[sched:%i] removed thread %p (tid %i pid %i) from bedroom (result %i)\n",
-           CPU_ID, snoozer, snoozer->tid, snoozer->proc->pid, result);
+   SCHED_DEBUG("[sched:%i] removed thread %p (tid %i pid %i) from bedroom (result %i)\n",
+               CPU_ID, snoozer, snoozer->tid, snoozer->proc->pid, result);
    
    return result;
 }
@@ -558,8 +558,8 @@ kresult sched_add_snoozer(thread *snoozer, unsigned int timeout)
    new->sleeper = snoozer;
    new->timer = timeout;
    
-   dprintf("[sched:%i] added thread %p (tid %i pid %i) to bedroom: will wake in %i ticks\n",
-           CPU_ID, snoozer, snoozer->tid, snoozer->proc->pid, timeout);
+   SCHED_DEBUG("[sched:%i] added thread %p (tid %i pid %i) to bedroom: will wake in %i ticks\n",
+               CPU_ID, snoozer, snoozer->tid, snoozer->proc->pid, timeout);
    
    sched_remove(snoozer, sleeping);
    return success;

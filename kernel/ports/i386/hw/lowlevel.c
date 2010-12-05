@@ -398,12 +398,11 @@ kresult x86_ioports_enable(thread *t)
    
    /* sanity check */
    if(!t) return e_bad_params;
-   
+
    /* give up if this process isn't allowed to be a driver or if a process
       has given up all its IO port rights */
    if(!(t->proc->flags & PROC_FLAG_CANBEDRIVER)) return e_no_rights;
    if(!(t->proc->ioport_bitmap)) return e_no_rights;
-   
    /* give up if this thread is already enabled */
    if(t->flags & THREAD_FLAG_HASIOBITMAP) return e_failure;
    

@@ -38,11 +38,11 @@ void syscall_do_driver(int_registers_block *regs)
    
    SYSCALL_DEBUG("[sys:%i] SYSCALL_DRIVER(%i) called by process %i (thread %i)\n",
                  CPU_ID, regs->eax, current->proc->pid, current->tid);
-   
+
    /* bail out now if the thread isn't sufficiently privileged */
    if(current->proc->layer != LAYER_DRIVERS) SYSCALL_RETURN(e_no_rights);
    if(!(current->proc->flags & PROC_FLAG_CANBEDRIVER)) SYSCALL_RETURN(e_no_rights);
-   
+
    switch(regs->eax)
    {
       case DIOSIX_DRIVER_REGISTER:

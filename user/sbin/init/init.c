@@ -121,7 +121,7 @@ void do_listen(void)
    
    /* move into driver layer and get access to IO ports */
    diosix_priv_layer_up();
-   diosix_driver_register();
+   if(diosix_driver_register()) while(1); /* halt on failure */
    
    vbe_set_mode(FB_WIDTH, FB_HEIGHT, FB_DEPTH);
    
@@ -154,7 +154,7 @@ void do_listen(void)
       
    while(1)
    {
-      diosix_thread_sleep(100);
+      diosix_thread_sleep(50);
       
       for(px = 0; px < FB_MAX_SIZE >> 1; px += sizeof(unsigned int))
          *((volatile unsigned int *)(FB_LOG_BASE + px)) = (buffer & 0xff) << 16;
@@ -169,7 +169,11 @@ void main(void)
    unsigned int child;
    unsigned int buffer = 0, message = 0;
    unsigned int px;
-
+   
+   /* create new process to receive */
+   child = diosix_fork();
+   if(!child) do_listen(); /* child does the listening */
+   
    /* create idle thread */
    child = diosix_thread_fork();
    if(!child)
@@ -178,10 +182,6 @@ void main(void)
       diosix_priv_layer_up();
       while(1);
    }
-   
-   /* create new process to receive */
-   child = diosix_fork();
-   if(!child) do_listen(); /* child does the listening */
 
    /* ask to share some memory with the child */
    msg.tid = DIOSIX_MSG_ANY_THREAD;
@@ -202,7 +202,7 @@ void main(void)
    {      
       while(1)
       {
-         diosix_thread_sleep(50);
+         diosix_thread_sleep(20);
          
          for(px = FB_MAX_SIZE >> 1; px < FB_MAX_SIZE; px += sizeof(unsigned int))
             *((volatile unsigned int *)(0x200000 + px)) = buffer & 0xff;
