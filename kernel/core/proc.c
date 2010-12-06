@@ -108,6 +108,41 @@ process *proc_find_proc(unsigned int pid)
    return NULL; /* not found! */
 }
 
+/* proc_is_valid_pgid
+   Confirm there is at least one other process with a matching
+   process group id and session id
+   => pgid = process group id to search for
+      sid = required matching session id
+   <= 0 for successful find, or an error code
+*/
+kresult proc_is_valid_pgid(unsigned int pgid, unsigned int sid)
+{
+   process *search;
+   unsigned int hashloop;
+   
+   lock_gate(&proc_lock, LOCK_READ);
+   
+   /* go through all the processes */
+   for(hashloop = 0; hashloop < PROC_HASH_BUCKETS; hashloop++)
+   {
+      search = proc_table[hashloop];
+      while(search)
+      {
+         if((search->proc_group_id == pgid) &&
+            (search->session_id = sid))
+         {
+            unlock_gate(&proc_lock, LOCK_READ);
+            return success; /* I got you */
+         }
+         
+         search = search->hash_next;
+      }
+   }
+   
+   unlock_gate(&proc_lock, LOCK_READ);
+   return e_not_found; /* not found! */
+}
+
 /* proc_is_child
    Confirm a process is a descendant of another process
    => parent = pointer to parent process

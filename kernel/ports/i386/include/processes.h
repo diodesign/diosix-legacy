@@ -205,6 +205,7 @@ struct thread
 #define PROC_FLAG_CANBEDRIVER   (1 << 2) /* can register as a driver process */
 #define PROC_FLAG_CANMAPPHYS    (1 << 3) /* is allowed to map physical memory into its virtual space */
 #define PROC_FLAG_CANUNIXSIGNAL (1 << 4) /* is allowed to send POSIX-compatible signals (sig code 0-31) */
+#define PROC_FLAG_HASCALLEDEXEC (1 << 5) /* process has called exec() to replace its image */
 #define PROC_RIGHTS_MASK  (PROC_FLAG_CANMSGASUSR | \
                            PROC_FLAG_CANBEDRIVER | \
                            PROC_FLAG_CANMAPPHYS | \
@@ -212,12 +213,6 @@ struct thread
 
 /* needed in the process struct */
 typedef struct irq_driver_entry irq_driver_entry;
-
-/* comtains the POSIX-defined real, effective and saved-set ids for processes */
-typedef struct
-{
-   unsigned int real, effective, saved;
-} posix_id_set;
 
 /* defines a supplementary group entry */
 typedef struct
@@ -325,6 +320,8 @@ extern rw_gate proc_lock;
 kresult proc_initialise(void);
 process *proc_new(process *current, thread *caller);
 process *proc_find_proc(unsigned int pid);
+kresult proc_is_valid_pgid(unsigned int pgid, unsigned int sid);
+kresult proc_is_child(process *parent, process *child);
 kresult proc_kill(unsigned int victimpid, process *slayer);
 kresult proc_layer_up(process *proc);
 kresult proc_clear_rights(process *proc, unsigned int bits);

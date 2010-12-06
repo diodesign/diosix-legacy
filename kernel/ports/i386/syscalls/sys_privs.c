@@ -65,3 +65,109 @@ void syscall_do_privs(int_registers_block *regs)
    /* fall through to returning an error code */
    SYSCALL_RETURN(e_bad_params);
 }
+
+/* unlock the target process (if set) in syscall_do_set_id() and return from the syscall */
+#define SYSCALL_SET_ID_RETURN(a) { if(target) unlock_gate(&(target->lock), LOCK_WRITE); SYSCALL_RETURN(a); }
+
+/* syscall: set_id - set various credential values inside a process,
+   subject to security checks, namely the user and group ids of a program.
+   => eax = DIOSIX_SETPGID: set process group id within same session
+            ebx = pid of process to alter, or 0 to use calling process's pid
+            ecx = new process group id to use, or 0 to use ebx
+            DIOSIX_SETSID, DIOSIX_SETEUID, DIOSIX_SETREUID,
+            DIOSIX_SETRESUID, DIOSIX_SETEGID, DIOSIX_SETREGID or DIOSIX_SETRESGID
+   <= 0 for success, or an error code
+*/
+void syscall_do_set_id(int_registers_block *regs)
+{
+   unsigned int action = regs->eax;
+   process *target = NULL, *current = cpu_table[CPU_ID].current->proc;
+
+   SYSCALL_DEBUG("[sys:%i] SYSCALL_SET_ID(%i) called by process %i (%p) (thread %i)\n",
+                 CPU_ID, regs->eax, cpu_table[CPU_ID].current->proc->pid,
+                 cpu_table[CPU_ID].current->proc, cpu_table[CPU_ID].current->tid);
+                 
+   switch(action)
+   {
+      /* set a new process group id in the given process
+         http://www.opengroup.org/onlinepubs/009695399/functions/setpgid.html */
+      case DIOSIX_SETPGID:
+      {
+         unsigned int pid = regs->ebx;
+         unsigned int pgid = regs->ecx;
+         unsigned int is_child;
+
+         /* pid of zero means use the calling process's pid */
+         if(!pid)
+         {
+            pid = current->pid;
+            target = current;
+         }
+         else
+            target = proc_find_proc(pid);
+         if(target)
+         {
+            lock_gate(&(target->lock), LOCK_WRITE);
+            
+            /* only perform this lookup once */
+            if(proc_is_child(current, target) == success)
+               is_child = 1;
+            else
+            {
+               /* if we're altering another process and it's
+                  not a child then give up */
+               if(target != current) SYSCALL_SET_ID_RETURN(e_no_rights);
+               is_child = 0;
+            }
+
+            /* cannot use this call on a child if it has called exec() */
+            if((target->flags & PROC_FLAG_HASCALLEDEXEC) && is_child)
+               SYSCALL_SET_ID_RETURN(e_no_rights);
+            
+            /* session leader may not change pgid */
+            if(target->session_id == pid)
+               SYSCALL_SET_ID_RETURN(e_no_rights);
+            
+            /* process cannot be a child and in a separate session */
+            if((target->session_id != current->session_id) && is_child)
+               SYSCALL_SET_ID_RETURN(e_no_rights);
+            
+            /* correct the pgid if zero */
+            if(!pgid) pgid = pid;
+            
+            /* the process group id must be valid and in same session */
+            if(pgid != pid && !proc_is_valid_pgid(pgid, current->session_id))
+               SYSCALL_SET_ID_RETURN(e_no_rights);
+            
+            /* finally update the target process */
+            target->proc_group_id = pgid;
+         }
+         else SYSCALL_RETURN(e_not_found); /* target not locked */
+      }
+      SYSCALL_SET_ID_RETURN(success);
+
+      case DIOSIX_SETSID:
+      SYSCALL_SET_ID_RETURN(success);
+
+      case DIOSIX_SETEUID:
+      SYSCALL_SET_ID_RETURN(success);
+
+      case DIOSIX_SETREUID:
+      SYSCALL_SET_ID_RETURN(success);
+
+      case DIOSIX_SETRESUID:
+      SYSCALL_SET_ID_RETURN(success);
+
+      case DIOSIX_SETEGID:
+      SYSCALL_SET_ID_RETURN(success);
+
+      case DIOSIX_SETREGID:
+      SYSCALL_SET_ID_RETURN(success);
+
+      case DIOSIX_SETRESGID:
+      SYSCALL_SET_ID_RETURN(success);
+      
+      default:
+         SYSCALL_SET_ID_RETURN(e_bad_params);
+   }
+}

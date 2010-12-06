@@ -74,6 +74,22 @@ typedef enum
 #define SYSCALL_ALARM         (14)
 #define SYSCALL_SET_ID        (15)
 
+/* manage a process's POSIX-conformant ids */
+#define DIOSIX_SETPGID    (1) /* set process group id */
+#define DIOSIX_SETSID     (2) /* set session id */
+#define DIOSIX_SETEUID    (3) /* set effective user id */
+#define DIOSIX_SETREUID   (4) /* set effective and real user id */
+#define DIOSIX_SETRESUID  (5) /* set effective, real and saved user id */
+#define DIOSIX_SETEGID    (6) /* set effective group id */
+#define DIOSIX_SETREGID   (7) /* set effective and real group id */
+#define DIOSIX_SETRESGID  (8) /* set effective, real and saved group id */
+
+/* contains the POSIX-defined real, effective and saved-set ids for processes */
+typedef struct
+{
+   unsigned int real, effective, saved;
+} posix_id_set;
+
 /* define the rate at which the scheduler is interrupted, the system-wide scheduling tick */
 #define DIOSIX_SCHED_TICK     (100) /* 100 times a second, one tick is 10ms */
 /* calculate how many scheduling ticks there are per second */

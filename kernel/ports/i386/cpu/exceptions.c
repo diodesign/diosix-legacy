@@ -195,6 +195,10 @@ void exception_handler(int_registers_block regs)
             case SYSCALL_DRIVER:
                syscall_do_driver(&regs);
                break;
+               
+            case SYSCALL_SET_ID:
+               syscall_do_set_id(&regs);
+               break;
 
             default:
                XPT_DEBUG("[xpt:%i] unknown syscall %x by thread %i in process %i\n",
