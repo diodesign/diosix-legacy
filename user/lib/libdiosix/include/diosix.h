@@ -103,6 +103,8 @@ typedef struct
 #define DIOSIX_MSG_KERNELONLY  (1 << 27) /* accept signals from the kernel only */
 #define DIOSIX_MSG_SHAREVMA    (1 << 26) /* share a VMA in reply message */
 #define DIOSIX_MSG_QUEUEME     (1 << 25) /* queue a non-reply non-signal message and block until received */
+#define DIOSIX_MSG_INMYPROCGRP (1 << 24) /* send the signal to all processes in sender's process group */
+#define DIOSIX_MSG_INAPROCGRP  (1 << 23) /* send the signal to all processes in process group selected by pid */
 /* simple type bits low (bits 0-3) */
 #define DIOSIX_MSG_GENERIC     (1)
 #define DIOSIX_MSG_SIGNAL      (2)

@@ -36,6 +36,32 @@ void syscall_do_msg_send(int_registers_block *regs)
    if(!msg || ((unsigned int)msg + MEM_CLIP(msg, sizeof(diosix_msg_info)) >= KERNEL_SPACE_BASE))
       SYSCALL_RETURN(e_bad_address);
    
+   /* determine the type of message being sent - this code is mostly portable... */
+   if(msg->flags & DIOSIX_MSG_SIGNAL)
+   {
+      process *target;
+      
+      SYSCALL_DEBUG("[sys:%i] sending signal %i...\n", CPU_ID, msg->signal.number);
+      
+      /* send a signal to the caller's process group */
+      if(msg->flags & DIOSIX_MSG_INMYPROCGRP)
+         SYSCALL_RETURN(proc_send_group_signal(current->proc->proc_group_id, current,
+                                               msg->signal.number, msg->signal.extra));
+      
+      /* send a signal to an arbitrary process group - pgid zero means use the caller's */
+      if(msg->flags & DIOSIX_MSG_INAPROCGRP)
+         SYSCALL_RETURN(proc_send_group_signal(msg->pid, current,
+                                               msg->signal.number, msg->signal.extra));
+      
+      /* default to sending a single signal */
+      target = proc_find_proc(msg->pid);
+      if(!target) SYSCALL_RETURN(e_not_found);
+      SYSCALL_RETURN(msg_send_signal(target, current, msg->signal.number, msg->signal.extra));
+   }
+   
+   /* bail out if it's not a generic sync message */
+   if(!(msg->flags & DIOSIX_MSG_GENERIC)) SYSCALL_RETURN(e_bad_params);
+   
    /* do the actual sending */
    send_result = msg_send(current, msg);
    

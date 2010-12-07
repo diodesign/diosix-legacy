@@ -108,6 +108,49 @@ process *proc_find_proc(unsigned int pid)
    return NULL; /* not found! */
 }
 
+/* proc_send_group_signal
+   Send a signal to all processes in a given process group via msg_send_signal().
+   => pgid = process group id to target, or 0 to use the sending process's pgid
+      sender = pointer to thread structure of sender, or NULL for kernel
+      signum = signal code to send
+      sigcode = additional reason code
+   <= 0 for success, or an error reason code
+*/
+kresult proc_send_group_signal(unsigned int pgid, thread *sender, unsigned int signum, unsigned int sigcode)
+{
+   process *search;
+   unsigned int hashloop;
+   kresult err;
+   
+   if(!pgid) pgid = sender->proc->proc_group_id;
+   
+   lock_gate(&proc_lock, LOCK_READ);
+   
+   /* go through all the processes looking for a pgid match */
+   for(hashloop = 0; hashloop < PROC_HASH_BUCKETS; hashloop++)
+   {
+      search = proc_table[hashloop];
+      while(search)
+      {
+         if(search->proc_group_id == pgid)
+         {
+            err = msg_send_signal(search, sender, signum, sigcode);
+            
+            /* give up if a failure occurs */
+            if(err)
+            {
+               unlock_gate(&proc_lock, LOCK_READ);
+               return err;
+            }
+         }
+         search = search->hash_next;
+      }
+   }
+   
+   unlock_gate(&proc_lock, LOCK_READ);
+   return err; /* should be success */
+}
+
 /* proc_is_valid_pgid
    Confirm there is at least one other process with a matching
    process group id and session id

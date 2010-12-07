@@ -21,7 +21,7 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #define MSG_SIGNAL_REJECT(a) { err = a; goto msg_send_signal_exit; }
 
 /* msg_send_signal
-   Send a POSIX signal message to a process - this function will not block.
+   Send a signal message to a process - this function will not block.
    It queues a signal message for the process and wakes up the thread that's
    supposed to be handling it, then returns. If no signal handler can be found
    then alert the caller.
@@ -44,9 +44,16 @@ kresult msg_send_signal(process *target, thread *sender, unsigned int signum, un
    err = lock_gate(&(target->lock), LOCK_WRITE);
    if(err) return err;
    
-   /* only authorised senders and the kernel can send UNIX signals */
+   /* only authorised senders, the kernel, processes within the same
+      process group or processes with the same real or effective user ids
+      can send UNIX signals */
    if(signum <= SIG_UNIX_MAX &&
-      (!sender || (sender->proc->flags & PROC_FLAG_CANUNIXSIGNAL)))
+      (!sender || (sender->proc->flags & PROC_FLAG_CANUNIXSIGNAL) ||
+       (target->proc_group_id == sender->proc->proc_group_id) ||
+       (target->uid.real == sender->proc->uid.real) ||
+       (target->uid.real == sender->proc->uid.effective) ||
+       (target->uid.saved == sender->proc->uid.real) ||
+       (target->uid.saved == sender->proc->uid.effective)))
    {
       /* it's a UNIX-compatible signal, but is it accepted? */
       if(!(target->unix_signals_accepted & (1 << signum)))
@@ -566,7 +573,7 @@ kresult msg_send(thread *sender, diosix_msg_info *msg)
 
    /* sanity check the msg data */
    if(!msg || !sender) return e_bad_address;
-
+   
    /* identify the receiver */
    receiver = msg_find_receiver(sender, msg);
    if(!receiver)
