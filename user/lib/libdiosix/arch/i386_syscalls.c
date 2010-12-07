@@ -156,6 +156,62 @@ unsigned int diosix_rights_clear(unsigned int bits)
    return retval;
 }
 
+unsigned int diosix_set_pg_id(unsigned int pid, unsigned int pgid)
+/* alter the process's process group id */
+{
+   unsigned int retval;
+   __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (DIOSIX_SETPGID), "b" (pid), "c" (pgid), "d" (SYSCALL_SET_ID));
+   return retval;
+}
+
+unsigned int diosix_set_session_id(void)
+/* alter the process's session id */
+{
+   unsigned int retval;
+   __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (DIOSIX_SETSID), "d" (SYSCALL_SET_ID));
+   return retval;
+}
+
+unsigned int diosix_set_eid(unsigned char flag, unsigned int eid)
+/* alter the process's effective user id if flag is 1 or effective group id if flag is 0 */
+{
+   unsigned int retval;
+   if(flag == DIOSIX_SET_USER)
+      __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (DIOSIX_SETEUID), "b" (eid), "d" (SYSCALL_SET_ID));
+   else
+      __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (DIOSIX_SETEGID), "b" (eid), "d" (SYSCALL_SET_ID));
+   return retval;
+}
+
+unsigned int diosix_set_reid(unsigned char flag, unsigned int eid, unsigned int rid)
+/* alter the process's real and effective user ids if flag is 1 or real and effective group ids if flag is 0 */
+{
+   unsigned int retval;
+   if(flag == DIOSIX_SET_USER)
+      __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (DIOSIX_SETREUID), "b" (eid), "c" (rid), "d" (SYSCALL_SET_ID));
+   else
+      __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (DIOSIX_SETREGID), "b" (eid), "c" (rid), "d" (SYSCALL_SET_ID));
+   return retval;
+}
+
+unsigned int diosix_set_resid(unsigned char flag, unsigned eid, unsigned int rid, unsigned sid)
+/* alter all process's user ids if flag is 1 or all its group ids if flag is 0 */
+{
+   unsigned int retval;
+   posix_id_set ids;
+   
+   /* copy values into block */
+   ids.effective = eid;
+   ids.real      = rid;
+   ids.saved     = sid;
+   
+   if(flag == DIOSIX_SET_USER)
+      __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (DIOSIX_SETRESUID), "b" (&ids), "d" (SYSCALL_SET_ID));
+   else
+      __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (DIOSIX_SETRESGID), "b" (&ids), "d" (SYSCALL_SET_ID));
+   return retval;
+}
+
 unsigned int diosix_iorights_remove(void)
 /* remove the previously afforded process right to access IO ports entirely */
 {

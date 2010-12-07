@@ -75,14 +75,17 @@ typedef enum
 #define SYSCALL_SET_ID        (15)
 
 /* manage a process's POSIX-conformant ids */
-#define DIOSIX_SETPGID    (1) /* set process group id */
-#define DIOSIX_SETSID     (2) /* set session id */
-#define DIOSIX_SETEUID    (3) /* set effective user id */
-#define DIOSIX_SETREUID   (4) /* set effective and real user id */
-#define DIOSIX_SETRESUID  (5) /* set effective, real and saved user id */
-#define DIOSIX_SETEGID    (6) /* set effective group id */
-#define DIOSIX_SETREGID   (7) /* set effective and real group id */
-#define DIOSIX_SETRESGID  (8) /* set effective, real and saved group id */
+#define DIOSIX_SETPGID   (1) /* set process group id */
+#define DIOSIX_SETSID    (2) /* set session id */
+#define DIOSIX_SETEUID   (3) /* set effective user id */
+#define DIOSIX_SETREUID  (4) /* set real user id */
+#define DIOSIX_SETRESUID (5) /* set effective, real and saved user id */
+#define DIOSIX_SETEGID   (6) /* set effective group id */
+#define DIOSIX_SETREGID  (7) /* set real group id */
+#define DIOSIX_SETRESGID (8) /* set effective, real and saved group id */
+
+#define DIOSIX_SET_GROUP (0) /* alter a group id */
+#define DIOSIX_SET_USER  (1) /* alter a user id */
 
 /* contains the POSIX-defined real, effective and saved-set ids for processes */
 typedef struct
