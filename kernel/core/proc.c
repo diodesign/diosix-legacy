@@ -155,10 +155,11 @@ kresult proc_send_group_signal(unsigned int pgid, thread *sender, unsigned int s
    Confirm there is at least one other process with a matching
    process group id and session id
    => pgid = process group id to search for
-      sid = required matching session id
+      sid = required matching session id, or 0 for match any
+      exclude = if set, exclude this process from the search
    <= 0 for successful find, or an error code
 */
-kresult proc_is_valid_pgid(unsigned int pgid, unsigned int sid)
+kresult proc_is_valid_pgid(unsigned int pgid, unsigned int sid, process *exclude)
 {
    process *search;
    unsigned int hashloop;
@@ -172,10 +173,13 @@ kresult proc_is_valid_pgid(unsigned int pgid, unsigned int sid)
       while(search)
       {
          if((search->proc_group_id == pgid) &&
-            (search->session_id = sid))
+            ((search->session_id == sid) || !sid))
          {
-            unlock_gate(&proc_lock, LOCK_READ);
-            return success; /* I got you */
+            if(search != exclude)
+            {
+               unlock_gate(&proc_lock, LOCK_READ);
+               return success; /* I got you */
+            }
          }
          
          search = search->hash_next;

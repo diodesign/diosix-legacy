@@ -136,7 +136,7 @@ void syscall_do_set_id(int_registers_block *regs)
             if(!pgid) pgid = pid;
             
             /* the process group id must be valid and in same session */
-            if(pgid != pid && !proc_is_valid_pgid(pgid, current->session_id))
+            if(pgid != pid && !proc_is_valid_pgid(pgid, current->session_id, NULL))
                SYSCALL_SET_ID_RETURN(e_no_rights);
             
             /* finally update the target process */
@@ -147,6 +147,22 @@ void syscall_do_set_id(int_registers_block *regs)
       SYSCALL_SET_ID_RETURN(success);
 
       case DIOSIX_SETSID:
+      {
+         /* set the session and process group id
+            http://www.opengroup.org/onlinepubs/009695399/functions/setsid.html */
+         target = current;
+         
+         lock_gate(&(target->lock), LOCK_WRITE);
+         
+         /* target cannot be a process group leader */
+         if(target->proc_group_id == target->pid) SYSCALL_SET_ID_RETURN(e_no_rights);
+         
+         /* process group cannot exist elsewhere */
+         if(proc_is_valid_pgid(target->pid, 0, target)) SYSCALL_SET_ID_RETURN(e_no_rights);
+         
+         /* update the process */
+         target->session_id = target->proc_group_id = target->pid;
+      }
       SYSCALL_SET_ID_RETURN(success);
 
       case DIOSIX_SETEUID:

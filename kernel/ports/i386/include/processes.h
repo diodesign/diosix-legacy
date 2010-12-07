@@ -321,7 +321,7 @@ kresult proc_initialise(void);
 process *proc_new(process *current, thread *caller);
 process *proc_find_proc(unsigned int pid);
 kresult proc_send_group_signal(unsigned int pgid, thread *sender, unsigned int signum, unsigned int sigcode);
-kresult proc_is_valid_pgid(unsigned int pgid, unsigned int sid);
+kresult proc_is_valid_pgid(unsigned int pgid, unsigned int sid, process *exclude);
 kresult proc_is_child(process *parent, process *child);
 kresult proc_kill(unsigned int victimpid, process *slayer);
 kresult proc_layer_up(process *proc);
