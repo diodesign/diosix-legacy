@@ -55,7 +55,7 @@ void syscall_do_thread_exit(int_registers_block *regs)
    }
    
    /* request to be killed by the system executive */
-   msg_send_signal(proc_sys_executive, NULL, SIGXTHREADEXIT, cpu_table[CPU_ID].current->proc->pid);
+   msg_send_signal(proc_role_lookup(DIOSIX_ROLE_SYSTEM_EXECUTIVE), NULL, SIGXTHREADEXIT, cpu_table[CPU_ID].current->proc->pid);
    
    /* remove from the run queue and mark as dying */
    sched_remove(cpu_table[CPU_ID].current, dead);   
@@ -142,9 +142,9 @@ void syscall_do_thread_kill(int_registers_block *regs)
    /* stop this thread from running and mark it as dying for the sysexec to clear up */
    sched_remove(victim, dead);
    
-   if(cpu_table[CPU_ID].current->proc != proc_sys_executive)
+   if(cpu_table[CPU_ID].current->proc != proc_role_lookup(DIOSIX_ROLE_SYSTEM_EXECUTIVE))
       /* inform the system executive that a thread has been killed */
-      msg_send_signal(proc_sys_executive, NULL, SIGXTHREADKILLED, owner->pid);
+      msg_send_signal(proc_role_lookup(DIOSIX_ROLE_SYSTEM_EXECUTIVE), NULL, SIGXTHREADKILLED, owner->pid);
 }
 
 /* syscall: thread_sleep - block the current thread for a given number of scheduling ticks.

@@ -25,7 +25,8 @@ void syscall_do_exit(int_registers_block *regs)
               cpu_table[CPU_ID].current->tid);
 
    /* request to be killed by the system executive */
-   msg_send_signal(proc_sys_executive, NULL, SIGXPROCEXIT, cpu_table[CPU_ID].current->proc->pid);
+   msg_send_signal(proc_role_lookup(DIOSIX_ROLE_SYSTEM_EXECUTIVE),
+                   NULL, SIGXPROCEXIT, cpu_table[CPU_ID].current->proc->pid);
 
    /* remove from the run queue and mark as dying */
    sched_remove(cpu_table[CPU_ID].current, dead);
@@ -91,9 +92,9 @@ void syscall_do_kill(int_registers_block *regs)
    
    regs->eax = proc_kill(victim, cpu_table[CPU_ID].current->proc);
    
-   if(!(regs->eax) && cpu_table[CPU_ID].current->proc != proc_sys_executive)
+   if(!(regs->eax) && cpu_table[CPU_ID].current->proc != proc_role_lookup(DIOSIX_ROLE_SYSTEM_EXECUTIVE))
       /* inform the system executive that a process has been killed */
-      msg_send_signal(proc_sys_executive, NULL, SIGXPROCKILLED, victim);
+      msg_send_signal(proc_role_lookup(DIOSIX_ROLE_SYSTEM_EXECUTIVE), NULL, SIGXPROCKILLED, victim);
 }
 
 /* syscall: alarm - send a SIGALRM signal to a process after the given number of

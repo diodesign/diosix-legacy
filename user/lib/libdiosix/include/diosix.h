@@ -87,6 +87,9 @@ typedef enum
 #define DIOSIX_SET_GROUP (0) /* alter a group id */
 #define DIOSIX_SET_USER  (1) /* alter a user id */
 
+/* diosix-specific process credential management */
+#define DIOSIX_SET_ROLE  (9) /* register a role in the system */
+
 /* contains the POSIX-defined real, effective and saved-set ids for processes */
 typedef struct
 {
@@ -142,6 +145,7 @@ typedef struct
 /* message passing - describe an outgoing message and params for the reply */
 typedef struct
 {
+   unsigned int role;       /* name the receiving process by role, or 0 for use pid+tid */
    unsigned int pid;        /* process pid sending to/receiving from, or 0 for any */
    unsigned int tid;        /* threasd tid sending to/receiving from, or 0 for any */
    unsigned int uid;        /* POSIX-conformant effective user id for the message sender */
@@ -221,6 +225,7 @@ typedef struct
    /* describe the owning process */
    unsigned int pid, parentpid;
    unsigned char flags, privlayer;
+   unsigned int role;
    
    /* POSIX-conformant real, effective and saved-set user and group ids */
    unsigned int ruid, euid, ssuid;

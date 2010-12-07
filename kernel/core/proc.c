@@ -20,14 +20,82 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 /* hash table of pointers to process entries */
 process **proc_table = NULL;
 
-/* keep a record of the system executive's process structure */
-process *proc_sys_executive = NULL;
+/* table of processes with defined roles within the operating systems */
+process *proc_roles[DIOSIX_ROLES_NR];
 
 unsigned int next_pid = FIRST_PID;
 unsigned int proc_count = 0;
 
 /* provide locking around critical sections */
 rw_gate proc_lock;
+
+
+/* proc_role_remove
+   Remove a role from a process
+   => target = process to alter
+      role = role to remove from the process
+   <= 0 for success, or an error code
+*/
+kresult proc_role_remove(process *target, unsigned int role)
+{
+   /* sanity check */
+   if(!target || !target->role) return e_bad_params;
+   if(target->role != role) return e_not_found;
+   
+   /* assumes a lock is held on the process */
+   lock_gate(&(proc_lock), LOCK_WRITE);
+   
+   proc_roles[target->role - 1] = NULL;
+   target->role = DIOSIX_ROLE_NONE;
+   
+   PROC_DEBUG("[proc:%i] removed role %i from process %p (pid %i)\n",
+              CPU_ID, role, target, target->pid);
+   
+   unlock_gate(&(proc_lock), LOCK_WRITE);
+   return success;
+}
+
+/* proc_role_add
+   Add a role to a process. Only processes with PROC_FLAG_CANPLAYAROLE
+   set can register a role with the kernel.
+   => target = process to alter
+      role = role to add to the process
+   <= 0 for success, or an error code
+*/
+kresult proc_role_add(process *target, unsigned int role)
+{
+   /* sanity check */
+   if(!target || target->role) return e_bad_params;
+   if(!(target->flags & PROC_FLAG_CANPLAYAROLE)) return e_no_rights;
+   if(!role || role > DIOSIX_ROLES_NR) return e_bad_params;
+   
+   /* assumes a lock is held on the process */
+   lock_gate(&(proc_lock), LOCK_WRITE);
+   
+   proc_roles[role - 1] = target;
+   target->role = role;
+
+   PROC_DEBUG("[proc:%i] given process %p (pid %i) role %i\n",
+              CPU_ID, target, target->pid, role);
+   
+   unlock_gate(&(proc_lock), LOCK_WRITE);
+   return success;
+}
+
+/* proc_role_lookup
+   Get the process with the given role
+   => role = role to search for
+   <= pointer to process structure or NULL if none registered
+*/
+process *proc_role_lookup(unsigned int role)
+{
+   if(!role || role > DIOSIX_ROLES_NR) return NULL;
+   
+   PROC_DEBUG("[proc:%i] looked up process %p for role %i\n",
+              CPU_ID, proc_roles[role - 1], role);
+   
+   return proc_roles[role - 1];
+}
 
 /* proc_layer_up
    Increase a process's privilege layer so that it becomes less privileged
@@ -522,7 +590,7 @@ do_proc_kill:
          if(victim->children[loop])
          {
             victim->children[loop]->prevparentpid = victim->children[loop]->parentpid;
-            proc_attach_child(proc_sys_executive, victim->children[loop]);
+            proc_attach_child(proc_role_lookup(DIOSIX_ROLE_SYSTEM_EXECUTIVE), victim->children[loop]);
          }
       }
       
@@ -563,6 +631,9 @@ do_proc_kill:
    vmm_destroy_vmas(victim);
    pg_destroy_process(victim);
    
+   /* remove any role entry the process held */
+   if(victim->role) proc_role_remove(victim, victim->role);
+   
    /* strip away any registered irq handlers */
    while(victim->interrupts)
    {
@@ -592,6 +663,9 @@ kresult proc_initialise(void)
 
    /* initialise critical section lock */
    vmm_memset(&proc_lock, 0, sizeof(rw_gate));
+   
+   /* initialise the roles table */
+   vmm_memset(&proc_roles, 0, DIOSIX_ROLES_NR * sizeof(process *));
    
    /* initialise proc hash table */
    err = vmm_malloc((void **)&proc_table, sizeof(process *) * PROC_HASH_BUCKETS);
@@ -693,9 +767,7 @@ kresult proc_initialise(void)
          
          /* create a blank io port access bitmap for the process */
          lowlevel_ioports_new(new);
-         
-         proc_sys_executive = new;
-         
+
          /* set the entry program counter and get ready to run it */
          new->entry = (unsigned int)payload.entry;
          sched_add(CPU_ID, new->threads[FIRST_TID]);

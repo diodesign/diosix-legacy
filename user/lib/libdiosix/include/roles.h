@@ -1,7 +1,7 @@
-/* kernel/ports/i386/include/portdefs.h
- * master header for the i386 port of the kernel 
+/* user/lib/libdiosix/include/roles.h
+ * list of roles known to the kernel
  * Author : Chris Williams
- * Date   : Mon,26 Mar 2007.23:09:39
+ * Date   : Tues,7 Dec 2010.09:28:00
 
 Copyright (c) Chris Williams and individual contributors
 
@@ -15,30 +15,21 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 */
 
-#ifndef _PORTDEFS_H
-#define   _PORTDEFS_H
+#ifndef _ROLES_H
+#define   _ROLES_H
 
-/* declare stuff shared with the userspace libraries */
-#include <diosix.h>
-#include <signal.h>
-#include <roles.h>
+#define DIOSIX_ROLE_NONE             (0)
 
-/* declare stuff exclusive to the microkernel */
-#include <debug.h>
-#include <multiboot.h>
-#include <locks.h>
-#include <processes.h>
+/* core system processes */
+#define DIOSIX_ROLE_SYSTEM_EXECUTIVE (1) /* usually init */
+#define DIOSIX_ROLE_VFS              (2) /* the virtual filesystem manager */
+#define DIOSIX_ROLE_PAGER            (3) /* the secondary storage swapper */
 
-/* the order of these should not be important */
-#include <boot.h>
-#include <sched.h>
-#include <chips.h>
-#include <buses.h>
-#include <memory.h>
-#include <interrupts.h>
-#include <cpu.h>
-#include <ipc.h>
-#include <lowlevel.h>
-#include <syscalls.h>
+/* basic 'console' hardware */
+#define DIOSIX_ROLE_CONSOLEVIDEO     (4) /* default display hardware */
+#define DIOSIX_ROLE_CONSOLEKEYBOARD  (5) /* default keyboard hardware */
+
+/* total number of roles - not including DIOSIX_ROLE_NONE */
+#define DIOSIX_ROLES_NR              (5)
 
 #endif

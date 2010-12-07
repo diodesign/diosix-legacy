@@ -272,8 +272,11 @@ thread *msg_find_receiver(thread *sender, diosix_msg_info *msg)
    proc = proc_find_proc(msg->pid);
    if(!proc) return NULL;
    
-   MSG_DEBUG("[msg:%i] trying to find a receiver, sender %p msg %p target=[tid %i pid %i]\n",
-             CPU_ID, sender, msg, msg->tid, msg->pid);
+   MSG_DEBUG("[msg:%i] trying to find a receiver, sender %p msg %p target=[tid %i pid %i role %i]\n",
+             CPU_ID, sender, msg, msg->tid, msg->pid, msg->role);
+   
+   /* if a specific role is suggested, then try that */
+   if(msg->role) return proc_role_lookup(msg->role);
    
    /* if a specific tid is given, then try that one */ 
    if(msg->tid != DIOSIX_MSG_ANY_THREAD)
@@ -579,8 +582,9 @@ kresult msg_send(thread *sender, diosix_msg_info *msg)
    if(!receiver)
    {
       /* none found, but wait: does this thread wish to be queued until a receiver is ready?
-         note that we can't queue replies. a reply is always sent to a ready receiver */
-      if((msg->flags & DIOSIX_MSG_QUEUEME) && !(msg->flags & DIOSIX_MSG_REPLY))
+         note that we can't queue replies. a reply is always sent to a ready receiver.
+         we also can't queue a message sent to a named process (by role) if it isn't registered */
+      if((msg->flags & DIOSIX_MSG_QUEUEME) && !(msg->flags & DIOSIX_MSG_REPLY) && !(msg->role))
       {
          process *target = proc_find_proc(msg->pid);
          if(target)

@@ -205,11 +205,13 @@ struct thread
 #define PROC_FLAG_CANBEDRIVER   (1 << 2) /* can register as a driver process */
 #define PROC_FLAG_CANMAPPHYS    (1 << 3) /* is allowed to map physical memory into its virtual space */
 #define PROC_FLAG_CANUNIXSIGNAL (1 << 4) /* is allowed to send POSIX-compatible signals (sig code 0-31) */
-#define PROC_FLAG_HASCALLEDEXEC (1 << 5) /* process has called exec() to replace its image */
+#define PROC_FLAG_CANPLAYAROLE  (1 << 5) /* can register a set role within the operating system */ 
+#define PROC_FLAG_HASCALLEDEXEC (1 << 6) /* process has called exec() to replace its image */
 #define PROC_RIGHTS_MASK  (PROC_FLAG_CANMSGASUSR | \
                            PROC_FLAG_CANBEDRIVER | \
                            PROC_FLAG_CANMAPPHYS | \
-                           PROC_FLAG_CANUNIXSIGNAL)
+                           PROC_FLAG_CANUNIXSIGNAL | \
+                           PROC_FLAG_CANPLAYAROLE)
 
 /* needed in the process struct */
 typedef struct irq_driver_entry irq_driver_entry;
@@ -272,6 +274,8 @@ struct process
       7 = reserved for user programs */
    unsigned char layer; /* this process's layer */
    
+   unsigned int role; /* the role the process plays in the system, if any */
+   
    /* POSIX-conformant user and group ids for this process */
    posix_id_set uid, gid;
    
@@ -331,5 +335,8 @@ kresult thread_new_hash(process *proc);
 thread *thread_duplicate(process *proc, thread *source);
 thread *thread_find_thread(process *proc, unsigned int tid);
 kresult thread_kill(process *owner, thread *victim);
+process *proc_role_lookup(unsigned int role);
+kresult proc_role_add(process *target, unsigned int role);
+kresult proc_role_remove(process *target, unsigned int role);
 
 #endif

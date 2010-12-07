@@ -52,12 +52,13 @@ unsigned int diosix_iorights_clear(unsigned int index, unsigned int bits);
 unsigned int diosix_signals_unix(unsigned int mask);
 unsigned int diosix_signals_kernel(unsigned int mask);
 
-/* user and group id management */
+/* user and group id and related management */
 unsigned int diosix_set_pg_id(unsigned int pid, unsigned int pgid);
 unsigned int diosix_set_session_id(void);
 unsigned int diosix_set_eid(unsigned char flag, unsigned int eid);
 unsigned int diosix_set_reid(unsigned char flag, unsigned int eid, unsigned int rid);
 unsigned int diosix_set_resid(unsigned char flag, unsigned eid, unsigned int rid, unsigned sid);
+unsigned int diosix_set_role(unsigned int role);
 
 /* manage drivers */
 unsigned int diosix_driver_register(void);

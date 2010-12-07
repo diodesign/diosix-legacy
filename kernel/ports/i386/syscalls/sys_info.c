@@ -60,6 +60,7 @@ void syscall_do_info(int_registers_block *regs)
          block->data.p.ssgid     = current->proc->gid.saved;
          block->data.p.proc_group_id = current->proc->proc_group_id;
          block->data.p.session_id    = current->proc->session_id;
+         block->data.p.role = current->proc->role;
          SYSCALL_RETURN(success);
          
       /* these are defined externally in the makefile */

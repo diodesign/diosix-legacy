@@ -53,8 +53,12 @@ void syscall_do_msg_send(int_registers_block *regs)
          SYSCALL_RETURN(proc_send_group_signal(msg->pid, current,
                                                msg->signal.number, msg->signal.extra));
       
-      /* default to sending a single signal */
-      target = proc_find_proc(msg->pid);
+      /* default to sending a single signal - check to see if we're sending to a
+         specifically named process (by role) or otherwise use the suggested pid */
+      if(msg->role)
+         target = proc_role_lookup(msg->role);
+      else
+         target = proc_find_proc(msg->pid);
       if(!target) SYSCALL_RETURN(e_not_found);
       SYSCALL_RETURN(msg_send_signal(target, current, msg->signal.number, msg->signal.extra));
    }

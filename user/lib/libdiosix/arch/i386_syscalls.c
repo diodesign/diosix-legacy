@@ -212,6 +212,14 @@ unsigned int diosix_set_resid(unsigned char flag, unsigned eid, unsigned int rid
    return retval;
 }
 
+unsigned int diosix_set_role(unsigned int role)
+/* assign an operating system role to this process */
+{
+   unsigned int retval;
+   __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (DIOSIX_SET_ROLE), "b" (role), "d" (SYSCALL_SET_ID));
+   return retval;
+}
+
 unsigned int diosix_iorights_remove(void)
 /* remove the previously afforded process right to access IO ports entirely */
 {

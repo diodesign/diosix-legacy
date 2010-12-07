@@ -332,7 +332,24 @@ void syscall_do_set_id(int_registers_block *regs)
          SYSCALL_SET_ID_RETURN(current,
                                syscall_do_id_change(current->uid.effective, &(current->gid),
                                                     action, ids->effective, ids->real, ids->saved));
-                               
+      
+      case DIOSIX_SET_ROLE:
+      {
+         unsigned int role = regs->ebx;
+         
+         /* remove role if it's zero */
+         if(!role)
+         {
+            lock_gate(&(current->lock), LOCK_WRITE);
+            SYSCALL_SET_ID_RETURN(current, proc_role_remove(current, role));
+         }
+         
+         /* otherwise, try to add it */
+         lock_gate(&(current->lock), LOCK_WRITE);
+         SYSCALL_SET_ID_RETURN(current, proc_role_add(current, role));
+      }
+      SYSCALL_SET_ID_RETURN(current, success);
+         
       default:
          SYSCALL_RETURN(e_bad_params);
    }
