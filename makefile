@@ -214,6 +214,8 @@ kernel: $(OBJS) $(LDSCRIPT)
 # build the FS
 	$(WRITE) '[+] building kernel API library'
 	$(Q)make -C user/lib/libdiosix
+	$(WRITE) '[+] building arch-specific drivers'
+	$(Q)make -C user/sbin/drivers/$(ARCH)
 	$(WRITE) '[+] building system executive (/sbin/init)'
 	$(Q)make -C user/sbin/init
 	$(WRITE) '[+] building filesystem'

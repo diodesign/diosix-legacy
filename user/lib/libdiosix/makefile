@@ -2,6 +2,9 @@
 # system interface library
 #
 
+# prettify the output
+Q=@
+WRITE = $(Q)echo 
 
 .SUFFIXES: .c
 PREFIX = /Users/chris/Documents/Code/cross/i386-elf/bin/bin/i386-elf-
@@ -19,11 +22,13 @@ all: libdiosix.a
 
 # dependencies
 objs/$(ARCH)_syscalls.o:	arch/$(ARCH)_syscalls.c	makefile
-				$(COMPILE.c)
+				$(WRITE) '==> COMPILE: $<'
+				$(Q)$(COMPILE.c)
 
 # explicit rules
 
 libdiosix.a:	$(OBJS)
-		$(AR) rcs libdiosix.a $(OBJS)
+		$(WRITE) '==> ARCHIVE: libdiosix.a'
+		$(Q)$(AR) rcs libdiosix.a $(OBJS)
 
 

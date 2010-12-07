@@ -6,4 +6,4 @@ kernel /boot/kernel
 
 module /boot/kernel.sym
 module /sbin/init
-
+module /sbin/drivers/i386/vbe

@@ -1,7 +1,7 @@
-/* user/sbin/init/init.c
- * First process to run; spawn system managers and boot system
+/* user/sbin/drivers/i386/vbe/lowlevel.c
+ * Low-level x86-specific routines
  * Author : Chris Williams
- * Date   : Wed,21 Oct 2009.10:37:00
+ * Date   : Tue,7 Dec 2010.06:55:00
 
 Copyright (c) Chris Williams and individual contributors
 
@@ -19,7 +19,37 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #include <functions.h>
 #include <signal.h>
 
-void main(void)
+unsigned char read_port_byte(unsigned short port)
 {
-   while(1); /* halt */
+   unsigned char ret_val;
+   
+   __asm__ __volatile__("inb %1,%0"
+                        : "=a"(ret_val)
+                        : "d"(port));
+   return ret_val;
+}
+
+unsigned short read_port(unsigned short port)
+{
+   unsigned char ret_val;
+   
+   __asm__ __volatile__("in %1,%0"
+                        : "=a"(ret_val)
+                        : "d"(port));
+   return ret_val;
+}
+
+void write_port_byte(unsigned short port, unsigned char val)
+{
+   __asm__ __volatile__("outb %0,%1"
+                        :
+                        : "a"(val), "d"(port));
+}
+
+
+void write_port(unsigned short port, unsigned short val)
+{
+   __asm__ __volatile__("out %0,%1"
+                        :
+                        : "a"(val), "d"(port));
 }

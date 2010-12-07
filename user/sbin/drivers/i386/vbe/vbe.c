@@ -1,7 +1,7 @@
-/* user/sbin/init/init.c
- * First process to run; spawn system managers and boot system
+/* user/sbin/drivers/i386/vbe/vbe.c
+ * Control the VBE graphics card
  * Author : Chris Williams
- * Date   : Wed,21 Oct 2009.10:37:00
+ * Date   : Tue,7 Dec 2010.06:55:00
 
 Copyright (c) Chris Williams and individual contributors
 
@@ -18,8 +18,28 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #include <diosix.h>
 #include <functions.h>
 #include <signal.h>
+#include "vbe.h"
 
-void main(void)
+unsigned short vbe_read(unsigned short index)
 {
-   while(1); /* halt */
+   write_port(VBE_DISPI_IOPORT_INDEX, index);
+   return read_port(VBE_DISPI_IOPORT_DATA);
+}
+
+void vbe_write(unsigned short index, unsigned short val)
+{
+   write_port(VBE_DISPI_IOPORT_INDEX, index);
+   write_port(VBE_DISPI_IOPORT_DATA, val);
+}
+
+void vbe_set_mode(unsigned short width, unsigned short height, unsigned char bpp)
+{
+   vbe_write(VBE_DISPI_INDEX_ENABLE, VBE_DISPI_DISABLED);
+   
+   vbe_write(VBE_DISPI_INDEX_XRES, width);
+   vbe_write(VBE_DISPI_INDEX_YRES, height);
+   vbe_write(VBE_DISPI_INDEX_BPP, bpp);
+   
+   vbe_write(VBE_DISPI_INDEX_ENABLE,
+             VBE_DISPI_ENABLED | VBE_DISPI_LFB_ENABLED);
 }

@@ -1,5 +1,5 @@
 #
-# first user process 'init'
+# Qemu/VirtualBox VBE driver process
 #
 
 # prettify the output
@@ -8,32 +8,39 @@ WRITE = $(Q)echo
 
 .SUFFIXES: .c
 PREFIX = /Users/chris/Documents/Code/cross/i386-elf/bin/bin/i386-elf-
-LIBDIOSIX = ../../lib/libdiosix
+LIBDIOSIX = ../../../../lib/libdiosix
 OBJDUMPbin = $(PREFIX)objdump 
 
 # set where the root fs to store the kernel + OS os
-PATHTOROOT = ../../../release/root
-PATHTOMKFS = ../../../release/makeiso.sh
+PATHTOROOT = ../../../../../release/root
 
 # defines
 FLAGS		= -O2 -std=c99 -Wall -static -nostdlib -nostdinc -fno-builtin -nodefaultlibs -I$(LIBDIOSIX)/include/
 CC		= $(PREFIX)gcc $(FLAGS)
 LD		= $(PREFIX)gcc $(FLAGS) -Xlinker --entry="main"
 # LD		= $(PREFIX)gcc $(FLAGS) -Xlinker
-OBJS	 	= objs/init.o
+OBJS	 	= objs/main.o objs/vbe.o objs/lowlevel.o
 
 # targets
-all: init
+all: vbe
 
 # dependencies
-objs/init.o:		init.c	makefile
+objs/main.o:	main.c	makefile vbe.h
+		$(WRITE) '==> COMPILE: $<'
+		$(Q)$(CC) -c -o $@ $<
+
+objs/lowlevel.o:	lowlevel.c	makefile vbe.h
 			$(WRITE) '==> COMPILE: $<'
 			$(Q)$(CC) -c -o $@ $<
 
+objs/vbe.o:	vbe.c	makefile vbe.h
+		$(WRITE) '==> COMPILE: $<'
+		$(Q)$(CC) -c -o $@ $<
+
 # explicit rules
 
-init:	$(OBJS)
-	$(WRITE) '==> LINK: init'
+vbe:	$(OBJS)
+	$(WRITE) '==> LINK: vbe'
 	$(Q)$(LD) $^ $(LIBDIOSIX)/libdiosix.a -o $@
-#	$(Q)$(OBJDUMPbin) --source $@ >init.lst
-	$(Q)cp init $(PATHTOROOT)/sbin/
+	$(Q)cp vbe $(PATHTOROOT)/sbin/drivers/i386/
+
