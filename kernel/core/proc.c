@@ -383,10 +383,12 @@ kresult proc_remove_child(process *parent, process *child)
 /* proc_new
    Clone a process - or create an entirely blank process
    => current = pointer to current parent process to base the
-                new child on, or NULL for none
+                new child on, or NULL for none.
       caller = thread that invoked this function or NULL if
-               the kernel called to generate a new process
- <= pointer to new process structure, or NULL for failure
+               the kernel called to generate a new process.
+               if NULL then start with a blank memory map
+               (save for the kernel's mappings).
+   <= pointer to new process structure, or NULL for failure
 */
 process *proc_new(process *current, thread *caller)
 {
@@ -432,11 +434,13 @@ process *proc_new(process *current, thread *caller)
       next_pid = FIRST_PID;
    
    unlock_gate(&proc_lock, LOCK_WRITE);
-   
-   /* call the port-specific process creation code, with current=NULL to indicate
-      if we're calling from before userspace has been set up */
-   pg_new_process(new, current);   
-   vmm_duplicate_vmas(new, current); /* and clone the vmas */
+
+   /* call the port-specific process creation code and duplicate the vmas of the parent
+      for this new process. If caller = NULL then the kernel is constructing the system's
+      first processes and will handle their virtual memory mappings, hence why we override
+      current with NULL if caller is also NULL */
+   if(caller) pg_new_process(new, current); else pg_new_process(new, NULL);
+   if(caller) vmm_duplicate_vmas(new, current); /* and clone the vmas */
    
    /* inherit status/details from the parent process */
    if(current)
@@ -455,22 +459,25 @@ process *proc_new(process *current, thread *caller)
       new->layer         = current->layer;
       new->priority_low  = current->priority_low;
       new->priority_high = current->priority_high;
-      new->next_tid      = current->next_tid;
+      
+      /* if the kernel's calling then keep tid at 1 */
+      if(caller) new->next_tid = current->next_tid;
+      else new->next_tid = FIRST_TID;
       
       /* preserve POSIX-conformant user and group ids */
       new->proc_group_id = current->proc_group_id;
       new->session_id    = current->session_id;
       vmm_memcpy(&(new->uid), &(current->uid), sizeof(posix_id_set));
       vmm_memcpy(&(new->gid), &(current->gid), sizeof(posix_id_set));
-      
+            
       if(proc_attach_child(current, new))
       {
          unlock_gate(&(current->lock), LOCK_WRITE);
          vmm_free(new);
          return NULL;
       }
-      
-      /* duplicate the running thread */
+
+      /* create a hash table of threads in the process */
       if(thread_new_hash(new))
       {
          proc_remove_child(current, new);
@@ -479,7 +486,12 @@ process *proc_new(process *current, thread *caller)
          return NULL;
       }
       
-      dupthread = thread_duplicate(new, caller);
+      /* duplicate the running thread */
+      /* if caller is NULL then it's the kernel calling during
+         boot and userspace hasn't been started yet */
+      if(caller) dupthread = thread_duplicate(new, caller);
+      else dupthread = thread_new(new);
+
       if(!dupthread)
       {
          proc_remove_child(current, new);
@@ -487,8 +499,8 @@ process *proc_new(process *current, thread *caller)
          unlock_gate(&(current->lock), LOCK_WRITE);
          return NULL;
       }
-      new->thread_count = 1;
       
+      new->thread_count = 1;
       unlock_gate(&(current->lock), LOCK_WRITE);
    }
    else
@@ -659,6 +671,7 @@ kresult proc_initialise(void)
    payload_descr payload;
    mb_module_t *module = NULL;
    kresult err;
+   process *first_proc = NULL;
    unsigned int loop, module_loop;
 
    /* initialise critical section lock */
@@ -701,20 +714,18 @@ kresult proc_initialise(void)
       /* create a bare-bones process for an executable in the payload */
       if(type == payload_exe)
       {
-         new = proc_new(NULL, NULL);
+         new = proc_new(first_proc, NULL);
          if(!new) return e_failure; /* bail if we can't start up our modules */
+         
+         /* take a copy of the first process's structure pointer.
+            it will be the parent for all others loaded here */
+         if(!first_proc) first_proc = new;
          
          /* build page tables for this module */
          BOOT_DEBUG("[proc:%i] preparing system process '%s'...\n", CPU_ID, payload.name);
          
          if(payload.areas[PAYLOAD_CODE].flags & (PAYLOAD_READ | PAYLOAD_EXECUTE))
-         {         
-            BOOT_DEBUG("       code: entry %p virt %p phys %p size %u memsize %u flags %u\n", 
-                    payload.entry,
-                    payload.areas[PAYLOAD_CODE].virtual, payload.areas[PAYLOAD_CODE].physical,
-                    payload.areas[PAYLOAD_CODE].size, payload.areas[PAYLOAD_CODE].memsize,
-                    payload.areas[PAYLOAD_CODE].flags);
-            
+         {
             virtual = (unsigned int)payload.areas[PAYLOAD_CODE].virtual;
             virtual_top = virtual + payload.areas[PAYLOAD_CODE].memsize;
             physical = (unsigned int)KERNEL_LOG2PHYS(payload.areas[PAYLOAD_CODE].physical);
@@ -735,11 +746,6 @@ kresult proc_initialise(void)
             if(payload.areas[PAYLOAD_DATA].flags & PAYLOAD_WRITE)
                flags = flags | PG_RW;
             
-            BOOT_DEBUG("       data:          virt %p phys %p size %u memsize %u flags %u\n", 
-                    payload.areas[PAYLOAD_DATA].virtual, payload.areas[PAYLOAD_DATA].physical,
-                    payload.areas[PAYLOAD_DATA].size, payload.areas[PAYLOAD_DATA].memsize,
-                    payload.areas[PAYLOAD_DATA].flags);
-            
             virtual = (unsigned int)payload.areas[PAYLOAD_DATA].virtual;
             virtual_top = virtual + payload.areas[PAYLOAD_DATA].memsize;
             physical = (unsigned int)KERNEL_LOG2PHYS(payload.areas[PAYLOAD_DATA].physical);
@@ -754,11 +760,11 @@ kresult proc_initialise(void)
                         payload.areas[PAYLOAD_DATA].memsize, VMA_WRITEABLE | VMA_FIXED, 0);
          }
          
-         if(!(new->threads[FIRST_TID]))
+         if(!new->thread_count)
          {
             BOOT_DEBUG("[proc:%i] OMGWTF system process %i (%p) thread creation failed!\n",
                        CPU_ID, new->pid, new);
-            debug_panic("failed to create first userland thread");
+            if(first_proc == new) debug_panic("failed to create first userland thread");
          }
          
          /* kernel payload binaries start in the executive layer */
@@ -770,7 +776,7 @@ kresult proc_initialise(void)
 
          /* set the entry program counter and get ready to run it */
          new->entry = (unsigned int)payload.entry;
-         sched_add(CPU_ID, new->threads[FIRST_TID]);
+         sched_move_to_end(sched_pick_queue(CPU_ID), thread_find_any_thread(new));
       }
    }
 

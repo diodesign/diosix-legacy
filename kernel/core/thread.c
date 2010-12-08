@@ -54,6 +54,29 @@ thread *thread_find_thread(process *proc, unsigned int tid)
    return NULL; /* not found! */
 }
 
+/* thread_find_any_thread
+   <= return pointer to first available thread in a process, or NULL for failure */
+thread *thread_find_any_thread(process *proc)
+{
+   unsigned int loop;
+   
+   /* sanity check */
+   if(!proc) return NULL;
+   
+   if(lock_gate(&(proc->lock), LOCK_READ))
+      return NULL;
+   
+   for(loop = 0; loop < THREAD_HASH_BUCKETS; loop++)
+      if(proc->threads[loop])
+      {
+         unlock_gate(&(proc->lock), LOCK_READ);
+         return proc->threads[loop]; /* foundya */
+      }
+   
+   unlock_gate(&(proc->lock), LOCK_READ);
+   return NULL; /* not found! */
+}
+
 /* thread_duplicate
    Make an exact copy of a thread in another process - for use when a
    process calls fork(). Assume the memory mappings will be taken care of elsewhere..
@@ -294,6 +317,7 @@ thread *thread_new(process *proc)
    {
       proc->threads[hash] = new->hash_next;
       if(new->hash_next) new->hash_prev = NULL;
+      proc->thread_count--;
       vmm_free((void *)kstack);
       vmm_free(new);
       unlock_gate(&(proc->lock), LOCK_WRITE);

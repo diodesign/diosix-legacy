@@ -334,6 +334,7 @@ thread *thread_new(process *proc);
 kresult thread_new_hash(process *proc);
 thread *thread_duplicate(process *proc, thread *source);
 thread *thread_find_thread(process *proc, unsigned int tid);
+thread *thread_find_any_thread(process *proc);
 kresult thread_kill(process *owner, thread *victim);
 process *proc_role_lookup(unsigned int role);
 kresult proc_role_add(process *target, unsigned int role);

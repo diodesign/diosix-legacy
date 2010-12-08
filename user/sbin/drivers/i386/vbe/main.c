@@ -55,4 +55,5 @@ void main(void)
    diosix_set_role(DIOSIX_ROLE_CONSOLEVIDEO);
    
    /* begin polling for requests */
+   while(1);
 }

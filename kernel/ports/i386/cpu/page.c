@@ -18,7 +18,6 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 #include <portdefs.h>
 
-process *userspace_page_handler = NULL;
 unsigned char page_fatal_flag = 0; /* set to 1 when handling a fatal kernel fault, to avoid infinite loops */
 
 /* pg_do_fault
@@ -425,13 +424,13 @@ kresult pg_new_process(process *new, process *current)
    unlock_gate(&(new->lock), LOCK_WRITE);
    
    /* notify the userspace page manager that a process is starting up */
-   if(userspace_page_handler)
+   if(current && proc_role_lookup(DIOSIX_ROLE_PAGER))
    {
-      if(msg_send_signal(userspace_page_handler, NULL, SIGXPROCCLONED, new->pid))
+      if(msg_send_signal(proc_role_lookup(DIOSIX_ROLE_PAGER), NULL, SIGXPROCCLONED, new->pid))
       {
          KOOPS_DEBUG("[page:%i] OMGWTF userspace page manager has gone AWOL\n"
                      "          tried talking to proc %i (%p) while cloning %i (%p)\n",
-                     CPU_ID, userspace_page_handler->pid, userspace_page_handler,
+                     CPU_ID, proc_role_lookup(DIOSIX_ROLE_PAGER)->pid, proc_role_lookup(DIOSIX_ROLE_PAGER),
                      new->pid, new);
       }
    }   
@@ -470,13 +469,13 @@ kresult pg_destroy_process(process *victim)
    victim->pgdir = NULL;
    
    /* bump the userspace page manager */
-   if(userspace_page_handler)
+   if(proc_role_lookup(DIOSIX_ROLE_PAGER))
    {
-      if(msg_send_signal(userspace_page_handler, NULL, SIGXPROCKILLED, victim->pid))
+      if(msg_send_signal(proc_role_lookup(DIOSIX_ROLE_PAGER), NULL, SIGXPROCKILLED, victim->pid))
       {
          KOOPS_DEBUG("[page:%i] OMGWTF userspace page manager has gone AWOL\n"
                      "       tried signalling proc %i (%p) while tearing down %i (%p)\n",
-                     CPU_ID, userspace_page_handler->pid, userspace_page_handler,
+                     CPU_ID, proc_role_lookup(DIOSIX_ROLE_PAGER)->pid, proc_role_lookup(DIOSIX_ROLE_PAGER),
                      victim->pid, victim);
       }
    }

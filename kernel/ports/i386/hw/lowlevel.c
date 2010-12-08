@@ -562,40 +562,48 @@ void x86_proc_preinit(void)
 /* x86_thread_switch
    Freeze a thread and select another to run
    => now = running thread to stop
-      next = thread to reload
+      next = thread to reload, or NULL to just preserve the now thread
       regs = pointer to kernel stack
 */
 void x86_thread_switch(thread *now, thread *next, int_registers_block *regs)
 {
-   tss_descr *new_tss = next->tss;
+   tss_descr *new_tss;
    
-   LOLVL_DEBUG("[x86:%i] switching thread %p for %p (regs %p state %i) (ds/ss %x cs %x ss0 %x esp0 %x)\n",
-           CPU_ID, now, next, regs, next->state, new_tss->ss, new_tss->cs, new_tss->ss0, new_tss->esp0);
-   LOLVL_DEBUG("[x86:%i] PRE-SWAP: ds %x edi %x esi %x ebp %x esp %x ebx %x edx %x ecx %x eax %x\n"
-           "      intnum %x errcode %x eip %x cs %x eflags %x useresp %x ss %x\n",
-           CPU_ID, regs->ds, regs->edi, regs->esi, regs->ebp, regs->esp, regs->ebx, regs->edx, regs->ecx, regs->eax,
-           regs->intnum, regs->errcode, regs->eip, regs->cs, regs->eflags, regs->useresp, regs->ss);
+   if(next)
+   {
+      new_tss = next->tss;
    
+      LOLVL_DEBUG("[x86:%i] switching thread %p for %p (regs %p state %i) (ds/ss %x cs %x ss0 %x esp0 %x)\n",
+              CPU_ID, now, next, regs, next->state, new_tss->ss, new_tss->cs, new_tss->ss0, new_tss->esp0);
+      LOLVL_DEBUG("[x86:%i] PRE-SWAP: ds %x edi %x esi %x ebp %x esp %x ebx %x edx %x ecx %x eax %x\n"
+              "      intnum %x errcode %x eip %x cs %x eflags %x useresp %x ss %x\n",
+              CPU_ID, regs->ds, regs->edi, regs->esi, regs->ebp, regs->esp, regs->ebx, regs->edx, regs->ecx, regs->eax,
+              regs->intnum, regs->errcode, regs->eip, regs->cs, regs->eflags, regs->useresp, regs->ss);
+   }
+      
    /* preserve state of the thread */
    vmm_memcpy(&(now->regs), regs, sizeof(int_registers_block));
    
-   /* load state for new thread */
-   vmm_memcpy(regs, &(next->regs), sizeof(int_registers_block));
-   
-   LOLVL_DEBUG("[x86:%i] POST-SWAP: ds %x edi %x esi %x ebp %x esp %x ebx %x edx %x ecx %x eax %x\n"
-           "      intnum %x errcode %x eip %x cs %x eflags %x useresp %x ss %x\n",
-           CPU_ID, regs->ds, regs->edi, regs->esi, regs->ebp, regs->esp, regs->ebx, regs->edx, regs->ecx, regs->eax,
-           regs->intnum, regs->errcode, regs->eip, regs->cs, regs->eflags, regs->useresp, regs->ss);
-   
-   /* reload page directory if we're switching to a new address space */
-   if(now->proc->pgdir != next->proc->pgdir)
-      x86_load_cr3(KERNEL_LOG2PHYS(next->proc->pgdir));
-   
-   /* inform the CPU that things have changed */
-   new_tss->esp0 = next->kstackbase;
-   x86_change_tss(&(cpu_table[CPU_ID].gdtptr),
-                  cpu_table[CPU_ID].tssentry, new_tss,
-                  next->flags & THREAD_FLAG_HASIOBITMAP);
+   if(next)
+   {
+      /* load state for new thread */
+      vmm_memcpy(regs, &(next->regs), sizeof(int_registers_block));
+      
+      LOLVL_DEBUG("[x86:%i] POST-SWAP: ds %x edi %x esi %x ebp %x esp %x ebx %x edx %x ecx %x eax %x\n"
+              "      intnum %x errcode %x eip %x cs %x eflags %x useresp %x ss %x\n",
+              CPU_ID, regs->ds, regs->edi, regs->esi, regs->ebp, regs->esp, regs->ebx, regs->edx, regs->ecx, regs->eax,
+              regs->intnum, regs->errcode, regs->eip, regs->cs, regs->eflags, regs->useresp, regs->ss);
+      
+      /* reload page directory if we're switching to a new address space */
+      if(now->proc->pgdir != next->proc->pgdir)
+         x86_load_cr3(KERNEL_LOG2PHYS(next->proc->pgdir));
+      
+      /* inform the CPU that things have changed */
+      new_tss->esp0 = next->kstackbase;
+      x86_change_tss(&(cpu_table[CPU_ID].gdtptr),
+                     cpu_table[CPU_ID].tssentry, new_tss,
+                     next->flags & THREAD_FLAG_HASIOBITMAP);
+   }
 }
 
 /* x86_init_tss
@@ -742,10 +750,10 @@ void x86_warm_kickstart(void)
 }
 
 /* x86_kickstart
-   Jumpstart the processor by executing the top queued thread in usermode  */
-void x86_kickstart(void)
+   Jumpstart the processor by executing the given thread in usermode. If torun is NULL, then
+   execute the top queued thread in usermode */
+void x86_kickstart(thread *torun)
 {
-   thread *torun = NULL;
    process *proc;
    unsigned int usresp;
    
@@ -919,7 +927,17 @@ void lowlevel_thread_switch(thread *now, thread *next, int_registers_block *regs
    unlock_spin(&(now->proc->lock.spinlock));
 #endif
    
-   x86_thread_switch(now, next, regs);
+   /* if the thread is already in usermode then switch to it */
+   if(next->flags & THREAD_FLAG_INUSERMODE)
+      x86_thread_switch(now, next, regs);
+   else
+   {
+      /* suspend the currently running thread */
+      x86_thread_switch(now, NULL, regs);
+      
+      /* and kickstart the next one into userspace */
+      x86_kickstart(next);
+   }
 }
 
 void lowlevel_proc_preinit(void)
@@ -929,7 +947,7 @@ void lowlevel_proc_preinit(void)
 
 void lowlevel_kickstart(void)
 {
-   x86_kickstart();
+   x86_kickstart(NULL);
 }
 
 void lowlevel_ioports_clone(process *new, process *current)
