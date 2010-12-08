@@ -269,14 +269,16 @@ thread *msg_find_receiver(thread *sender, diosix_msg_info *msg)
    
    /* start with basic checks */
    if(!msg) return NULL;
-   proc = proc_find_proc(msg->pid);
+   
+   /* if a specific role is suggested, then try that */
+   if(msg->role)
+      proc = proc_role_lookup(msg->role);
+   else
+      proc = proc_find_proc(msg->pid);
    if(!proc) return NULL;
    
    MSG_DEBUG("[msg:%i] trying to find a receiver, sender %p msg %p target=[tid %i pid %i role %i]\n",
              CPU_ID, sender, msg, msg->tid, msg->pid, msg->role);
-   
-   /* if a specific role is suggested, then try that */
-   if(msg->role) return proc_role_lookup(msg->role);
    
    /* if a specific tid is given, then try that one */ 
    if(msg->tid != DIOSIX_MSG_ANY_THREAD)
