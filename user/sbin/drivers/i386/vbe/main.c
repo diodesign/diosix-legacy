@@ -21,6 +21,13 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #include <roles.h>
 #include "vbe.h"
 
+/* the frame buffer */
+unsigned int *fb_base = (unsigned int *)FB_LOG_BASE;
+
+/* ----------------------------------------------------------------------
+                    manage the video hardware
+ ---------------------------------------------------------------------- */
+
 /* initialise_screen
    Get the graphics card into a known usable state */
 void initialise_screen(void)
@@ -40,10 +47,58 @@ void initialise_screen(void)
    if(diosix_driver_map_phys(&req)) diosix_exit(1);   
 }
 
-void main(void)
+
+/* ----------------------------------------------------------------------
+                     basic graphics routines 
+   ---------------------------------------------------------------------- */
+
+/* plot_pixel
+   Fill a pixel on the screen with a colour
+   => x = x coordinate
+      y = y coordinate
+      colour = pixel colour
+*/
+void plot_pixel(unsigned int x, unsigned int y, unsigned int colour)
 {
-   diosix_msg_info msg;
+   /* calculate the px position in memory */
+   unsigned int px = x * FB_WORDSPERPIXEL + y * (FB_WIDTH * FB_WORDSPERPIXEL);
    
+   /* write to video memory */
+   fb_base[px] = colour;
+}
+
+/* plot_rectangle
+   Fill a rectangle on the screen with a colour
+   => x = bottom left-hand corner x coordinate
+      y = bottom left-hand corner y coordinate
+      w = width in pixels
+      h = height in pixels
+      colour = colour to plot
+*/
+void plot_rectangle(unsigned int x, unsigned int y,
+                    unsigned int w, unsigned int h, unsigned int colour)
+{
+   unsigned int w_loop, h_loop;
+   
+   /* calculate the position of the bottom left-hand corner */
+   unsigned int px = x * FB_WORDSPERPIXEL + y * (FB_WIDTH * FB_WORDSPERPIXEL);
+   
+   for(h_loop = 0; h_loop < h; h_loop++)
+   {
+      for(w_loop = 0; w_loop < w; w_loop++)
+         fb_base[px + w_loop] = colour; /* write to video memory */
+      
+      /* advance a line */
+      px += (FB_WIDTH * FB_WORDSPERPIXEL);
+   }
+}
+
+
+/* ----------------------------------------------------------------------
+                        main loop of the driver 
+   ---------------------------------------------------------------------- */
+int main(void)
+{   
    /* move into driver layer and get access to IO ports */
    diosix_priv_layer_up();
    if(diosix_driver_register()) diosix_exit(1); /* or exit on failure */
@@ -53,6 +108,9 @@ void main(void)
    
    /* name this process so others can find it */
    diosix_set_role(DIOSIX_ROLE_CONSOLEVIDEO);
+   
+   /* clear the screen */
+   plot_rectangle(0, 0, FB_WIDTH, FB_HEIGHT, VBE_COLOUR_BLUE);
    
    /* begin polling for requests */
    while(1);

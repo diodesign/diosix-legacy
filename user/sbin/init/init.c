@@ -20,7 +20,7 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #include <signal.h>
 #include <roles.h>
 
-void main(void)
+int main(void)
 {
    /* name this process so others can find it */
    diosix_set_role(DIOSIX_ROLE_SYSTEM_EXECUTIVE);

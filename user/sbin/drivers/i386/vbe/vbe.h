@@ -24,6 +24,7 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #ifndef _VBE_H
 #define _VBE_H 1
 
+/* hardware constants */
 #define VBE_DISPI_IOPORT_INDEX (0x1ce)
 #define VBE_DISPI_IOPORT_DATA  (0x1cf)
 
@@ -45,12 +46,21 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #define VBE_DISPI_BPP_24   (0x18)
 #define VBE_DISPI_BPP_32   (0x20)
 
+/* colours */
+#define VBE_COLOUR_BLUE    (0x0000ff)
+#define VBE_COLOUR_GREEN   (0x00ff00)
+#define VBE_COLOUR_RED     (0xff0000)
+
+/* default settings */
 #define FB_WIDTH     (800)    /* pixels x max */
 #define FB_HEIGHT    (600)    /* pixels y max */
 #define FB_DEPTH     (VBE_DISPI_BPP_32) /* bits per pixel */
 #define FB_MAX_SIZE  (FB_WIDTH * FB_HEIGHT * (FB_DEPTH >> 3))
 #define FB_PHYS_BASE (0xe0000000)
 #define FB_LOG_BASE  (0x400000)
+
+#define FB_WORDSPERPIXEL   (FB_DEPTH >> 5) /* 32bits per word */
+#define FB_BYTESPERPIXEL   (FB_DEPTH >> 3) /* 8bits per byte */
 
 /* x86-specific stuff */
 unsigned char read_port_byte(unsigned short port);
