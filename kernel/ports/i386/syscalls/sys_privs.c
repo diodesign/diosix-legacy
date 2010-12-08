@@ -177,7 +177,7 @@ kresult syscall_do_id_change(unsigned int uid, posix_id_set *id, unsigned int ac
 }
 
 /* unlock the (a) process (if set) in syscall_do_set_id() and return (b) from the syscall */
-#define SYSCALL_SET_ID_RETURN(a, b) { if((a)) unlock_gate(&((a)->lock), LOCK_WRITE); SYSCALL_RETURN(a); }
+#define SYSCALL_SET_ID_RETURN(a, b) { if((a)) unlock_gate(&((a)->lock), LOCK_WRITE); SYSCALL_RETURN(b); }
 
 /* syscall: set_id - set various credential values inside a process,
    subject to security checks, namely the user and group ids of a program.
