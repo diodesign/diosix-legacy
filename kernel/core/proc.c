@@ -776,7 +776,7 @@ kresult proc_initialise(void)
 
          /* set the entry program counter and get ready to run it */
          new->entry = (unsigned int)payload.entry;
-         sched_move_to_end(sched_pick_queue(CPU_ID), thread_find_any_thread(new));
+         sched_add(sched_pick_queue(CPU_ID), thread_find_any_thread(new));
       }
    }
 

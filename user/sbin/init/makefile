@@ -35,5 +35,5 @@ objs/init.o:		init.c	makefile
 init:	$(OBJS)
 	$(WRITE) '==> LINK: init'
 	$(Q)$(LD) $^ $(LIBDIOSIX)/libdiosix.a -o $@
-#	$(Q)$(OBJDUMPbin) --source $@ >init.lst
+	$(Q)$(OBJDUMPbin) --source $@ >init.lst
 	$(Q)cp init $(PATHTOROOT)/sbin/
