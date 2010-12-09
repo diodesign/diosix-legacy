@@ -19,6 +19,7 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #include <functions.h>
 #include <signal.h>
 #include <roles.h>
+#include <io.h>
 #include "vbe.h"
 #include "font.h"
 
@@ -156,10 +157,58 @@ void plot_character(unsigned int x, unsigned int y, unsigned char c, unsigned in
             plot_pixel(x + FONT_WIDTH - xloop, y + yloop, colour);
    }
 }
+
+/* backspace
+   Move the text cursor to the left, moving it up to the end of the last
+   line if necessary, and erase the last written character */
+void backspace(void)
+{
+   unsigned int x, y;
+   
+   /* handle moving up a line */
+   if(!txt_x)
+   {
+      if(txt_y)
+      {
+         txt_x = FB_TXT_WIDTH - 1;
+         txt_x = 0;
+      }
+      else return; /* nothing to delete! */
+      
+   }
+   else
+      txt_x--;
  
+   /* calculate coordinates of last known character */
+   x = txt_x * FONT_WIDTH;
+   y = txt_y * FONT_HEIGHT;
+   
+   /* erase it */
+   plot_rectangle(x, y, FONT_WIDTH, FONT_HEIGHT, VBE_COLOUR_GREY(FB_BACKGROUND));
+}
+
+/* write_character
+   Draw a character on the screen, scrolling the screen if necessary. 
+   => c = character to write
+      colour = text colour to use
+ */
+void write_character(char c, unsigned int colour)
+{
+   unsigned int x, y;
+   
+   x = txt_x * FONT_WIDTH;
+   y = txt_y * FONT_HEIGHT;
+   
+   plot_character(x, y, c, VBE_COLOUR_GREY(colour));
+      
+   /* line break automatically at the end of a line */
+   txt_x++;
+   if(txt_x >= FB_TXT_WIDTH) line_break();
+}
+
 /* write_string
-   Draw a line of text on the screen, inserting a line break at the end and
-   scrolling the screen if necessary. the 
+   Draw a string of text on the screen, inserting a line break at the
+   end and scrolling the screen if necessary. 
    => str = NULL terminated string to write
       colour = text colour to use
 */
@@ -205,6 +254,8 @@ void boot_screen(void)
    ---------------------------------------------------------------------- */
 int main(void)
 {
+   diosix_msg_info msg;
+   
    /* move into driver layer and get access to IO ports */
    diosix_priv_layer_up();
    if(diosix_driver_register()) diosix_exit(1); /* or exit on failure */
@@ -217,6 +268,35 @@ int main(void)
    
    boot_screen();
    
+   /* prepare to receive signals to write to the screen */
+   msg.role = msg.pid = DIOSIX_MSG_ANY_PROCESS;
+   msg.tid = DIOSIX_MSG_ANY_THREAD;
+   msg.flags = DIOSIX_MSG_SIGNAL;
+   
    /* begin polling for requests */
-   while(1);
+   for(;;)
+   {
+      /* wait for signal 64 to arrive */
+      if(diosix_msg_receive(&msg) == success && msg.signal.number == 64)
+      {
+         unsigned char ascii = msg.signal.extra & 0xff;
+         
+         /* if it's ascii, then do it */
+         if(ascii >= 32 && ascii < 127)
+            write_character(ascii, VBE_COLOUR_GREY(FB_FOREGROUND));
+         else
+         {
+            switch(msg.signal.extra)
+            {
+               case KEY_ENTER:
+                  line_break();
+                  break;
+                  
+               case KEY_BSPACE:
+                  backspace();
+                  break;
+            }
+         }
+      }
+   }
 }

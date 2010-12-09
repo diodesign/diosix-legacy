@@ -7,3 +7,4 @@ kernel /boot/kernel
 module /boot/kernel.sym
 module /sbin/init
 module /sbin/drivers/i386/vbe
+module /sbin/drivers/i386/ps2kbd

@@ -59,6 +59,9 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #define SIGXTHREADEXIT   (36) /* a thread has called SYSCALL_THREAD_EXIT, code = thread owner's PID */
 #define SIGXIRQ          (37) /* an IRQ has been raised, code = IRQ line number */
 
+/* enable diosix kernel signal number (a) */
+#define SIGX_ENABLE(a)   (1 << ((unsigned int)(a) - SIG_KERNEL_MIN))
+
 /* range of kernel signals (inclusive) */
 #define SIG_KERNEL_MIN   (32)
 #define SIG_KERNEL_MAX   (63)

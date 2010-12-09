@@ -17,7 +17,7 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 #include <diosix.h>
 #include <functions.h>
-#include <console.h>
+#include <io.h>
 
 /* ----------------------------------------------------
    client interface: manipulating file contents
@@ -62,7 +62,7 @@ kresult diosix_io_unlink(char *victim)
    return success;
 }
 
-kresult diosix_io_fstat(int file, struct stat *st)
+/* kresult diosix_io_fstat(int file, struct stat *st)
 {
 	return success;
 }
@@ -70,7 +70,7 @@ kresult diosix_io_fstat(int file, struct stat *st)
 kresult diosix_io_stat(const char *file, struct stat *st)
 {
 	return success;
-}
+} */
 
 /* ----------------------------------------------------
    server interface

@@ -19,18 +19,103 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #include <functions.h>
 #include <signal.h>
 #include <roles.h>
+#include <io.h>
 #include "ps2kbd.h"
 
+/* lookup_code
+   Convert a keyboard controller code into ASCII
+   => code = hardware scan code
+      shift = set non-zero to apply automatic shift
+      escaped = set non-zero to look up alterative code
+   <= 32bit word with ASCII code in the low byte and flags in the upper 24bits,
+      or 0 for no translation
+*/
+unsigned int lookup_code(unsigned char code, unsigned char shift, unsigned escaped)
+{
+   /* sanity check */
+   if(code >= PS2KBD_KEYS) return 0;
+   
+   if(escaped) return ps2kbd_scancodes[code][2];
+   if(shift) return ps2kbd_scancodes[code][1];
+   return ps2kbd_scancodes[code][0];
+}
 
 /* ----------------------------------------------------------------------
                         main loop of the driver 
    ---------------------------------------------------------------------- */
 int main(void)
 {
+   diosix_msg_info msg, smsg;
+   unsigned char shift = 0, control = 0, escaped = 0;
+   unsigned char code;
+   unsigned int finalcode;
+   
    /* move into driver layer and get access to IO ports */
    diosix_priv_layer_up();
    if(diosix_driver_register()) diosix_exit(1); /* or exit on failure */
    
-   /* begin polling for requests */
-   while(1);
+   /* prepare the signal sending message block */
+   smsg.role = DIOSIX_ROLE_CONSOLEVIDEO;
+   smsg.tid = DIOSIX_MSG_ANY_THREAD;
+   smsg.pid = DIOSIX_MSG_ANY_PROCESS;
+   smsg.flags = DIOSIX_MSG_SIGNAL | DIOSIX_MSG_SENDASUSR;
+   smsg.signal.number = 64;
+   
+   /* prepare to sleep until an interrupt comes in */
+   msg.role = msg.pid = DIOSIX_MSG_ANY_PROCESS;
+   msg.tid = DIOSIX_MSG_ANY_THREAD;
+   msg.flags = DIOSIX_MSG_SIGNAL | DIOSIX_MSG_KERNELONLY;
+   
+   /* accept the keyboard irq */
+   diosix_signals_kernel(SIGX_ENABLE(SIGXIRQ));
+   
+   for(;;)
+   {
+      /* block until a signal comes in from the hardware */
+      if(diosix_msg_receive(&msg) == success && msg.signal.extra == PS2KBD_IRQ)
+      {
+         /* it's the keyboard controller */
+         code = read_port_byte(PS2KBD_DATA);
+         if(code == PS2KBD_ESCAPED)
+            escaped = 1;
+         else
+         {
+            /* mask out the break bit and translate it into something ASCII */
+            finalcode = lookup_code(code & ~PS2KBD_BREAK, shift, escaped);
+            escaped = 0; /* end escaped sequence now */
+            
+            /* decode the scan code */
+            switch(finalcode)
+            {
+               case 0:
+                  /* zero indicates an error or something we can't handle */
+                  break;
+                  
+               /* a shift key moved */
+               case KEY_SHIFT:
+                  if(code & PS2KBD_BREAK) shift = 0;
+                  else shift = 1;
+                  break;
+                  
+               /* a control key moved */
+               case KEY_CONTROL:
+                  if(code & PS2KBD_BREAK) control = 0;
+                  else control = 1;
+                  break;
+                  
+               default:
+                  /* only accept press-downs on keys */
+                  if(!(code & PS2KBD_BREAK))
+                  {
+                     /* set the control key flag if necessary */
+                     if(control) finalcode |= KEY_CONTROL;
+
+                     /* send the final ASCII code + flags to a receiver */
+                     smsg.signal.extra = finalcode;
+                     diosix_msg_send(&smsg);
+                  }
+            }
+         }
+      }
+   }
 }

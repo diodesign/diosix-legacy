@@ -18,6 +18,53 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #ifndef _IO_H
 #define   _IO_H
 
+/* agree on a way to represent non-ASCII key codes.
+   8-bit ascii in the low byte with flags in the upper 24 bits */
+#define KEY_TAB      (9)   /* tab control code */
+#define KEY_ENTER    (13)  /* carriage return control code */
+#define KEY_ESC      (27)
+#define KEY_DELETE   (127)
+#define KEY_F1       (1 | KEY_FKEY)
+#define KEY_F2       (2 | KEY_FKEY)
+#define KEY_F3       (3 | KEY_FKEY)
+#define KEY_F4       (4 | KEY_FKEY)
+#define KEY_F5       (5 | KEY_FKEY)
+#define KEY_F6       (6 | KEY_FKEY)
+#define KEY_F7       (7 | KEY_FKEY)
+#define KEY_F8       (8 | KEY_FKEY)
+#define KEY_F9       (9 | KEY_FKEY)
+#define KEY_F10      (10 | KEY_FKEY)
+
+#define KEY_SHIFT    (1 << 8)
+#define KEY_BSPACE   (1 << 9)
+#define KEY_CONTROL  (1 << 10)
+#define KEY_LCTRL    (KEY_CONTROL)
+#define KEY_RCTRL    (KEY_CONTROL)
+#define KEY_LSHIFT   (KEY_SHIFT)
+#define KEY_RSHIFT   (KEY_SHIFT)
+#define KEY_ALT      (1 << 11)
+#define KEY_LALT     (KEY_ALT)
+#define KEY_RALT     (KEY_ALT)
+#define KEY_CLOCK    (1 << 12)
+#define KEY_FKEY     (1 << 13)
+#define KEY_HOME     (1 << 14)
+#define KEY_UP       (1 << 15)
+#define KEY_DOWN     (1 << 16)
+#define KEY_LEFT     (1 << 17)
+#define KEY_RIGHT    (1 << 18)
+#define KEY_PGUP     (1 << 19)
+#define KEY_PGDOWN   (1 << 20)
+#define KEY_INSERT   (1 << 21)
+#define KEY_END      (1 << 22)
+
+/* reserved at this time */
+#define KEY_PSCREEN  (0)
+#define KEY_SLOCK    (0)
+#define KEY_NLOCK    (0)
+#define KEY_BREAK    (0)
+
+
+/* define the interface between clients and servers */
 typedef struct
 {
    unsigned int flags, status;
