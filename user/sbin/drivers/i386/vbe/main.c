@@ -20,9 +20,13 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #include <signal.h>
 #include <roles.h>
 #include "vbe.h"
+#include "font.h"
 
 /* the frame buffer */
-unsigned int *fb_base = (unsigned int *)FB_LOG_BASE;
+volatile unsigned int *fb_base = (volatile unsigned int *)FB_LOG_BASE;
+
+/* the text cursor - where the next character will be printed */
+unsigned int txt_x, txt_y;
 
 /* ----------------------------------------------------------------------
                     manage the video hardware
@@ -44,7 +48,10 @@ void initialise_screen(void)
    req.flags = VMA_WRITEABLE | VMA_NOCACHE | VMA_SHARED;
    
    /* exit if there's a failure */
-   if(diosix_driver_map_phys(&req)) diosix_exit(1);   
+   if(diosix_driver_map_phys(&req)) diosix_exit(1);
+   
+   /* start off in the top left corner */
+   txt_x = txt_y = 0;
 }
 
 
@@ -60,8 +67,14 @@ void initialise_screen(void)
 */
 void plot_pixel(unsigned int x, unsigned int y, unsigned int colour)
 {
+   unsigned int px;
+   
+   /* keep everything sane */
+   if(x >= FB_WIDTH) x = FB_WIDTH - 1;
+   if(y >= FB_HEIGHT) y = FB_HEIGHT - 1;
+   
    /* calculate the px position in memory */
-   unsigned int px = x * FB_WORDSPERPIXEL + y * (FB_WIDTH * FB_WORDSPERPIXEL);
+   px = x * FB_WORDSPERPIXEL + y * (FB_WIDTH * FB_WORDSPERPIXEL);
    
    /* write to video memory */
    fb_base[px] = colour;
@@ -69,8 +82,8 @@ void plot_pixel(unsigned int x, unsigned int y, unsigned int colour)
 
 /* plot_rectangle
    Fill a rectangle on the screen with a colour
-   => x = bottom left-hand corner x coordinate
-      y = bottom left-hand corner y coordinate
+   => x = top left-hand corner x coordinate
+      y = top left-hand corner y coordinate
       w = width in pixels
       h = height in pixels
       colour = colour to plot
@@ -80,25 +93,118 @@ void plot_rectangle(unsigned int x, unsigned int y,
 {
    unsigned int w_loop, h_loop;
    
-   /* calculate the position of the bottom left-hand corner */
-   unsigned int px = x * FB_WORDSPERPIXEL + y * (FB_WIDTH * FB_WORDSPERPIXEL);
+   /* keep everything sane */
+   if(x >= FB_WIDTH) x = FB_WIDTH - 1;
+   if(y >= FB_HEIGHT) y = FB_HEIGHT - 1;
+   if((x + w) >= FB_WIDTH) w = (FB_WIDTH - 1) - x;
+   if((y + h) >= FB_HEIGHT) h = (FB_HEIGHT - 1) - y;
    
    for(h_loop = 0; h_loop < h; h_loop++)
-   {
       for(w_loop = 0; w_loop < w; w_loop++)
-         fb_base[px + w_loop] = colour; /* write to video memory */
-      
-      /* advance a line */
-      px += (FB_WIDTH * FB_WORDSPERPIXEL);
-   }
+         plot_pixel(x + w_loop, y + h_loop, colour);
 }
 
+/* line_break
+   Insert a line break on the screen, scrolling the screen if necessary
+*/
+void line_break(void)
+{
+   /* do the carriage return */
+   txt_x = 0;
+   
+   /* and the line feed */
+   if((txt_y + 1) >= FB_TXT_WIDTH)
+   {
+      /* scroll the screen */
+      unsigned int px = 0;
+      unsigned char *fb_offset = (void *)fb_base;
+      
+      fb_offset += FONT_HEIGHT * (FONT_WIDTH * FB_BYTESPERPIXEL * FB_TXT_WIDTH);
+      
+      while(px < (FB_MAX_SIZE - (unsigned int)fb_offset))
+      {
+         fb_base[px] = fb_offset[px];
+         px++;
+      }
+      
+      /* clear the bottom line */
+      plot_rectangle(0, FB_HEIGHT - FONT_HEIGHT, FB_WIDTH, FONT_HEIGHT, VBE_COLOUR_GREY(FB_BACKGROUND));
+   }
+   else
+      txt_y++;
+}
+
+/* plot_character
+   Draw a character on the screen
+   => x, y = coordinates to plot the top left-hand corner of the character
+      c = character code to plot
+      colour = colour to use in the plot
+*/
+void plot_character(unsigned int x, unsigned int y, unsigned char c, unsigned int colour)
+{
+   unsigned int yloop, xloop;
+   
+   /* keep everything sane */
+   if(x >= (FB_WIDTH - FONT_WIDTH)) x = FB_WIDTH - FONT_WIDTH - 1;
+   if(y >= (FB_HEIGHT - FONT_HEIGHT)) y = FB_HEIGHT - FONT_HEIGHT - 1;
+   if(c >= FONT_NR_CHARS) c = 0; 
+
+   for(yloop = 0; yloop < FONT_HEIGHT; yloop++)
+   {
+      for(xloop = 0; xloop < FONT_WIDTH; xloop++)
+         if(font_data[c][yloop] & (1 << xloop))
+            plot_pixel(x + FONT_WIDTH - xloop, y + yloop, colour);
+   }
+}
+ 
+/* write_string
+   Draw a line of text on the screen, inserting a line break at the end and
+   scrolling the screen if necessary. the 
+   => str = NULL terminated string to write
+      colour = text colour to use
+*/
+void write_string(char *str, unsigned int colour)
+{
+   unsigned int x, y;
+   
+   x = txt_x * FONT_WIDTH;
+   y = txt_y * FONT_HEIGHT;
+   
+   while(*str)
+   {
+      plot_character(x, y, *str, VBE_COLOUR_GREY(colour));
+      
+      str++;
+      x += FONT_WIDTH;
+      
+      /* line break automatically at the end of a line */
+      txt_x++;
+      if(txt_x >= FB_TXT_WIDTH) line_break();
+   }
+   
+   line_break();
+}
+
+
+/* introduce us to the console user */
+void boot_screen(void)
+{
+   unsigned int loop;
+   
+   /* fade into white */
+   for(loop = 0; loop < FB_BACKGROUND; loop += 8)
+      plot_rectangle(0, 0, FB_WIDTH, FB_HEIGHT, VBE_COLOUR_GREY(loop));
+   
+   plot_rectangle(0, 0, FB_WIDTH, FONT_HEIGHT + 1, VBE_COLOUR_GREY(FB_FOREGROUND));
+   write_string("now running diosix-hyatt", FB_BACKGROUND);
+   write_string("hello world from userland!", FB_FOREGROUND);
+}
 
 /* ----------------------------------------------------------------------
                         main loop of the driver 
    ---------------------------------------------------------------------- */
 int main(void)
-{   
+{
    /* move into driver layer and get access to IO ports */
    diosix_priv_layer_up();
    if(diosix_driver_register()) diosix_exit(1); /* or exit on failure */
@@ -109,8 +215,7 @@ int main(void)
    /* name this process so others can find it */
    diosix_set_role(DIOSIX_ROLE_CONSOLEVIDEO);
    
-   /* clear the screen */
-   plot_rectangle(0, 0, FB_WIDTH, FB_HEIGHT, VBE_COLOUR_BLUE);
+   boot_screen();
    
    /* begin polling for requests */
    while(1);

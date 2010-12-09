@@ -567,8 +567,12 @@ kresult proc_kill(unsigned int victimpid, process *slayer)
 do_proc_kill:
    unlock_gate(&(slayer->lock), LOCK_READ);
    
-   /* we have a green light, so reverse the process creation
-      routines in proc_new() */
+   /* we have a green light - but we're not trying to kill the
+      system executive, right? */
+   if(victim == proc_role_lookup(DIOSIX_ROLE_SYSTEM_EXECUTIVE))
+      debug_panic("system executive just died D:");
+   
+   /* reverse the process creation routines in proc_new() */
    parent = proc_find_proc(victim->parentpid);
    
    /* stop it from running but remember, there's no point

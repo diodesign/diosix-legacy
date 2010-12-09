@@ -42,5 +42,6 @@ objs/vbe.o:	vbe.c	makefile vbe.h
 vbe:	$(OBJS)
 	$(WRITE) '==> LINK: vbe'
 	$(Q)$(LD) $^ $(LIBDIOSIX)/libdiosix.a -o $@
+	$(Q)$(OBJDUMPbin) --source $@ >vbe.lst
 	$(Q)cp vbe $(PATHTOROOT)/sbin/drivers/i386/
 
