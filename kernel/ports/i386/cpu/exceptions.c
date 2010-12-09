@@ -30,9 +30,6 @@ extern void isr20(); extern void isr21(); extern void isr22(); extern void isr23
 extern void isr24(); extern void isr25(); extern void isr26(); extern void isr27();
 extern void isr28(); extern void isr29(); extern void isr30(); extern void isr31();
 
-/* inter-processor interrupts (142-143) - sent to warn other cores of changes */
-extern void isr142(); extern void isr143();
-
 /* diosix native software interrupt - 0x90 (144) set by KERNEL_SWI_BASE */
 extern void isr144();
 
@@ -271,6 +268,6 @@ void exceptions_initialise(void)
    int_set_gate(31, (unsigned int)isr31, 0x18, 0x8E, 0);
    
    /* define the software interrupt vector - starting from 0x90 (144)
-    OR flags with 0x60 to set DPL to ring3, so userland can call them */
+      OR flags with 0x60 to set DPL to ring3, so userland can call them */
    int_set_gate(INT_KERNEL_SWI, (unsigned int)isr144, 0x18, 0x8E | 0x60, 1); /* reload idt */
 }

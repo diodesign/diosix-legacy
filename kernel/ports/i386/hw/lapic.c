@@ -21,7 +21,10 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 /* hardware interrupts for the local APIC */
 extern void irq16(); extern void irq17(); extern void irq18(); extern void irq19();
-extern void irq20(); extern void irq21(); extern void irq22(); 
+extern void irq20(); extern void irq21(); extern void irq22();
+
+/* inter-processor interrupts (142-143) - sent to warn other cores of changes */
+extern void isr142(); extern void isr143();
 
 /* local apic timer measurements for multiprocessor systems */
 volatile unsigned char lapic_preflight_timer_pass = 0;
@@ -173,8 +176,12 @@ void lapic_initialise(unsigned char flags)
       int_set_gate(IRQ_APIC_THERMAL, (unsigned int)irq21, 0x18, 0x8E, 0);
       irq_register_driver(IRQ_APIC_THERMAL, IRQ_DRIVER_FUNCTION, 0, &lapic_irq_default);
 
-      int_set_gate(IRQ_APIC_ERROR, (unsigned int)irq22, 0x18, 0x8E, 1); /* reload idt */
+      int_set_gate(IRQ_APIC_ERROR, (unsigned int)irq22, 0x18, 0x8E, 0);
       irq_register_driver(IRQ_APIC_ERROR, IRQ_DRIVER_FUNCTION, 0, &lapic_irq_default);
+      
+      /* catch IPI messages */
+      int_set_gate(INT_IPI_RESCHED, (unsigned int)isr142, 0x18, 0x8E, 0);
+      int_set_gate(INT_IPI_FLUSHTLB, (unsigned int)isr143, 0x18, 0x8E, 1); /* reload idt */
    }
    
    /* program the APIC's registers so that interrupts point towards

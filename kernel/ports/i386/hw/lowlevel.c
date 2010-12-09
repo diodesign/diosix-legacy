@@ -815,6 +815,8 @@ void x86_kickstart(thread *torun)
      iret;" : : "b" (usresp), "c" (proc->entry));
    
    /* execution shouldn't really return to here */
+   KOOPS_DEBUG("[x86:%i] x86_kickstart: thread %p (tid %i pid %i) failed to kickstart\n",
+               CPU_ID, torun, torun->tid, torun->proc->pid);
 }
 
 // ----------------------- interrupt management ----------------------------
