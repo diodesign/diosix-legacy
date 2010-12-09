@@ -14,7 +14,7 @@ ARCH = i386
 FLAGS		= -O2 -std=c99 -Wall -static -nostdlib -nostdinc -fno-builtin -nodefaultlibs -Iinclude
 CC		= $(PREFIX)gcc $(FLAGS)
 AR		= $(PREFIX)ar
-OBJS	 	= objs/$(ARCH)_syscalls.o
+OBJS	 	= objs/$(ARCH)_syscalls.o objs/console.o
 COMPILE.c 	= $(CC) -c -o $@ $<
 
 # targets
@@ -24,6 +24,10 @@ all: libdiosix.a
 objs/$(ARCH)_syscalls.o:	arch/$(ARCH)_syscalls.c	makefile
 				$(WRITE) '==> COMPILE: $<'
 				$(Q)$(COMPILE.c)
+
+objs/console.o:		console.c	makefile
+			$(WRITE) '==> COMPILE: $<'
+			$(Q)$(COMPILE.c)
 
 # explicit rules
 

@@ -4,3 +4,4 @@
 
 all:	makefile
 	make -C vbe
+	make -C ps2kbd
