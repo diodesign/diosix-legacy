@@ -734,6 +734,7 @@ void x86_warm_kickstart(void)
    
    /* now return to the usermode thread - all the registers are stacked up in the 
       thread's reg block - see int_handler in locore.s for this return code */
+   regs->eflags |= 0x200; /* iret must reenable interrupts so force the flag */
    __asm__ __volatile__
    ("movl %0, %%esp; \
      pop %%eax; \
@@ -743,7 +744,6 @@ void x86_warm_kickstart(void)
      mov %%ax, %%gs; \
      popa; \
      addl $8, %%esp; \
-     sti; \
      iret;" : : "a" (regs));
    
    /* shouldn't reach here.. */
@@ -931,9 +931,16 @@ void lowlevel_thread_switch(thread *now, thread *next, int_registers_block *regs
    
    /* if the thread is already in usermode then switch to it */
    if(next->flags & THREAD_FLAG_INUSERMODE)
+   {
+      LOLVL_DEBUG("[x86:%i] switching to warm thread %i process %i (%p) from thread %i process %i (%p)\n",
+                   CPU_ID, next->tid, next->proc->pid, next, now->tid, now->proc->pid, now);
       x86_thread_switch(now, next, regs);
+   }
    else
    {
+      LOLVL_DEBUG("[x86:%i] switching to cold thread %i process %i (%p) from thread %i process %i (%p)\n",
+                   CPU_ID, next->tid, next->proc->pid, next, now->tid, now->proc->pid, now);
+      
       /* suspend the currently running thread */
       x86_thread_switch(now, NULL, regs);
       

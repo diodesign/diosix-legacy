@@ -73,7 +73,7 @@ void irq_handler(int_registers_block regs)
             (driver->func)(regs.intnum, &regs);
             handled = 1;
             break;
-            
+
          case IRQ_DRIVER_PROCESS:
             {
                /* poke the driver process */
@@ -172,7 +172,7 @@ kresult irq_deregister_driver(unsigned int irq_num, unsigned int type,
    
    lock_gate(&irq_lock, LOCK_WRITE);
    
-   /* remove it from the table */
+   /* remove it from the list */
    if(victim->next)
       victim->next->previous = victim->previous;
    if(victim->previous)
@@ -211,6 +211,8 @@ kresult irq_deregister_driver(unsigned int irq_num, unsigned int type,
    => irq_num  = IRQ line to attach this driver to
       flags    = define the driver type and any other flags, types are:
                  IRQ_DRIVER_PROCESS, IRQ_DRIVER_FUNCTION
+                 IRQ_DRIVER_LAST: run the driver after the default entry,
+                 assuming the default is registered first
       proc     = pointer to process to send the irq signal to (or 0 for none)
       func     = in-kernel function to call, or NULL for none
    <= 0 for success or else an error code 
@@ -261,21 +263,46 @@ kresult irq_register_driver(unsigned int irq_num, unsigned int flags,
    /* protect the data structure during update */
    lock_gate(&irq_lock, LOCK_WRITE);
    
-   /* attach the driver entry to the head of the list for the chosen IRQ line */
-   head = irq_drivers[irq_num];
-   if(head)
+   if(flags & IRQ_DRIVER_LAST)
    {
-      /* update the old head */
-      new->next = head;
-      head->previous = new;
+      /* attach the driver entry at the end of the list */
+      irq_driver_entry *search = irq_drivers[irq_num];
+      
+      if(search)
+      {
+         while(search->next)
+            search = search->next;
+         
+         /* search is now set to the last on the list */
+         search->next = new;
+         new->previous = search;
+         new->next = NULL;
+      }
+      else
+      {
+         /* there's no other drivers registered yet */
+         irq_drivers[irq_num] = new;
+         new->previous = new->next = NULL;
+      }
    }
-   
-   irq_drivers[irq_num] = new;
+   else
+   {
+      /* attach the driver entry to the head of the list for the chosen IRQ line */
+      head = irq_drivers[irq_num];
+      if(head)
+      {
+         /* update the old head */
+         new->next = head;
+         head->previous = new;
+      }
+      
+      irq_drivers[irq_num] = new;
+   }
    
    unlock_gate(&irq_lock, LOCK_WRITE);
    
-   IRQ_DEBUG("[irq:%i] registered driver %p to IRQ %i (proc %p func %p flags %x)\n", CPU_ID,
-             new, irq_num, proc, func, flags);
+   IRQ_DEBUG("[irq:%i] registered driver %p (previous %p next %p) to IRQ %i (proc %p func %p flags %x)\n", CPU_ID,
+             new, new->previous, new->next, irq_num, proc, func, flags);
    
    return success;
 }

@@ -108,7 +108,7 @@ kresult int_initialise(void)
       /* set up a 100Hz ticker for the scheduler  */
       INT_DEBUG("[int:%i] uniproc: set up timer (%iHz)...\n", CPU_ID, SCHED_FREQUENCY);
       x86_timer_init(SCHED_FREQUENCY);
-      irq_register_driver(PIC_8254_IRQ, IRQ_DRIVER_FUNCTION, 0, &int_common_timer);
+      irq_register_driver(PIC_8254_IRQ, IRQ_DRIVER_FUNCTION | IRQ_DRIVER_LAST, 0, &int_common_timer);
       
       return success;
    }

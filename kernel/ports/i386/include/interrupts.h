@@ -70,6 +70,7 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #define IRQ_DRIVER_TYPEMASK (IRQ_DRIVER_FUNCTION | IRQ_DRIVER_PROCESS)
 
 #define IRQ_DRIVER_IGNORE   (1 << 2)   /* this driver is not interested at the moment */
+#define IRQ_DRIVER_LAST     (1 << 3)   /* run this driver after the default handler */
 
 #define IRQ_MAX_LINES        (256) /* maximum of 256 (0-255) IRQ lines */
 #define MAX_IOAPICS          (4) /* maximum of 4 IOAPICs per system */

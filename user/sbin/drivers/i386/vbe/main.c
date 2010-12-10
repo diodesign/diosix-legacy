@@ -255,7 +255,7 @@ void boot_screen(void)
 int main(void)
 {
    diosix_msg_info msg;
-   
+
    /* move into driver layer and get access to IO ports */
    diosix_priv_layer_up();
    if(diosix_driver_register()) diosix_exit(1); /* or exit on failure */
@@ -272,7 +272,7 @@ int main(void)
    msg.role = msg.pid = DIOSIX_MSG_ANY_PROCESS;
    msg.tid = DIOSIX_MSG_ANY_THREAD;
    msg.flags = DIOSIX_MSG_SIGNAL;
-   
+
    /* begin polling for requests */
    for(;;)
    {

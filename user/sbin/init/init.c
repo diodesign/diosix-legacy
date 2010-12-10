@@ -21,7 +21,7 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #include <roles.h>
 
 int main(void)
-{
+{   
    /* name this process so others can find it */
    diosix_set_role(DIOSIX_ROLE_SYSTEM_EXECUTIVE);
    

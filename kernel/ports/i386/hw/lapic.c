@@ -233,7 +233,7 @@ void lapic_initialise(unsigned char flags)
       lapic_preflight_timer_init = 0xffffffff - lapic_preflight_timer_init;
       
       /* register the LAPIC timer driver */
-      irq_register_driver(IRQ_APIC_TIMER, IRQ_DRIVER_FUNCTION, 0, &int_common_timer);
+      irq_register_driver(IRQ_APIC_TIMER, IRQ_DRIVER_FUNCTION | IRQ_DRIVER_LAST, 0, &int_common_timer);
    }
    
    LAPIC_DEBUG("[lapic:%i] programming APIC timer with reload value of %x\n", CPU_ID, lapic_preflight_timer_init);

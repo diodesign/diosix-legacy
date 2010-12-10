@@ -288,7 +288,6 @@ x86_start_ap_end:
 %macro ISR_NOERRCODE 1  ; define a macro, taking one parameter
   [global isr%1]        ; %1 accesses the first parameter.
   isr%1:
-    cli                 ; switch off /all/ interrupts FIXME :(
     push byte 0         ; stack a dummy error code
     push byte %1        ; stack the interrupt number
     jmp int_enter_knl   ; begin to connect asm to C world
@@ -298,7 +297,6 @@ x86_start_ap_end:
 %macro ISR_ERRCODE 1
   [global isr%1]
   isr%1:
-    cli                 ; switch off /all/ interrupts FIXME :(
     push byte %1        ; stack int number, error code already stacked
     jmp int_enter_knl   ; begin to connect asm to C world
 %endmacro
@@ -307,7 +305,6 @@ x86_start_ap_end:
 %macro IRQ 2            ; two parameters: IRQ number and ISR number
   [global irq%1]
   irq%1:
-    cli                 ; switch off /all/ interrupts FIXME :(
     push byte 0         ; stack a zero
     push byte %2        ; stack the interrupt number
     jmp irq_enter_knl   ; begin to connect asm to C world
@@ -433,7 +430,6 @@ int_enter_knl:
 
    popa                     ; restore edi, esi, ebp et al
    add esp, 8               ; fix-up the stacked error code and intr number
-   sti                      ; /all/ interrupts reenabled FIXME :(
    iret                     ; restore CS, EIP, EFLAGS, SS, and ESP
    
 ; device interrupt handler stub
@@ -459,7 +455,6 @@ irq_enter_knl:
 
    popa                     ; restore edi, esi, ebp et al
    add esp, 8               ; fix-up the stacked error code and intr number
-   sti                      ; /all/ interrupts reenabled FIXME :(
    iret                     ; restore CS, EIP, EFLAGS, SS, and ESP
 
 ; ---------------- assembler to load the lidt ---------------------------------

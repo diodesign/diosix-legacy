@@ -49,7 +49,7 @@ int main(void)
    unsigned char shift = 0, control = 0, escaped = 0;
    unsigned char code;
    unsigned int finalcode;
-   
+
    /* move into driver layer and get access to IO ports */
    diosix_priv_layer_up();
    if(diosix_driver_register()) diosix_exit(1); /* or exit on failure */
