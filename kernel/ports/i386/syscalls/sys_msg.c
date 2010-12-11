@@ -60,7 +60,15 @@ void syscall_do_msg_send(int_registers_block *regs)
       else
          target = proc_find_proc(msg->pid);
       if(!target) SYSCALL_RETURN(e_not_found);
-      SYSCALL_RETURN(msg_send_signal(target, current, msg->signal.number, msg->signal.extra));
+      
+      /* send the signal */
+      send_result = msg_send_signal(target, current, msg->signal.number, msg->signal.extra);
+      
+      /* write in the target PID if successfully delivered */
+      if(!send_result)
+         msg->pid = target->pid;
+      
+      SYSCALL_RETURN(send_result);
    }
    
    /* bail out if it's not a generic sync message */

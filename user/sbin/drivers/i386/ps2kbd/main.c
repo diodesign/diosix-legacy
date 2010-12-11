@@ -114,6 +114,10 @@ int main(void)
                      /* send the final ASCII code + flags to a receiver */
                      smsg.signal.extra = finalcode;
                      diosix_msg_send(&smsg);
+                     
+                     /* to avoid looking up the video driver each time,
+                        clear the role field once we've got a pid */
+                     if(smsg.pid) smsg.role = DIOSIX_ROLE_NONE;
                   }
             }
          }

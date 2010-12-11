@@ -111,9 +111,10 @@ kresult msg_send_signal(process *target, thread *sender, unsigned int signum, un
    /* find a thread in the receiver to wake up to receive the signal */
    wakemsg.pid = target->pid;
    wakemsg.tid = DIOSIX_MSG_ANY_THREAD;
+   wakemsg.role = DIOSIX_ROLE_NONE;
    wakemsg.flags = DIOSIX_MSG_SIGNAL;
    towake = msg_find_receiver(sender, &wakemsg);
-   
+
    if(towake)
    {
       /* update the receiver with details of the signal sender */
@@ -201,7 +202,7 @@ kresult msg_test_receiver(thread *sender, thread *target, diosix_msg_info *msg)
 
    /* protect us from changes to the target's metadata */
    lock_gate(&(target->lock), LOCK_READ);
-
+   
    switch(msg->flags & DIOSIX_MSG_TYPEMASK)
    {
       case DIOSIX_MSG_SIGNAL:
@@ -266,7 +267,7 @@ thread *msg_find_receiver(thread *sender, diosix_msg_info *msg)
 {
    process *proc;
    thread *recv;
-   
+
    /* start with basic checks */
    if(!msg) return NULL;
    
@@ -298,9 +299,9 @@ thread *msg_find_receiver(thread *sender, diosix_msg_info *msg)
       for(loop = 0; loop < THREAD_HASH_BUCKETS; loop++)
       {
          recv = proc->threads[loop];
-
+         
          while(recv)
-         {
+         {            
             /* only check threads that are actually waiting for a msg */
             if((recv->state == waitingforreply) ||
                (recv->state == waitingformsg))
