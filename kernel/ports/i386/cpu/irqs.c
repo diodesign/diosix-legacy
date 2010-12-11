@@ -69,9 +69,42 @@ void irq_handler(int_registers_block regs)
          case IRQ_DRIVER_FUNCTION:
             IRQ_DEBUG("[irq:%i] calling kernel function %p for IRQ %i (driver %p)\n",
                       CPU_ID, driver->func, regs.intnum, driver);
-            /* call the kernel function */
-            (driver->func)(regs.intnum, &regs);
-            handled = 1;
+            /* a post-default handler handler may force an end to proceedings through
+               a thread switch to a cold thread. this is where it gets a bit messy.
+               if such a driver function is about to run, and is last, then release the
+               irq lock early and assume we may not return from the function call */
+            if(driver->next)
+            {
+               /* call the kernel function */
+               (driver->func)(regs.intnum, &regs);
+               handled = 1;
+            }
+            else
+            {
+               if(driver->flags & IRQ_DRIVER_LAST)
+               {
+                  /* call the last kernel function */
+                  kresult (*driver_func)(unsigned char intnum, int_registers_block *regs) = driver->func;
+                  
+                  /* hand the lock over to the new thread if the current one was rescheduled away */
+                  IRQ_DEBUG("[irq:%i] releasing IRQ lock early\n", CPU_ID);
+                  if(locker && locker != cpu_table[CPU_ID].current)
+                     LOCK_SET_OWNER(&irq_lock, cpu_table[CPU_ID].current);
+                  unlock_gate(&irq_lock, LOCK_READ);
+                  
+                  (driver_func)(regs.intnum, &regs);
+                  handled = 1;
+               }
+               else
+               {
+                  /* call the kernel function */
+                  (driver->func)(regs.intnum, &regs);
+                  handled = 1;
+               }
+               
+               /* bail out as there's no more to be done */
+               goto irq_handler_exit;
+            }
             break;
 
          case IRQ_DRIVER_PROCESS:
@@ -95,7 +128,8 @@ void irq_handler(int_registers_block regs)
    if(locker && locker != cpu_table[CPU_ID].current)
       LOCK_SET_OWNER(&irq_lock, cpu_table[CPU_ID].current);
    unlock_gate(&irq_lock, LOCK_READ);
-   
+
+irq_handler_exit:
    if(!handled)
    {
       IRQ_DEBUG("[irq:%i] spurious IRQ %i!\n", CPU_ID, regs.intnum);

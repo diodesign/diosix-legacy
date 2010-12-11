@@ -68,6 +68,7 @@ int main(void)
    
    /* accept the keyboard irq */
    diosix_signals_kernel(SIGX_ENABLE(SIGXIRQ));
+   diosix_driver_register_irq(PS2KBD_IRQ);
    
    for(;;)
    {
