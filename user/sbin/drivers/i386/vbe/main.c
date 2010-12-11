@@ -170,11 +170,10 @@ void backspace(void)
    {
       if(txt_y)
       {
+         txt_y--;
          txt_x = FB_TXT_WIDTH - 1;
-         txt_x = 0;
       }
       else return; /* nothing to delete! */
-      
    }
    else
       txt_x--;
