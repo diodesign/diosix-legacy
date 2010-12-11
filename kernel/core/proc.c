@@ -740,8 +740,17 @@ kresult proc_initialise(void)
                physical += MEM_PGSIZE;
             }
             
-            vmm_add_vma(new, (unsigned int)payload.areas[PAYLOAD_CODE].virtual,
-                        payload.areas[PAYLOAD_CODE].memsize, VMA_READABLE | VMA_FIXED | VMA_EXECUTABLE | VMA_TEXT, 0);
+            err = vmm_add_vma(new, (unsigned int)payload.areas[PAYLOAD_CODE].virtual,
+                              payload.areas[PAYLOAD_CODE].memsize,
+                              VMA_READABLE | VMA_FIXED | VMA_EXECUTABLE | VMA_TEXT, 0);
+            if(err)
+            {
+               BOOT_DEBUG("[proc:%i] failed to create executable area for process (%p %x %x %x)\n",
+                          CPU_ID, new, (unsigned int)payload.areas[PAYLOAD_CODE].virtual,
+                          payload.areas[PAYLOAD_CODE].memsize,
+                          VMA_READABLE | VMA_FIXED | VMA_EXECUTABLE | VMA_TEXT);
+               return err;
+            }
          }
          if(payload.areas[PAYLOAD_DATA].flags & (PAYLOAD_READ))
          {
@@ -760,8 +769,16 @@ kresult proc_initialise(void)
                physical += MEM_PGSIZE;
             }
             
-            vmm_add_vma(new, (unsigned int)payload.areas[PAYLOAD_DATA].virtual,
-                        payload.areas[PAYLOAD_DATA].memsize, VMA_WRITEABLE | VMA_FIXED | VMA_DATA, 0);
+            err = vmm_add_vma(new, (unsigned int)payload.areas[PAYLOAD_DATA].virtual,
+                             payload.areas[PAYLOAD_DATA].memsize, VMA_WRITEABLE | VMA_FIXED | VMA_DATA, 0);
+            if(err)
+            {
+               BOOT_DEBUG("[proc:%i] failed to create data area for process (%p %x %x %x)\n",
+                          CPU_ID, new, (unsigned int)payload.areas[PAYLOAD_DATA].virtual,
+                          payload.areas[PAYLOAD_DATA].memsize,
+                          VMA_WRITEABLE | VMA_FIXED | VMA_DATA);
+               return err;
+            }
          }
          
          if(!new->thread_count)

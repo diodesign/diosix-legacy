@@ -1720,9 +1720,6 @@ kresult vmm_add_vma(process *proc, unsigned int base, unsigned int size,
    
    new->mappings = vmm_create_pool(sizeof(vmm_area_mapping), 2);
    
-   VMM_DEBUG("[vmm:%i] created vma %p for proc %i (%p): base %x size %i flags %x cookie %x\n",
-           CPU_ID, new, proc->pid, proc, base, size, flags, cookie);
-   
    err = vmm_link_vma(proc, base, new);
    if(err)
    {
@@ -1733,6 +1730,9 @@ kresult vmm_add_vma(process *proc, unsigned int base, unsigned int size,
       return err;
    }
    
+   VMM_DEBUG("[vmm:%i] created vma %p for proc %i (%p): base %x size %i flags %x cookie %x\n",
+             CPU_ID, new, proc->pid, proc, base, size, flags, cookie);
+              
    return success;
 }
 
@@ -1807,7 +1807,6 @@ kresult vmm_destroy_vmas(process *victim)
 */
 vmm_tree *vmm_lookup_vma(thread *caller, unsigned int type)
 {
-   kresult err;
    struct vmm_tree *node;
    struct sglib_vmm_tree_iterator state;   
    process *proc;

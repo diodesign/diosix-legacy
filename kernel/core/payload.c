@@ -123,6 +123,7 @@ payload_type payload_parsemodule(mb_module_t *module, payload_descr *payload)
    }
 
    /* fill in some basic info about this module */
+   vmm_memset(payload, 0, sizeof(payload_descr));
    payload->name = (char *)KERNEL_PHYS2LOG(module->string);
    payload->entry = (void *)fheader->e_entry;
 

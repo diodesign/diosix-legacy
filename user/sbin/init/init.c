@@ -31,8 +31,5 @@ int main(void)
    diosix_memory_create((void *)ptr, size);
    diosix_memory_access((void *)ptr, VMA_WRITEABLE);
    
-   while(size)
-      ptr[--size] = 0;
-   
    while(1); /* halt */
 }
