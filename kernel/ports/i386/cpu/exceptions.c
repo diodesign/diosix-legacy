@@ -193,6 +193,10 @@ void exception_handler(int_registers_block regs)
                syscall_do_driver(&regs);
                break;
                
+            case SYSCALL_MEMORY:
+               syscall_do_memory(&regs);
+               break;   
+               
             case SYSCALL_SET_ID:
                syscall_do_set_id(&regs);
                break;

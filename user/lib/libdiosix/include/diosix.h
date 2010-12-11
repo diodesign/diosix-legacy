@@ -190,6 +190,7 @@ typedef struct
 #define DIOSIX_MEMORY_DESTROY        (1)
 #define DIOSIX_MEMORY_RESIZE         (2)
 #define DIOSIX_MEMORY_ACCESS         (3)
+#define DIOSIX_MEMORY_LOCATE         (4)
 
 /* vmm_area access flags */
 #define VMA_READABLE    (0 << 0)
@@ -202,6 +203,11 @@ typedef struct
 #define VMA_SHARED      (1 << 5) /* inhibit copy-on-write and share the area with other processes */
 #define VMA_HASPHYS     (1 << 7) /* hint to the vmm that a page has physical memory assigned to it */
 #define VMA_ACCESS_MASK (VMA_WRITEABLE | VMA_EXECUTABLE | VMA_NOCACHE | VMA_SHARED)
+#define VMA_GENERIC     (0 << 8) /* vma has no pre-defined purpose */
+#define VMA_TEXT        (1 << 8) /* vma contains the process's executable image */
+#define VMA_DATA        (2 << 8) /* vma contains the process's data area */
+#define VMA_STACK       (3 << 8) /* vma contains a thread's stack */
+#define VMA_TYPE_MASK   (VMA_GENERIC | VMA_TEXT | VMA_DATA | VMA_STACK)
 
 /* describe a physical memory request */
 typedef struct

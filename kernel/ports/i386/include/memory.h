@@ -180,10 +180,10 @@ kresult vmm_memcpyuser(void *target, process *tproc, void *source, process *spro
 kresult vmm_link_vma(process *proc, unsigned int baseaddr, vmm_area *vma);
 kresult vmm_unlink_vma(process *owner, vmm_tree *victim);
 vmm_area_mapping *vmm_find_vma_mapping(vmm_area *vma, process *tofind);
-kresult vmm_add_vma(process *proc, unsigned int base, unsigned int size, unsigned char flags, unsigned int cookie);
+kresult vmm_add_vma(process *proc, unsigned int base, unsigned int size, unsigned int flags, unsigned int cookie);
 kresult vmm_duplicate_vmas(process *new, process *source);
 kresult vmm_destroy_vmas(process *victim);
-vmm_decision vmm_fault(process *proc, unsigned int addr, unsigned char flags, unsigned char *rw_flag);
+vmm_decision vmm_fault(process *proc, unsigned int addr, unsigned int flags, unsigned char *rw_flag);
 vmm_tree *vmm_find_vma(process *proc, unsigned int addr, unsigned int size);
 kpool *vmm_create_pool(unsigned int block_size, unsigned int init_count);
 kresult vmm_destroy_pool(kpool *pool);
@@ -195,6 +195,7 @@ kresult vmm_fixup_moved_pool(kpool *pool, void *prev, void *new);
 unsigned int vmm_count_pool_inuse(kpool *pool);
 kresult vmm_alter_vma(process *owner, vmm_tree *node, unsigned int flags);
 kresult vmm_resize_vma(process *owner, vmm_tree *node, signed int change);
+vmm_tree *vmm_lookup_vma(thread *caller, unsigned int type);
 
 /* kernel global variables for managing physical pages */
 extern unsigned int *phys_pg_stack_low_base;
@@ -239,7 +240,7 @@ kresult pg_destroy_process(process *victim);
 kresult pg_add_4K_mapping(unsigned int **pgdir, unsigned int virtual, unsigned int physical, unsigned int flags);
 kresult pg_add_4M_mapping(unsigned int **pgdir, unsigned int virtual, unsigned int physical, unsigned int flags);
 kresult pg_fault(int_registers_block *regs);
-kresult pg_preempt_fault(thread *test, unsigned int virtualaddr, unsigned int size, unsigned char flags);
+kresult pg_preempt_fault(thread *test, unsigned int virtualaddr, unsigned int size, unsigned int flags);
 kresult pg_do_fault(thread *target, unsigned int addr, unsigned int cpuflags);
 void pg_postmortem(int_registers_block *regs);
 kresult pg_user2phys(unsigned int *paddr, unsigned int **pgdir, unsigned int vaddr);

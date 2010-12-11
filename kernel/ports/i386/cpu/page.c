@@ -260,7 +260,7 @@ pf_fault_bad:
       flags = access type flags (VMA_WRITEABLE set to indicate a write or clear for a read)
    <= success or a failure code
 */
-kresult pg_preempt_fault(thread *test, unsigned int virtualaddr, unsigned int size, unsigned char flags)
+kresult pg_preempt_fault(thread *test, unsigned int virtualaddr, unsigned int size, unsigned int flags)
 {
    unsigned int virtualloop, virtual_aligned_min, virtual_aligned_max;
    unsigned int pgdir_index, pgtable_index, *pgtbl;

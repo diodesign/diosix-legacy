@@ -22,8 +22,17 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 int main(void)
 {   
+   volatile unsigned char *ptr = (volatile unsigned char *)0x1000;
+   unsigned int size = 4096 * 4;
+   
    /* name this process so others can find it */
    diosix_set_role(DIOSIX_ROLE_SYSTEM_EXECUTIVE);
+   
+   diosix_memory_create((void *)ptr, size);
+   diosix_memory_access((void *)ptr, VMA_WRITEABLE);
+   
+   while(size)
+      ptr[--size] = 0;
    
    while(1); /* halt */
 }

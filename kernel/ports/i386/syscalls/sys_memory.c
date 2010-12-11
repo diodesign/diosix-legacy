@@ -30,6 +30,9 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
             DIOSIX_MEMORY_ACCESS: set the access flags of a virtual memory area.
                => ebx = pointer to start of virtual area to alter
                   ecx = access bits within the VMA_ACCESS_MASK bitmask
+            DIOSIX_MEMORY_LOCATE: find a vma by its type
+               => ebx = pointer to a word in which the vma's base address will be written
+                  ecx = type, either: VMA_GENERIC, VMA_TEXT, VMA_DATA or VMA_STACK
    <= eax = 0 for success or an error code
 */
 void syscall_do_memory(int_registers_block *regs)
@@ -44,7 +47,7 @@ void syscall_do_memory(int_registers_block *regs)
    {
       case DIOSIX_MEMORY_CREATE:
          /* vmm_add_vma() has sufficient sanity checking */
-         SYSCALL_RETURN(vmm_add_vma(current->proc, vma_base, regs->ecx, VMA_MEMSOURCE, 0));
+         SYSCALL_RETURN(vmm_add_vma(current->proc, vma_base, regs->ecx, VMA_MEMSOURCE | VMA_GENERIC, 0));
          
       case DIOSIX_MEMORY_DESTROY:
       {
@@ -94,7 +97,31 @@ void syscall_do_memory(int_registers_block *regs)
          vmm_tree *node = vmm_find_vma(current->proc, vma_base, sizeof(char));
          if(!node) SYSCALL_RETURN(e_bad_address);
          
-         SYSCALL_RETURN(vmm_alter_vma(current->proc, node, regs->ecx & VMA_ACCESS_MASK));
+         SYSCALL_RETURN(vmm_alter_vma(current->proc, node, regs->ecx));
+      }
+         
+      case DIOSIX_MEMORY_LOCATE:
+      {
+         unsigned int *ptr = (unsigned int *)regs->ebx;
+         vmm_tree *node;
+         
+         /* sanity check pointer */
+         if(!ptr || (unsigned int)ptr >= KERNEL_SPACE_BASE) SYSCALL_RETURN(e_bad_params);
+         
+         /* find a vma that matches the type given in ecx */
+         node = vmm_lookup_vma(current, regs->ecx);
+         if(node)
+         {
+            vmm_area_mapping *mapping = vmm_find_vma_mapping(node->area, current->proc);
+            if(!mapping) SYSCALL_RETURN(e_not_found);
+            
+            /* write the pointer value back to userspace */
+            *ptr = mapping->base;
+            SYSCALL_DEBUG("[sys:%i] memory locate: type %i vma %p base %x size %x ptr %x\n",
+                          CPU_ID, regs->ecx, node->area, mapping->base, node->area->size, ptr);
+            SYSCALL_RETURN(success);
+         }
+         else SYSCALL_RETURN(e_not_found);
       }
    }
    

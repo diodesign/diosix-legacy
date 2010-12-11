@@ -311,7 +311,7 @@ thread *thread_new(process *proc)
    /* create a vma for the thread's user stack - don't forget stacks grow down */
    stackbase = KERNEL_SPACE_BASE - (THREAD_MAX_STACK * MEM_PGSIZE * new->tid);
    err = vmm_add_vma(proc, stackbase - (THREAD_MAX_STACK * MEM_PGSIZE), (THREAD_MAX_STACK * MEM_PGSIZE),
-                     VMA_READABLE | VMA_WRITEABLE | VMA_MEMSOURCE, 0);
+                     VMA_READABLE | VMA_WRITEABLE | VMA_MEMSOURCE | VMA_STACK, 0);
    /* bail out and clean up if linking the stack failed */
    if(err)
    {

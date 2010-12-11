@@ -1623,7 +1623,7 @@ vmm_resize_vma_exit:
    Alter a vma's access flags.
    => owner = pointer to the owning process
       node = pointer to a vma's node within the process's virtual memory tree
-      flags = new flags word for the vma
+      flags = new VMA_ACCESS_MASK flags for the vma
    <= 0 for success or an error code
 */
 kresult vmm_alter_vma(process *owner, vmm_tree *node, unsigned int flags)
@@ -1642,7 +1642,10 @@ kresult vmm_alter_vma(process *owner, vmm_tree *node, unsigned int flags)
    lock_gate(&(vma->lock), LOCK_WRITE);
    
    if(vmm_count_pool_inuse(vma->mappings) == 1)
-      vma->flags = flags;
+   {
+      vma->flags &= ~VMA_ACCESS_MASK; /* clear the access bits */
+      vma->flags |= (flags & VMA_ACCESS_MASK); /* set the new access bits */
+   }
    else
       err = e_no_rights; /* permission denied */
    
@@ -1692,7 +1695,7 @@ vmm_area_mapping *vmm_find_vma_mapping(vmm_area *vma, process *tofind)
    <= success or a failure code
 */
 kresult vmm_add_vma(process *proc, unsigned int base, unsigned int size,
-                    unsigned char flags, unsigned int cookie)
+                    unsigned int flags, unsigned int cookie)
 {
    vmm_area *new;
 
@@ -1794,6 +1797,49 @@ kresult vmm_destroy_vmas(process *victim)
    return err;
 }
 
+/* vmm_lookup_vma
+   Locate a vma tree node using the given type flags in the given proc.
+   => caller = thread making the request on behalf of its process.
+      type = vma type flags to check against. If type is VMA_GENERIC, then
+             the first generic vma will be returned. If type is VMA_STACK,
+             then return the thread's stack vma
+   <= pointer to tree node or NULL for not found
+*/
+vmm_tree *vmm_lookup_vma(thread *caller, unsigned int type)
+{
+   kresult err;
+   struct vmm_tree *node;
+   struct sglib_vmm_tree_iterator state;   
+   process *proc;
+   
+   /* sanatise input */
+   if(!caller) return NULL;
+   type &= VMA_TYPE_MASK;
+   
+   proc = caller->proc;
+   if(type == VMA_STACK)
+      return vmm_find_vma(proc, caller->stackbase - (THREAD_MAX_STACK * MEM_PGSIZE), 1);
+   
+   lock_gate(&(proc->lock), LOCK_WRITE);
+   
+   /* walk the process's tree */
+   for(node = sglib_vmm_tree_it_init(&state, proc->mem);
+       node != NULL;
+       node = sglib_vmm_tree_it_next(&state))
+   {
+      /* mask the type bits and compare to the desired type */
+      if((node->area->flags & VMA_TYPE_MASK) == type)
+      {
+         unlock_gate(&(proc->lock), LOCK_WRITE);
+         return node;
+      }
+   }
+   
+   /* oops, not found */
+   unlock_gate(&(proc->lock), LOCK_WRITE);
+   return NULL;
+}
+
 /* vmm_find_vma
    Locate a vma tree node using the given address in the given proc. Any overlapping
    vmas will be returned or NULL for no vma.
@@ -1835,7 +1881,7 @@ vmm_tree *vmm_find_vma(process *proc, unsigned int addr, unsigned int size)
       rw_flag = pointer to an unsigned char set to 1 for a writeable area or preserved for read-only
    <= decision code
 */
-vmm_decision vmm_fault(process *proc, unsigned int addr, unsigned char flags, unsigned char *rw_flag)
+vmm_decision vmm_fault(process *proc, unsigned int addr, unsigned int flags, unsigned char *rw_flag)
 {
    lock_gate(&(proc->lock), LOCK_READ);
 

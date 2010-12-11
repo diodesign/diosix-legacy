@@ -326,3 +326,43 @@ unsigned int diosix_get_kernel_info(diosix_kernel_info *block)
    return retval;
 }
 
+/* ----------------------- virtual memory management ---------------- */
+unsigned int diosix_memory_create(void *ptr, unsigned int size)
+/* create a new virtual memory area at address ptr of size bytes */
+{
+   unsigned int retval;
+   __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (DIOSIX_MEMORY_CREATE), "b" (ptr), "c" (size), "d" (SYSCALL_MEMORY));  
+   return retval;  
+}
+
+unsigned int diosix_memory_destroy(void *ptr)
+/* destroy a VMA that has the address ptr */
+{
+   unsigned int retval;
+   __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (DIOSIX_MEMORY_DESTROY), "b" (ptr), "d" (SYSCALL_MEMORY));  
+   return retval; 
+}
+
+unsigned int diosix_memory_resize(void *ptr, signed int change)
+/* increase or decrease by change bytes the size of a VMA given by ptr */
+{
+   unsigned int retval;
+   __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (DIOSIX_MEMORY_RESIZE), "b" (ptr), "c" (change), "d" (SYSCALL_MEMORY));  
+   return retval; 
+}
+
+unsigned int diosix_memory_access(void *ptr, unsigned int bits)
+/* set the VMA_ACCESS_MASK access flags using bits for a VMA given by ptr */
+{
+   unsigned int retval;
+   __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (DIOSIX_MEMORY_ACCESS), "b" (ptr), "c" (bits), "d" (SYSCALL_MEMORY));  
+   return retval; 
+}
+
+unsigned int diosix_memory_locate(void **ptr, unsigned int type)
+/* write the address of the VMA identified by the type bits into the ptr pointer */
+{
+   unsigned int retval;
+   __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (DIOSIX_MEMORY_LOCATE), "b" (ptr), "c" (type), "d" (SYSCALL_MEMORY));  
+   return retval; 
+}

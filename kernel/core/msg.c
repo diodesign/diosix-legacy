@@ -384,14 +384,15 @@ kresult msg_copy(thread *receiver, void *data, unsigned int size, unsigned int *
 }
 
 /* msg_share_mem
- Link a virtual memory area in one process with another process through the inter-process
- messaging system. The entire vma must be linked and it must not collide with any other vmas.
- => target = process the vma will be linked with
- target_mem = structure describing where to link the vma in the target
- source = process the vma is already linked with
- source_mem = structure describing where to fidn the vma to link
- <= 0 for success, or an error code
- */
+   Link a virtual memory area in one process with another process through the inter-process
+   messaging system. The entire vma must be linked and it must not collide with any other vmas,
+   and the vma must have been marked as shared through memory_access syscall.
+   => target = process the vma will be linked with
+      target_mem = structure describing where to link the vma in the target
+      source = process the vma is already linked with
+      source_mem = structure describing where to fidn the vma to link
+   <= 0 for success, or an error code
+*/
 kresult msg_share_mem(process *target, diosix_share_request *target_mem,
                       process *source, diosix_share_request *source_mem)
 {
@@ -415,10 +416,10 @@ kresult msg_share_mem(process *target, diosix_share_request *target_mem,
    lock_gate(&(source->lock), LOCK_READ);
    lock_gate(&(target->lock), LOCK_READ);
    
-   source_node = vmm_find_vma(source, source_mem->base, sizeof(char));
+   source_node = vmm_find_vma(source, source_mem->base, source_mem->size);
    
-   /* check to see if the vma exists in the source */
-   if(source_node)
+   /* check to see if the vma exists in the source and has been marked as shareable */
+   if(source_node && (source_node->area->flags & VMA_SHARED))
    {
       lock_gate(&(source_node->area->lock), LOCK_WRITE);
       

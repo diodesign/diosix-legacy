@@ -95,10 +95,10 @@ void plot_rectangle(unsigned int x, unsigned int y,
    unsigned int w_loop, h_loop;
    
    /* keep everything sane */
-   if(x >= FB_WIDTH) x = FB_WIDTH - 1;
-   if(y >= FB_HEIGHT) y = FB_HEIGHT - 1;
-   if((x + w) >= FB_WIDTH) w = (FB_WIDTH - 1) - x;
-   if((y + h) >= FB_HEIGHT) h = (FB_HEIGHT - 1) - y;
+   if(x > FB_WIDTH) x = FB_WIDTH;
+   if(y > FB_HEIGHT) y = FB_HEIGHT;
+   if((x + w) > FB_WIDTH) w = FB_WIDTH - x;
+   if((y + h) > FB_HEIGHT) h = FB_HEIGHT - y;
    
    for(h_loop = 0; h_loop < h; h_loop++)
       for(w_loop = 0; w_loop < w; w_loop++)
@@ -237,15 +237,15 @@ void write_string(char *str, unsigned int colour)
 /* introduce us to the console user */
 void boot_screen(void)
 {
-   unsigned int loop;
+   unsigned int i;
    
    /* fade into white */
-   for(loop = 0; loop < FB_BACKGROUND; loop += 8)
-      plot_rectangle(0, 0, FB_WIDTH, FB_HEIGHT, VBE_COLOUR_GREY(loop));
+   for(i = 0; i < FB_BACKGROUND; i+= 8)
+      plot_rectangle(0, 0, FB_WIDTH, FB_HEIGHT, VBE_COLOUR_GREY(i));
    
+   /* plot some kind of welcome title bar */
    plot_rectangle(0, 0, FB_WIDTH, FONT_HEIGHT + 1, VBE_COLOUR_GREY(FB_FOREGROUND));
    write_string("now running diosix-hyatt", FB_BACKGROUND);
-   write_string("hello world from userland!", FB_FOREGROUND);
 }
 
 /* ----------------------------------------------------------------------

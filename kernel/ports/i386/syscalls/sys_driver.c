@@ -104,7 +104,7 @@ void syscall_do_driver(int_registers_block *regs)
                         
             /* sanatise the settings flags */
             flags = req->flags & (VMA_WRITEABLE | VMA_NOCACHE | VMA_SHARED);
-            flags |= VMA_FIXED; /* do not release the physical page frames */
+            flags |= VMA_FIXED | VMA_GENERIC; /* do not release the physical page frames */
             
             lock_gate(&(current->proc->lock), LOCK_WRITE);
             

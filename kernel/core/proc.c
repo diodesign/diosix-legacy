@@ -741,7 +741,7 @@ kresult proc_initialise(void)
             }
             
             vmm_add_vma(new, (unsigned int)payload.areas[PAYLOAD_CODE].virtual,
-                        payload.areas[PAYLOAD_CODE].memsize, VMA_READABLE | VMA_FIXED, 0);
+                        payload.areas[PAYLOAD_CODE].memsize, VMA_READABLE | VMA_FIXED | VMA_EXECUTABLE | VMA_TEXT, 0);
          }
          if(payload.areas[PAYLOAD_DATA].flags & (PAYLOAD_READ))
          {
@@ -761,7 +761,7 @@ kresult proc_initialise(void)
             }
             
             vmm_add_vma(new, (unsigned int)payload.areas[PAYLOAD_DATA].virtual,
-                        payload.areas[PAYLOAD_DATA].memsize, VMA_WRITEABLE | VMA_FIXED, 0);
+                        payload.areas[PAYLOAD_DATA].memsize, VMA_WRITEABLE | VMA_FIXED | VMA_DATA, 0);
          }
          
          if(!new->thread_count)

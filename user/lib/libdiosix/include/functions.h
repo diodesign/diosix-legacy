@@ -77,5 +77,7 @@ unsigned int diosix_get_kernel_info(diosix_kernel_info *block);
 unsigned int diosix_memory_create(void *ptr, unsigned int size);
 unsigned int diosix_memory_destroy(void *ptr);
 unsigned int diosix_memory_resize(void *ptr, signed int change);
+unsigned int diosix_memory_access(void *ptr, unsigned int bits);
+unsigned int diosix_memory_locate(void **ptr, unsigned int type);
 
 #endif
