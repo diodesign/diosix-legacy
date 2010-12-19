@@ -1,4 +1,4 @@
-/* user/lib/libdiosix/include/diosix.h
+/* user/lib/newlib/libc/sys/diosix-i386/diosix.h
  * prototypes, defines and structures in the kernel relevant to userspace
  * Author : Chris Williams
  * Date   : Sat,14 Nov 2009.17:17:00

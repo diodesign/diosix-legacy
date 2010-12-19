@@ -7,18 +7,16 @@ Q=@
 WRITE = $(Q)echo 
 
 .SUFFIXES: .c
-PREFIX = /Users/chris/Documents/Code/cross/i386-elf/bin/bin/i386-elf-
-LIBDIOSIX = ../../../../lib/libdiosix
+
 OBJDUMPbin = $(PREFIX)objdump 
 
 # set where the root fs to store the kernel + OS os
 PATHTOROOT = ../../../../../release/root
 
 # defines
-FLAGS		= -O2 -std=c99 -Wall -static -nostdlib -nostdinc -fno-builtin -nodefaultlibs -I$(LIBDIOSIX)/include/
+FLAGS		= -O2 -std=c99 -Wall -static -I../../../../../user/lib/newlib/libc/sys/diosix-i386/
 CC		= $(PREFIX)gcc $(FLAGS)
-LD		= $(PREFIX)gcc $(FLAGS) -Xlinker --entry="main"
-# LD		= $(PREFIX)gcc $(FLAGS) -Xlinker
+LD		= $(PREFIX)gcc $(FLAGS)
 OBJS	 	= objs/main.o objs/vbe.o objs/lowlevel.o
 
 # targets
@@ -41,7 +39,7 @@ objs/vbe.o:	vbe.c	makefile vbe.h
 
 vbe:	$(OBJS)
 	$(WRITE) '==> LINK: vbe'
-	$(Q)$(LD) $^ $(LIBDIOSIX)/libdiosix.a -o $@
+	$(Q)$(LD) $^ -o $@
 	$(Q)$(OBJDUMPbin) --source $@ >vbe.lst
 	$(Q)cp vbe $(PATHTOROOT)/sbin/drivers/i386/
 

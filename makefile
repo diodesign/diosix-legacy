@@ -12,11 +12,9 @@ VERSION		= -DKERNEL_IDENTIFIER="\"diosix-hyatt i386 SMP pre-Release1.0\"" \
 
 # ------------------------------------------------------------
 
-# set where the compiler is
-PREFIX = /Users/chris/Documents/Code/cross/i386-elf/bin/bin/i386-elf-
-
-# set the architecture 
+# set the architecture and any architecture flags
 ARCH = i386
+ARCH_FLAGS = -m32 -march=i386
 
 # ------------------------------------------------------------
 
@@ -35,18 +33,18 @@ CCbin =      $(Q)$(PREFIX)gcc
 LDbin =      $(Q)$(PREFIX)ld 
 OBJDUMPbin = $(Q)$(PREFIX)objdump 
 STRIPbin =   $(Q)$(PREFIX)strip 
-READELFbin = $(Q)$(PREFIX)readelf
+READELFbin = $(Q)$(READELF_PATH)
 NASMbin =    $(Q)nasm
 
 # defines
 PORTDIR  = kernel/ports/$(ARCH)
 COREDIR  = kernel/core
 OBJSDIR  = $(PORTDIR)/objs
-LIBDIOSIXDIR = user/lib/libdiosix
+LIBDIOSIXDIR = user/lib/newlib/libc/sys/diosix-$(ARCH)
 SVNDEF := -D'SVN_REV="$(shell svnversion -n .)"'
 
 MAKEFILE	= makefile
-MAKEDEP		= $(MAKEFILE) $(PORTDIR)/include/portdefs.h $(PORTDIR)/include/processes.h $(PORTDIR)/include/boot.h $(PORTDIR)/include/cpu.h $(PORTDIR)/include/buses.h $(PORTDIR)/include/debug.h $(PORTDIR)/include/elf.h $(PORTDIR)/include/interrupts.h $(PORTDIR)/include/ipc.h $(PORTDIR)/include/locks.h $(PORTDIR)/include/lowlevel.h $(PORTDIR)/include/memory.h $(PORTDIR)/include/multiboot.h $(PORTDIR)/include/sched.h $(PORTDIR)/include/sglib.h $(PORTDIR)/include/syscalls.h $(LIBDIOSIXDIR)/include/diosix.h $(LIBDIOSIXDIR)/include/signal.h
+MAKEDEP		= $(MAKEFILE) $(PORTDIR)/include/portdefs.h $(PORTDIR)/include/processes.h $(PORTDIR)/include/boot.h $(PORTDIR)/include/cpu.h $(PORTDIR)/include/buses.h $(PORTDIR)/include/debug.h $(PORTDIR)/include/elf.h $(PORTDIR)/include/interrupts.h $(PORTDIR)/include/ipc.h $(PORTDIR)/include/locks.h $(PORTDIR)/include/lowlevel.h $(PORTDIR)/include/memory.h $(PORTDIR)/include/multiboot.h $(PORTDIR)/include/sched.h $(PORTDIR)/include/sglib.h $(PORTDIR)/include/syscalls.h $(LIBDIOSIXDIR)/diosix.h $(LIBDIOSIXDIR)/async.h
 
 INCDIR		= $(PORTDIR)/include
 LDSCRIPT	= $(PORTDIR)/diosix.ld
@@ -54,7 +52,7 @@ LDSCRIPT	= $(PORTDIR)/diosix.ld
 NASM		= $(NASMbin) -f elf -i$(INCDIR)/
 FLAGS		= -g -std=c99 -Wall -nostdlib -nostartfiles \
 		  -nostdinc -fno-builtin -nodefaultlibs \
-		  -fomit-frame-pointer 
+		  -fomit-frame-pointer $(ARCH_FLAGS)
 
 # all debugging flags possible
 # DEBUGFLAGS	= -DDEBUG -DMSG_DEBUG -DBUS_DEBUG -DPROC_DEBUG -DSCHED_DEBUG -DTHREAD_DEBUG -DVMM_DEBUG -DXPT_DEBUG -DINT_DEBUG -DIRQ_DEBUG -DMP_DEBUG -DPAGE_DEBUG -DKSYM_DEBUG -DIOAPIC_DEBUG -DLAPIC_DEBUG -DLOCK_DEBUG -DLOLVL_DEBUG -DPIC_DEBUG -DSYSCALL_DEBUG -DPERFORMANCE_DEBUG -DLOCK_TIME_CHECK
@@ -62,7 +60,7 @@ FLAGS		= -g -std=c99 -Wall -nostdlib -nostartfiles \
 # basic debugging
 DEBUGFLAGS	= -DDEBUG -DPROC_DEBUG -DLOCK_TIME_CHECK -DSYSCALL_DEBUG
 
-CC		= $(CCbin) $(SVNDEF) $(FLAGS) -I$(INCDIR) -I$(COREDIR) -I$(LIBDIOSIXDIR)/include $(DEBUGFLAGS) $(VERSION)
+CC		= $(CCbin) $(SVNDEF) $(FLAGS) -I$(INCDIR) -I$(COREDIR) -I$(LIBDIOSIXDIR) $(DEBUGFLAGS) $(VERSION)
 LD		= $(CCbin) $(FLAGS) -Xlinker --script=$(LDSCRIPT) -Xlinker
 
 
@@ -212,8 +210,6 @@ kernel: $(OBJS) $(LDSCRIPT)
 	$(STRIPbin) -s $(PORTDIR)/$@
 	$(Q)cp $(PORTDIR)/$@ $(PATHTOROOT)/boot/kernel
 # build the FS
-	$(WRITE) '[+] building kernel API library'
-	$(Q)make -C user/lib/libdiosix
 	$(WRITE) '[+] building arch-specific drivers'
 	$(Q)make -C user/sbin/drivers/$(ARCH)
 	$(WRITE) '[+] building system executive (/sbin/init)'

@@ -15,13 +15,14 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 */
 
-#include <diosix.h>
-#include <functions.h>
-#include <signal.h>
-#include <roles.h>
-#include <io.h>
+#include "diosix.h"
+#include "functions.h"
+#include "async.h"
+#include "roles.h"
+#include "io.h"
 #include "vbe.h"
 #include "font.h"
+#include <stdio.h>
 
 /* the frame buffer */
 volatile unsigned int *fb_base = (volatile unsigned int *)FB_LOG_BASE;

@@ -1,4 +1,4 @@
-/* user/lib/libdiosix/include/signal.h
+/* user/lib/newlib/libc/sys/diosix-i386/async.h
  * Single Unix Specification's <signal.h> - http://www.opengroup.org/onlinepubs/009695399/basedefs/signal.h.html
    With diosix-specific extensions.
  * Author : Chris Williams
@@ -16,8 +16,8 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 */
 
-#ifndef _SIGNAL_H
-#define   _SIGNAL_H
+#ifndef _ASYNC_H
+#define   _ASYNC_H
 
 /* UNIX-compatible signal numbers */
 /* SIGZERO (0) is invalid */

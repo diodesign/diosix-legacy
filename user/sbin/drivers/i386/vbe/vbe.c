@@ -15,9 +15,6 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 */
 
-#include <diosix.h>
-#include <functions.h>
-#include <signal.h>
 #include "vbe.h"
 
 unsigned short vbe_read(unsigned short index)

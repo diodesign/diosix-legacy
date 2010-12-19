@@ -1,4 +1,4 @@
-/* user/lib/libdiosix/include/roles.h
+/* user/lib/newlib/libc/sys/diosix-i386/roles.h
  * list of roles known to the kernel
  * Author : Chris Williams
  * Date   : Tues,7 Dec 2010.09:28:00

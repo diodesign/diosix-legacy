@@ -15,10 +15,6 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 */
 
-#include <diosix.h>
-#include <functions.h>
-#include <signal.h>
-
 
 #ifndef _PS2KBD_H
 #define _PS2KBD_H 1

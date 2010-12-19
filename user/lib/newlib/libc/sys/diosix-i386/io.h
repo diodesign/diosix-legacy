@@ -1,4 +1,4 @@
-/* user/lib/libdiosix/include/io.h
+/* user/lib/newlib/libc/sys/diosix-i386/io.h
  * structures and defines for input and output via the vfs
  * Author : Chris Williams
  * Date   : Thu,09 Dec 2010.05:09:00

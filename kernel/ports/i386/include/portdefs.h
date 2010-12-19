@@ -19,9 +19,9 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #define   _PORTDEFS_H
 
 /* declare stuff shared with the userspace libraries */
-#include <diosix.h>
-#include <signal.h>
-#include <roles.h>
+#include "diosix.h"
+#include "async.h"
+#include "roles.h"
 
 /* declare stuff exclusive to the microkernel */
 #include <debug.h>

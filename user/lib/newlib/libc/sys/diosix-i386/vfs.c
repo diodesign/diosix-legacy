@@ -1,4 +1,4 @@
-/* user/lib/libdiosix/console.c
+/* user/lib/newlib/libc/sys/diosix-i386/vfs.c
  * library functions to send and receive generic data via the vfs
  * Author : Chris Williams
  * Date   : Thurs,09 Dec 2009.04:45:00
@@ -15,9 +15,9 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 */
 
-#include <diosix.h>
-#include <functions.h>
-#include <io.h>
+#include "diosix.h"
+#include "functions.h"
+#include "io.h"
 
 /* ----------------------------------------------------
    client interface: manipulating file contents
@@ -62,7 +62,7 @@ kresult diosix_io_unlink(char *victim)
    return success;
 }
 
-/* kresult diosix_io_fstat(int file, struct stat *st)
+kresult diosix_io_fstat(int file, struct stat *st)
 {
 	return success;
 }
@@ -70,7 +70,7 @@ kresult diosix_io_unlink(char *victim)
 kresult diosix_io_stat(const char *file, struct stat *st)
 {
 	return success;
-} */
+}
 
 /* ----------------------------------------------------
    server interface

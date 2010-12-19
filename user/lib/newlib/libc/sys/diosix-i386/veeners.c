@@ -1,4 +1,4 @@
-/* user/lib/libdiosix/arch/i386_syscalls.c
+/* user/lib/newlib/libc/sys/diosix-i386/veeners.c
  * the syscall veneers for i386 applications to talk to the microkernel
  * Author : Chris Williams
  * Date   : Sat,14 Nov 2009.17:17:00
@@ -15,8 +15,8 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 */
 
-#include <diosix.h>
-#include <functions.h>
+#include "diosix.h"
+#include "functions.h"
 
 /* veneers to syscalls - for full usage, see the kernel
    source for comments or check the documentation */

@@ -1,4 +1,4 @@
-/* user/lib/libdiosix/include/functions.h
+/* user/lib/newlib/libc/sys/diosix-i386/functions.h
  * define syscall veneers for applications to talk to the microkernel
  * Author : Chris Williams
  * Date   : Sat,14 Nov 2009.17:17:00

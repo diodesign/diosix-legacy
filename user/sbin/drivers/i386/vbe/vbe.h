@@ -15,10 +15,6 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 */
 
-#include <diosix.h>
-#include <functions.h>
-#include <signal.h>
-
 /* values taken from http://wiki.osdev.org/Bochs_Graphics_Adaptor */
 
 #ifndef _VBE_H
