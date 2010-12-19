@@ -28,8 +28,5 @@ int main(void)
    /* name this process so others can find it */
    diosix_set_role(DIOSIX_ROLE_SYSTEM_EXECUTIVE);
    
-   diosix_memory_create((void *)ptr, size);
-   diosix_memory_access((void *)ptr, VMA_WRITEABLE);
-   
    while(1); /* halt */
 }

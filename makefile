@@ -33,14 +33,14 @@ CCbin =      $(Q)$(PREFIX)gcc
 LDbin =      $(Q)$(PREFIX)ld 
 OBJDUMPbin = $(Q)$(PREFIX)objdump 
 STRIPbin =   $(Q)$(PREFIX)strip 
-READELFbin = $(Q)$(READELF_PATH)
+READELFbin = $(Q)readelf
 NASMbin =    $(Q)nasm
 
 # defines
 PORTDIR  = kernel/ports/$(ARCH)
 COREDIR  = kernel/core
 OBJSDIR  = $(PORTDIR)/objs
-LIBDIOSIXDIR = user/lib/newlib/libc/sys/diosix-$(ARCH)
+LIBDIOSIXDIR = user/lib/newlib/libgloss/libnosys
 SVNDEF := -D'SVN_REV="$(shell svnversion -n .)"'
 
 MAKEFILE	= makefile
@@ -214,5 +214,7 @@ kernel: $(OBJS) $(LDSCRIPT)
 	$(Q)make -C user/sbin/drivers/$(ARCH)
 	$(WRITE) '[+] building system executive (/sbin/init)'
 	$(Q)make -C user/sbin/init
+	$(WRITE) '[+] building virtual filesystem manager (/sbin/vfs)'
+	$(Q)make -C user/sbin/vfs
 	$(WRITE) '[+] building filesystem'
 	$(Q)$(MKFSPROGRAM)

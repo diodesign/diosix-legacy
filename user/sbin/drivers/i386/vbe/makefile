@@ -14,7 +14,7 @@ OBJDUMPbin = $(PREFIX)objdump
 PATHTOROOT = ../../../../../release/root
 
 # defines
-FLAGS		= -O2 -std=c99 -Wall -static -I../../../../../user/lib/newlib/libc/sys/diosix-i386/
+FLAGS		= -O2 -std=c99 -Wall -static -I../../../../../user/lib/newlib/libgloss/libnosys
 CC		= $(PREFIX)gcc $(FLAGS)
 LD		= $(PREFIX)gcc $(FLAGS)
 OBJS	 	= objs/main.o objs/vbe.o objs/lowlevel.o
