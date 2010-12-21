@@ -754,29 +754,32 @@ kresult proc_initialise(void)
          }
          if(payload.areas[PAYLOAD_DATA].flags & (PAYLOAD_READ))
          {
-            unsigned int flags = PG_PRESENT | PG_PRIVLVL;
+            unsigned int pflags = PG_PRESENT | PG_PRIVLVL;
+            unsigned int vflags = VMA_FIXED | VMA_DATA;
             
             if(payload.areas[PAYLOAD_DATA].flags & PAYLOAD_WRITE)
-               flags = flags | PG_RW;
+            {
+               pflags = pflags | PG_RW;
+               vflags = vflags | VMA_WRITEABLE;
+            }
             
             virtual = (unsigned int)payload.areas[PAYLOAD_DATA].virtual;
             virtual_top = virtual + payload.areas[PAYLOAD_DATA].memsize;
             physical = (unsigned int)KERNEL_LOG2PHYS(payload.areas[PAYLOAD_DATA].physical);
             while(virtual < virtual_top)
             {
-               pg_add_4K_mapping(new->pgdir, virtual, physical, flags);
+               pg_add_4K_mapping(new->pgdir, virtual, physical, pflags);
                virtual += MEM_PGSIZE;
                physical += MEM_PGSIZE;
             }
             
             err = vmm_add_vma(new, (unsigned int)payload.areas[PAYLOAD_DATA].virtual,
-                             payload.areas[PAYLOAD_DATA].memsize, VMA_WRITEABLE | VMA_FIXED | VMA_DATA, 0);
+                             payload.areas[PAYLOAD_DATA].memsize, vflags, 0);
             if(err)
             {
                BOOT_DEBUG("[proc:%i] failed to create data area for process (%p %x %x %x)\n",
                           CPU_ID, new, (unsigned int)payload.areas[PAYLOAD_DATA].virtual,
-                          payload.areas[PAYLOAD_DATA].memsize,
-                          VMA_WRITEABLE | VMA_FIXED | VMA_DATA);
+                          payload.areas[PAYLOAD_DATA].memsize, vflags);
                return err;
             }
          }
