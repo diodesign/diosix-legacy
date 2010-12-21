@@ -1698,13 +1698,18 @@ kresult vmm_add_vma(process *proc, unsigned int base, unsigned int size,
                     unsigned int flags, unsigned int cookie)
 {
    vmm_area *new;
+   unsigned int new_size = 0, original_base = base;
 
-   /* sanity check */
+   /* sanity check, no null pointers, zero sizes or overflows */
    if(!base || !size) return e_bad_params;
+   if(base >= (unsigned int)(base + size)) return e_bad_params; 
    
-   /* round up the size and round down the base to 4K page multiples */
-   size = MEM_PG_ROUND_UP(size - 1);
+   /* round down the base to 4K page multiples and calculate 
+      new size to ensure the vma covers a whole number of pages */
    base = base & ~MEM_PGMASK;
+   while((base + new_size) <= (original_base + size))
+      new_size += MEM_PGSIZE;
+   size = new_size;
    
    /* block any attempt to map over the kernel */
    if(base + MEM_CLIP(base, size) >= KERNEL_SPACE_BASE) return e_bad_params;
@@ -1855,7 +1860,7 @@ vmm_tree *vmm_find_vma(process *proc, unsigned int addr, unsigned int size)
    
    /* give up now if we're given rubbish pointers */
    if(!proc || !addr) return NULL;
-
+                 
    /* mock up a vma and node to search for */
    area.size = size;
    node.base = addr;
@@ -1888,7 +1893,7 @@ vmm_decision vmm_fault(process *proc, unsigned int addr, unsigned int flags, uns
    vmm_tree *found = vmm_find_vma(proc, addr, sizeof(char));
    
    if(!found) return badaccess; /* no vma means no possible access */
-   
+
    vma = found->area;
 
    lock_gate(&(vma->lock), LOCK_READ);

@@ -732,8 +732,12 @@ kresult proc_initialise(void)
          {
             virtual = (unsigned int)payload.areas[PAYLOAD_CODE].virtual;
             virtual_top = virtual + payload.areas[PAYLOAD_CODE].memsize;
-            physical = (unsigned int)KERNEL_LOG2PHYS(payload.areas[PAYLOAD_CODE].physical);
-            while(virtual < virtual_top)
+            
+            /* round down the base addresses to the nearest page boundary */
+            virtual &= ~MEM_PGMASK;
+            physical = (unsigned int)KERNEL_LOG2PHYS(payload.areas[PAYLOAD_CODE].physical) & ~MEM_PGMASK;
+
+            while(virtual <= virtual_top)
             {
                pg_add_4K_mapping(new->pgdir, virtual, physical, PG_PRESENT | PG_PRIVLVL);
                virtual += MEM_PGSIZE;
@@ -765,8 +769,12 @@ kresult proc_initialise(void)
             
             virtual = (unsigned int)payload.areas[PAYLOAD_DATA].virtual;
             virtual_top = virtual + payload.areas[PAYLOAD_DATA].memsize;
-            physical = (unsigned int)KERNEL_LOG2PHYS(payload.areas[PAYLOAD_DATA].physical);
-            while(virtual < virtual_top)
+            
+            /* round down the base addresses to the nearest page boundary */
+            virtual &= ~MEM_PGMASK;
+            physical = (unsigned int)KERNEL_LOG2PHYS(payload.areas[PAYLOAD_DATA].physical) & ~MEM_PGMASK;
+
+            while(virtual <= virtual_top)
             {
                pg_add_4K_mapping(new->pgdir, virtual, physical, pflags);
                virtual += MEM_PGSIZE;

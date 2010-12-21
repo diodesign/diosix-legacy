@@ -40,7 +40,7 @@ kresult pg_do_fault(thread *target, unsigned int faultaddr, unsigned int cpuflag
    /* give up if the user process has tried to access kernel memory */
    if((faultaddr >= KERNEL_SPACE_BASE) && (cpuflags & PG_FAULT_U))
       return e_bad_address;
-   
+
    /* look up the entry for this faulting address in the user page tables */
    pgtable = (unsigned int *)((unsigned int)proc->pgdir[pgdir_index] & PG_4K_MASK);
    if(pgtable)
