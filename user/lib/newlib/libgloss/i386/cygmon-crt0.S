@@ -1,5 +1,23 @@
+/* user/lib/newlib/libgloss/i386/cygmon-crt0.S
+ * i386-specific start-up routines for software linked with libc
+ * Author : Chris Williams
+ * Date   : Tues,21 Dec 2010.22:31:00
+ 
+ diosix-specific crt0 code:
+ Copyright (c) Chris Williams and individual contributors
+
+ Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+ The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
+
+*/
+
 /*
- * crt0 startup code for user programs running under Cygmon
+ * includes crt0 startup code for user programs running under Cygmon
  *
  * Copyright (c) 1998, 2000 Cygnus Support
  *
@@ -33,27 +51,15 @@ SYM(argc):
    .globl _start
 _start:
 __start:
-	/* see if the stack is already setup. if not, then default
-         *  to using the value of %sp as set by the ROM monitor
-         */
-	/* movl	$__stack, %eax
-	testl	%eax, %eax
-	jz	1f
-	movl	%eax, %esp
-1:
-	mov $0, %ebp
 
+   /* clear the bss section */
 	movl	$__bss_start, %edi
-	movl	$__bss_end, %ecx
+	movl	$_end, %ecx
 	subl	%edi, %ecx
 	xorl	%eax, %eax
 	rep; stosb
 
-	pushl	$SYM(__sigtramp)
-	pushl	$0
-	call	SYM(__install_signal_handler)
-	popl	%eax
-
+   /* not implemented on diosix yet
 	pushl	$SYM(__do_global_dtors)
 	call	SYM(atexit)
 	popl	%eax
@@ -67,6 +73,7 @@ __start:
 	movl	SYM(argc), %ecx
 	pushl	%eax
 	pushl	%ecx */
+   
 	call	SYM(main)
 	/* popl	%ecx
 	popl	%edx */
