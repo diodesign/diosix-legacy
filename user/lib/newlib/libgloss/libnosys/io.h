@@ -74,6 +74,7 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #define VFS_MSG_OPEN_FILE     (2)
 #define VFS_MSG_READLINK_FILE (2)
 #define VFS_MSG_STAT_FILE     (2)
+#define VFS_MSG_UNLINK_FILE   (2)
 
 /* total number of parts for these requests */
 #define VFS_CHOWN_PARTS       (3)
@@ -85,6 +86,7 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #define VFS_READ_PARTS        (3)
 #define VFS_READLINK_PARTS    (3)
 #define VFS_STAT_PARTS        (3)
+#define VFS_UNLINK_PARTS      (3)
 
 /* define vfs request message types */
 typedef enum
@@ -146,6 +148,8 @@ typedef struct
 } diosix_vfs_request_readlink;
 
 typedef diosix_vfs_request_readlink diosix_vfs_request_stat;
+typedef diosix_vfs_request_readlink diosix_vfs_request_unlink;
+
 
 /* similarly, a reply from the vfs has a header and
    a possible payload of data. */

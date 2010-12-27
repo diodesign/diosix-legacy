@@ -49,7 +49,7 @@ _DEFUN (_unlink, (name),
    DIOSIX_WRITE_MULTIPART(&req, VFS_MSG_UNLINK_FILE, name, descr.length);
 
    /* create the rest of the message and send */
-   err = diosix_vfs_request_msg(&msg, &req, VFS_STAT_PARTS,
+   err = diosix_vfs_request_msg(&msg, &req, VFS_UNLINK_PARTS,
                                 st, sizeof(struct st));
    
    if(err)
