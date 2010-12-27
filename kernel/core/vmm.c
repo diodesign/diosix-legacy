@@ -1,4 +1,4 @@
-   /* kernel/core/vmm.c
+/* kernel/core/vmm.c
  * diosix portable virtual memory manager
  * Author : Chris Williams
  * Date   : Mon,26 Mar 2007.23:09:39

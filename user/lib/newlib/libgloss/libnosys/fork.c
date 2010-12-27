@@ -38,4 +38,3 @@ _DEFUN (_fork, (),
    /* go straight to the kernel */
    return diosix_fork();
 }
-

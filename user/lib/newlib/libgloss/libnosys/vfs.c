@@ -1,4 +1,4 @@
-/* user/lib/newlib/libc/sys/diosix-i386/vfs.c
+/* user/lib/newlib/libgloss/libnosys/vfs.c
  * library functions to send and receive generic data via the vfs
  * Author : Chris Williams
  * Date   : Thurs,09 Dec 2009.04:45:00
@@ -17,7 +17,85 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 #include "diosix.h"
 #include "functions.h"
+#include "roles.h"
 #include "io.h"
+
+/* ----------------------------------------------------
+   suppport functions
+   ------------------------------------------------- */
+
+/* diosix_vfs_new_request
+   Craft a new request to the vfs.
+   => array = pointer to multipart array that the vfs
+              message will be constructed out of.
+              The first element is the request header,
+              the second the request information. Further
+              elements will be relevant to the specific
+              request type.
+      type = vfs request type
+      head = pointer to structure holding the request's header
+      request = pointer to the request description structure.
+                if the pointer is null, then no description
+                structure set up occurs.
+      size = size of the request description structure
+   <= returns 0 for success, or an error code
+*/
+kresult diosix_vfs_new_request(diosix_msg_multipart *array,
+                               diosix_vfs_req_type type,
+                               diosix_vfs_request_head *head,
+                               void *descr, unsigned int size)
+{
+   /* sanity checks */
+   if(!array || !head) return e_bad_params;
+
+   head.type = type;
+   DIOSIX_WRITE_MULTIPART(array, VFS_REQ_HEADER, head, sizeof(diosix_vfs_request_head));
+   
+   if(request)
+   {
+      /* check the size is sane */
+      if(!size) return e_bad_params;
+      
+      DIOSIX_WRITE_MULTIPART(array, VFS_REQ_DESCRIBE, descr, size);
+   }
+   
+   return success;
+}
+
+/* diosix_vfs_request_msg
+   Fill out all the details to send a vfs request message
+   and perform the send to the vfs process. This function
+   will block until the vfs completes the action or wants
+   to return an error.
+   => msg = message structure to send
+      parts = pointer to multiparts array of request's contents
+      parts_count = number of parts in the array
+      reply = pointer to structure in which the reply will be stored
+      reply_size = size of the reply-holding structure
+   <= 0 for success, or an error code
+*/
+kresult diosix_vfs_request_msg(diosix_msg_info *msg,
+                               diosix_msg_multipart *parts,
+                               unsigned int parts_count,
+                               void *reply, unsigned int reply_size)
+{
+   /* sanity check */
+   if(!msg || !parts || !parts_count || !reply || !reply_size)
+      return e_bad_parmas;
+
+   /* fill out all the details */
+   msg->pid   = DIOSIX_MSG_ANY_PROCESS;
+   msg->tid   = DIOSIX_MSG_ANY_THREAD;
+   msg->role  = DIOSIX_ROLE_VFS;
+   msg->flags = DIOSIX_MSG_GENERIC | DIOSIX_MSG_QUEUEME | DIOSIX_MSG_MULTIPART;
+   msg->send  = parts;
+   msg->send_size = parts_count;
+   msg->recv  = reply;
+   msg->recv_max_size = reply_size;
+   
+   /* send the message */
+   return diosix_msg_send(msg);
+}
 
 /* ----------------------------------------------------
    client interface: manipulating file contents

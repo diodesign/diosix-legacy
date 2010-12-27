@@ -1,4 +1,4 @@
-/* user/lib/newlib/libc/sys/diosix-i386/functions.h
+/* user/lib/newlib/libgloss/libnosys/functions.h
  * define syscall veneers for applications to talk to the microkernel
  * Author : Chris Williams
  * Date   : Sat,14 Nov 2009.17:17:00
@@ -20,9 +20,15 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 /* useful defines */
 
+/* Find the nearest upper or lower page boundary.
+   DIOSIX_PAGE_ROUNDUP() returns zero if its argument
+   is zero. both assume a 4K page size :( */
 #define DIOSIX_PAGE_ROUNDUP(a)   ( (unsigned int)(a) ? ((((unsigned int)(a) - 1) >> 12) + 1) << 12 : 0)
+#define DIOSIX_PAGE_ROUNDDOWN(a) ( (unsigned int)(a) & ((1 << 12) - 1) )
 
-/* veneers to syscalls */
+/* --------------------------------------------
+   veneers to syscalls
+   -------------------------------------------- */
 
 /* basic process management */
 unsigned int diosix_exit(unsigned int code);
@@ -79,5 +85,19 @@ unsigned int diosix_memory_destroy(void *ptr);
 unsigned int diosix_memory_resize(void *ptr, signed int change);
 unsigned int diosix_memory_access(void *ptr, unsigned int bits);
 unsigned int diosix_memory_locate(void **ptr, unsigned int type);
+
+/* --------------------------------------------
+   interface with the vfs 
+   -------------------------------------------- */
+   
+/* send requests to the vfs */
+kresult diosix_vfs_new_request(diosix_msg_multipart *array,
+                               diosix_vfs_req_type type,
+                               diosix_vfs_request_head *head,
+                               void *descr, unsigned int size);
+kresult diosix_vfs_request_msg(diosix_msg_info *msg,
+                               diosix_msg_multipart *parts,
+                               unsigned int parts_count,
+                               void *reply, unsigned int reply_size);
 
 #endif

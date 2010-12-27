@@ -1,4 +1,4 @@
-/* user/lib/newlib/libc/sys/diosix-i386/io.h
+/* user/lib/newlib/libgloss/libnosys/io.h
  * structures and defines for input and output via the vfs
  * Author : Chris Williams
  * Date   : Thu,09 Dec 2010.05:09:00
@@ -63,18 +63,96 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #define KEY_NLOCK    (0)
 #define KEY_BREAK    (0)
 
+/* define vfs multipart message layout */
+#define VFS_REQ_HEADER        (0) /* start with a header */
+#define VFS_REQ_REQUEST       (1) /* next add information describing the request */
 
-/* define the interface between clients and servers */
+/* request-specific elements in a multipart message */
+#define VFS_MSG_CHOWN_PATH    (2)
+#define VFS_MSG_LINK_EXISTING (2)
+#define VFS_MSG_LINK_NEW      (3)
+#define VFS_MSG_OPEN_FILE     (2)
+#define VFS_MSG_READLINK_FILE (2)
+#define VFS_MSG_STAT_FILE     (2)
+
+/* total number of parts for these requests */
+#define VFS_CHOWN_PARTS       (3)
+#define VFS_CLOSE_PARTS       (2)
+#define VFS_FSTAT_PARTS       (2)
+#define VFS_LINK_PARTS        (4)
+#define VFS_LSEEK_PARTS       (2)
+#define VFS_OPEN_PARTS        (3)
+#define VFS_READ_PARTS        (3)
+#define VFS_READLINK_PARTS    (3)
+#define VFS_STAT_PARTS        (3)
+
+/* define vfs request message types */
+typedef enum
+{
+   chown_req,
+   close_req,
+   fstat_req,
+   link_req,
+   lseek_req,
+   open_req,
+   read_req,
+   readlink_req,
+   stat_req,
+   symlink_req,
+   unlink_req
+} diosix_vfs_req_type;
+
+/* define the interface between clients and servers.
+   each request is made up of a header and a payload
+   of data. the total size of the request will be in  
+   the headers for the ipc message. */
 typedef struct
 {
-   unsigned int flags, status;
-   char *node;
-} diosix_server;
+   diosix_vfs_msg_type type;
+} diosix_vfs_request_head;
 
 typedef struct
 {
-   unsigned int flags, mode, status;
-   char *path;
-} diosix_server_request;
+   unsigned int owner, group; /* new owner uid+gid */
+   unsigned int length; /* size of the path string */
+} diosix_vfs_request_chown;
+
+typedef struct
+{
+   int filedes; /* open file descriptor */
+} diosix_vfs_request_close;
+
+typedef diosix_vfs_request_close diosix_vfs_request_read;
+typedef diosix_vfs_request_close diosix_vfs_request_fstat;
+
+typedef struct
+{
+   unsigned int existing_length, new_length;
+} diosix_vfs_request_link;
+
+typedef struct
+{
+   unsigned filedescr, ptr, dir;
+} diosix_vfs_request_lseek;
+
+typedef struct
+{
+   int flags, mode, length;
+} diosix_vfs_request_open;
+
+typedef struct
+{
+   unsigned int length;
+} diosix_vfs_request_readlink;
+
+typedef diosix_vfs_request_readlink diosix_vfs_request_stat;
+
+/* similarly, a reply from the vfs has a header and
+   a possible payload of data. */
+typedef struct
+{
+   kresult result;  /* the diosix error or success code */
+   int posix_result; /* the POSIX-conformant non-error value */
+} diosix_vfs_reply;
 
 #endif
