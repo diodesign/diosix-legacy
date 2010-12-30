@@ -143,7 +143,7 @@ typedef struct
 } diosix_msg_multipart;
 
 /* update multipart array (a) element (e) with data (d) and size (s) */
-#define DIOSIX_WRITE_MULTIPART(a, e, d, s) { (a)[(e)].data = (void *)(d); (a)[(e)].size = (void *)(s); }
+#define DIOSIX_WRITE_MULTIPART(a, e, d, s) { (a)[(e)].data = (void *)(d); (a)[(e)].size = (unsigned int)(s); }
 
 /* message passing - describe an outgoing message and params for the reply */
 typedef struct

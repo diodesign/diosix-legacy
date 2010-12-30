@@ -26,6 +26,7 @@ extern int errno;
 /* diosix-specific definitions */
 #include "diosix.h"
 #include "functions.h"
+#include "io.h"
 
 int
 _DEFUN (_lseek, (file, ptr, dir),
@@ -44,11 +45,11 @@ _DEFUN (_lseek, (file, ptr, dir),
    descr.filedesc = file;
    descr.ptr = ptr;
    descr.dir = dir;
-   diosix_vfs_new_request(&req, lseek_req, &head, &descr,
+   diosix_vfs_new_request(req, lseek_req, &head, &descr,
                           sizeof(diosix_vfs_request_lseek));
 
    /* create the rest of the message and send */
-   err = diosix_vfs_request_msg(&msg, &req, VFS_LSEEK_PARTS,
+   err = diosix_vfs_request_msg(&msg, req, VFS_LSEEK_PARTS,
                                 &reply, sizeof(diosix_vfs_reply));
    
    if(err || reply.result)

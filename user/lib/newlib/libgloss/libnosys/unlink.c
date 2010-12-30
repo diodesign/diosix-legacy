@@ -19,6 +19,7 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #include "config.h"
 #include <_ansi.h>
 #include <_syslist.h>
+#include <string.h>
 #include <errno.h>
 #undef errno
 extern int errno;
@@ -26,6 +27,7 @@ extern int errno;
 /* diosix-specific definitions */
 #include "diosix.h"
 #include "functions.h"
+#include "io.h"
 
 int
 _DEFUN (_unlink, (name),
@@ -43,20 +45,20 @@ _DEFUN (_unlink, (name),
    
    /* craft a request to the vfs to unlink (and possibly delete) 
       a file using a given pathname (don't forget the null term) */
-   descr.length = strlen(file) + sizeof(unsigned char);
-   diosix_vfs_new_request(&req, unlink_req, &head, &descr,
+   descr.length = strlen(name) + sizeof(unsigned char);
+   diosix_vfs_new_request(req, unlink_req, &head, &descr,
                           sizeof(diosix_vfs_request_unlink));
-   DIOSIX_WRITE_MULTIPART(&req, VFS_MSG_UNLINK_FILE, name, descr.length);
+   DIOSIX_WRITE_MULTIPART(req, VFS_MSG_UNLINK_FILE, name, descr.length);
 
    /* create the rest of the message and send */
-   err = diosix_vfs_request_msg(&msg, &req, VFS_UNLINK_PARTS,
-                                st, sizeof(struct st));
+   err = diosix_vfs_request_msg(&msg, req, VFS_UNLINK_PARTS,
+                                &reply, sizeof(diosix_vfs_reply));
    
-   if(err)
+   if(err || reply.result)
    {
       errno = ENOSYS;
       return -1;
    }
    
-   return 0;
+   return 0; /* success */
 }

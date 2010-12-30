@@ -26,6 +26,7 @@ extern int errno;
 /* diosix-specific definitions */
 #include "diosix.h"
 #include "functions.h"
+#include "io.h"
 
 int
 _DEFUN (_read, (file, ptr, len),
@@ -45,12 +46,12 @@ _DEFUN (_read, (file, ptr, len),
    
    /* craft a request to the vfs to read data from a
       previously open file */
-   descr.filedescr = file;
-   diosix_vfs_new_request(&req, read_req, &head, &descr,
+   descr.filedes = file;
+   diosix_vfs_new_request(req, read_req, &head, &descr,
                           sizeof(diosix_vfs_request_read));
 
    /* create the rest of the message and send */
-   err = diosix_vfs_request_msg(&msg, &req, VFS_READ_PARTS,
+   err = diosix_vfs_request_msg(&msg, req, VFS_READ_PARTS,
                                 ptr, len);
    
    if(err)
@@ -59,5 +60,5 @@ _DEFUN (_read, (file, ptr, len),
       return -1;
    }
    
-   return msg.recv_size; /* success - read number of bytes read */
+   return msg.recv_size; /* success - return number of bytes read */
 }

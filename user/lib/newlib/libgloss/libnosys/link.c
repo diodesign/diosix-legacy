@@ -19,6 +19,7 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #include "config.h"
 #include <_ansi.h>
 #include <_syslist.h>
+#include <string.h>
 #include <errno.h>
 #undef errno
 extern int errno;
@@ -26,6 +27,7 @@ extern int errno;
 /* diosix-specific definitions */
 #include "diosix.h"
 #include "functions.h"
+#include "io.h"
 
 int
 _DEFUN (_link, (existing, new),
@@ -41,17 +43,17 @@ _DEFUN (_link, (existing, new),
 
    /* craft a request to the vfs to link a file. don't forget
       the terminating byte in the strings */
-   descr.existing_length = strlen(existing) + + sizeof(unsigned char);
+   descr.existing_length = strlen(existing) + sizeof(unsigned char);
    descr.new_length = strlen(new) + sizeof(unsigned char);
-   diosix_vfs_new_request(&req, link_req, &head,
-                          descr, sizeof(diosix_vfs_request_link));
-   DIOSIX_WRITE_MULTIPART(&req, VFS_MSG_LINK_EXISTING, existing,
+   diosix_vfs_new_request(req, link_req, &head,
+                          &descr, sizeof(diosix_vfs_request_link));
+   DIOSIX_WRITE_MULTIPART(req, VFS_MSG_LINK_EXISTING, existing,
                           descr.existing_length);
-   DIOSIX_WRITE_MULTIPART(&req, VFS_MSG_LINK_NEW, new,
+   DIOSIX_WRITE_MULTIPART(req, VFS_MSG_LINK_NEW, new,
                           descr.new_length);
    
    /* create the rest of the message and send */
-   err = diosix_vfs_request_msg(&msg, &req, VFS_LINK_PARTS,
+   err = diosix_vfs_request_msg(&msg, req, VFS_LINK_PARTS,
                                 &reply, sizeof(diosix_vfs_reply));
    
    if(err || reply.result)

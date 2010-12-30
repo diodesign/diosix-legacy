@@ -18,6 +18,9 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 /* platform independent definitions */
 #include "config.h"
 #include <_syslist.h>
+#include <errno.h>
+#undef errno
+extern int errno;
 
 /* diosix-specific definitions */
 #include "diosix.h"
@@ -43,14 +46,14 @@ _sbrk (incr)
       if(incr < 0)
       {
          errno = ENOMEM;
-         return -1;
+         return (void *)-1;
       }
    
       /* create the initial memory area */
       if(diosix_memory_create(&end, incr))
       {
          errno = ENOMEM;
-         return -1;
+         return (void *)-1;
       }
       
       /* initialise the heap's statistics and return */
@@ -64,7 +67,7 @@ _sbrk (incr)
    if(incr < 0) if(heap_inuse > abs(incr))
    {
       errno = ENOMEM;
-      return -1;
+      return (void *)-1;
    }
  
    /* the kernel is only interested in whole page resizes
@@ -77,7 +80,7 @@ _sbrk (incr)
       if(diosix_memory_resize(&end, incr))
       {
          errno = ENOMEM;
-         return -1;
+         return (void *)-1;
       }
    }
 

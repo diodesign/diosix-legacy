@@ -18,6 +18,8 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #ifndef _FUNCTIONS_H
 #define   _FUNCTIONS_H
 
+#include "io.h"
+
 /* useful defines */
 
 /* Find the nearest upper or lower page boundary.
@@ -94,7 +96,7 @@ unsigned int diosix_memory_locate(void **ptr, unsigned int type);
 kresult diosix_vfs_new_request(diosix_msg_multipart *array,
                                diosix_vfs_req_type type,
                                diosix_vfs_request_head *head,
-                               void *descr, unsigned int size);
+                               void *request, unsigned int size);
 kresult diosix_vfs_request_msg(diosix_msg_info *msg,
                                diosix_msg_multipart *parts,
                                unsigned int parts_count,

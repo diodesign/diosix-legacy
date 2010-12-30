@@ -19,6 +19,7 @@
 #include "config.h"
 #include <_ansi.h>
 #include <_syslist.h>
+#include <string.h>
 #include <errno.h>
 #undef errno
 extern int errno;
@@ -46,6 +47,7 @@ _DEFUN (_kill, (pid, sig),
    msg.pid = pid; /* target process */
    msg.tid = DIOSIX_MSG_ANY_THREAD;
    msg.signal.number = sig;
+   msg.signal.extra = 0;
    
    /* interpret pid appropriately */
    msg.flags = DIOSIX_MSG_SIGNAL;

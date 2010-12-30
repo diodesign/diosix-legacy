@@ -21,12 +21,14 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #include <_syslist.h>
 #include <errno.h>
 #include <sys/types.h>
+#include <string.h>
 #undef errno
 extern int errno;
 
 /* diosix-specific definitions */
 #include "diosix.h"
 #include "functions.h"
+#include "io.h"
 
 int
 _DEFUN (_readlink, (path, buf, bufsize),
@@ -46,13 +48,13 @@ _DEFUN (_readlink, (path, buf, bufsize),
    /* craft a request to the vfs to read data from a
       previously open file */
    descr.length = strlen(path) + sizeof(unsigned char);
-   diosix_vfs_new_request(&req, readlink_req, &head, &descr,
+   diosix_vfs_new_request(req, readlink_req, &head, &descr,
                           sizeof(diosix_vfs_request_readlink));
-   DIOSIX_WRITE_MULTIPART(&req, VFS_MSG_READLINK_FILE, path,
+   DIOSIX_WRITE_MULTIPART(req, VFS_MSG_READLINK_FILE, path,
                           descr.length);
 
    /* create the rest of the message and send */
-   err = diosix_vfs_request_msg(&msg, &req, VFS_READLINK_PARTS,
+   err = diosix_vfs_request_msg(&msg, req, VFS_READLINK_PARTS,
                                 buf, bufsize);
    
    if(err)

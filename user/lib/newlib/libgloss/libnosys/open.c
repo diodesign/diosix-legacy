@@ -19,6 +19,7 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #include "config.h"
 #include <_ansi.h>
 #include <_syslist.h>
+#include <string.h>
 #include <errno.h>
 #undef errno
 extern int errno;
@@ -26,6 +27,7 @@ extern int errno;
 /* diosix-specific definitions */
 #include "diosix.h"
 #include "functions.h"
+#include "io.h"
 
 int
 _DEFUN (_open, (file, flags, mode),
@@ -36,7 +38,7 @@ _DEFUN (_open, (file, flags, mode),
    diosix_msg_info msg;
    diosix_msg_multipart req[VFS_OPEN_PARTS];
    diosix_vfs_request_head head;
-   diosix_vfs_request_chown descr;
+   diosix_vfs_request_open descr;
    diosix_vfs_reply reply;
    kresult err;
 
@@ -48,13 +50,13 @@ _DEFUN (_open, (file, flags, mode),
    descr.flags = flags;
    descr.mode = mode;
    descr.length = strlen(file) + sizeof(unsigned char);
-   diosix_vfs_new_request(&req, open_req, &head, &descr,
+   diosix_vfs_new_request(req, open_req, &head, &descr,
                           sizeof(diosix_vfs_request_open));
-   DIOSIX_WRITE_MULTIPART(&req, VFS_MSG_OPEN_PATH, file,
+   DIOSIX_WRITE_MULTIPART(req, VFS_MSG_OPEN_FILE, file,
                           descr.length);
 
    /* create the rest of the message and send */
-   err = diosix_vfs_request_msg(&msg, &req, VFS_OPEN_PARTS,
+   err = diosix_vfs_request_msg(&msg, req, VFS_OPEN_PARTS,
                                 &reply, sizeof(diosix_vfs_reply));
    
    if(err || reply.result)

@@ -26,6 +26,7 @@ extern int errno;
 /* diosix-specific definitions */
 #include "diosix.h"
 #include "functions.h"
+#include "io.h"
 
 int
 _DEFUN (_write, (file, ptr, len),
@@ -43,13 +44,13 @@ _DEFUN (_write, (file, ptr, len),
    /* craft a request to the vfs to write data to a file */
    descr.filedescr = file;
    descr.length = len;
-   diosix_vfs_new_request(&req, write_req, &head,
-                          descr, sizeof(diosix_vfs_request_write));
-   DIOSIX_WRITE_MULTIPART(&req, VFS_MSG_WRITE_DATA, ptr,
+   diosix_vfs_new_request(req, write_req, &head,
+                          &descr, sizeof(diosix_vfs_request_write));
+   DIOSIX_WRITE_MULTIPART(req, VFS_MSG_WRITE_DATA, ptr,
                           descr.length);
    
    /* create the rest of the message and send */
-   err = diosix_vfs_request_msg(&msg, &req, VFS_WRITE_PARTS,
+   err = diosix_vfs_request_msg(&msg, req, VFS_WRITE_PARTS,
                                 &reply, sizeof(diosix_vfs_reply));
    
    if(err || reply.result)

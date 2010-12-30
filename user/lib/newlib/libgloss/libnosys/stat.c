@@ -21,6 +21,7 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #include <_syslist.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <string.h>
 #include <errno.h>
 #undef errno
 extern int errno;
@@ -28,6 +29,7 @@ extern int errno;
 /* diosix-specific definitions */
 #include "diosix.h"
 #include "functions.h"
+#include "io.h"
 
 int
 _DEFUN (_stat, (file, st),
@@ -47,13 +49,13 @@ _DEFUN (_stat, (file, st),
    /* craft a request to the vfs to get a file's statistics
       using a given pathname (don't forget the null term) */
    descr.length = strlen(file) + sizeof(unsigned char);
-   diosix_vfs_new_request(&req, stat_req, &head, &descr,
+   diosix_vfs_new_request(req, stat_req, &head, &descr,
                           sizeof(diosix_vfs_request_stat));
-   DIOSIX_WRITE_MULTIPART(&req, VFS_MSG_STAT_FILE, file, descr.length);
+   DIOSIX_WRITE_MULTIPART(req, VFS_MSG_STAT_FILE, file, descr.length);
 
    /* create the rest of the message and send */
-   err = diosix_vfs_request_msg(&msg, &req, VFS_STAT_PARTS,
-                                st, sizeof(struct st));
+   err = diosix_vfs_request_msg(&msg, req, VFS_STAT_PARTS,
+                                st, sizeof(*st));
    
    if(err)
    {

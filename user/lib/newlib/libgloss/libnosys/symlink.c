@@ -19,6 +19,7 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #include "config.h"
 #include <_ansi.h>
 #include <_syslist.h>
+#include <string.h>
 #include <errno.h>
 #undef errno
 extern int errno;
@@ -26,12 +27,15 @@ extern int errno;
 /* diosix-specific definitions */
 #include "diosix.h"
 #include "functions.h"
+#include "io.h"
 
 int
 _DEFUN (_symlink, (path1, path2),
         const char *path1 _AND
         const char *path2)
 {
+   /* this code is the same as link()'s code except a
+      symlink_req is made rather than a link_req */
    diosix_msg_info msg;
    diosix_msg_multipart req[VFS_LINK_PARTS];
    diosix_vfs_request_head head;
@@ -41,17 +45,17 @@ _DEFUN (_symlink, (path1, path2),
 
    /* craft a request to the vfs to create a sym link. don't forget
       the terminating byte in the strings */
-   descr.existing_length = strlen(existing) + + sizeof(unsigned char);
-   descr.new_length = strlen(new) + sizeof(unsigned char);
-   diosix_vfs_new_request(&req, symlink_req, &head,
-                          descr, sizeof(diosix_vfs_request_link));
-   DIOSIX_WRITE_MULTIPART(&req, VFS_MSG_LINK_EXISTING, existing,
+   descr.existing_length = strlen(path1) + sizeof(unsigned char);
+   descr.new_length = strlen(path2) + sizeof(unsigned char);
+   diosix_vfs_new_request(req, symlink_req, &head,
+                          &descr, sizeof(diosix_vfs_request_link));
+   DIOSIX_WRITE_MULTIPART(req, VFS_MSG_LINK_EXISTING, path1,
                           descr.existing_length);
-   DIOSIX_WRITE_MULTIPART(&req, VFS_MSG_LINK_NEW, new,
+   DIOSIX_WRITE_MULTIPART(req, VFS_MSG_LINK_NEW, path2,
                           descr.new_length);
    
    /* create the rest of the message and send */
-   err = diosix_vfs_request_msg(&msg, &req, VFS_LINK_PARTS,
+   err = diosix_vfs_request_msg(&msg, req, VFS_LINK_PARTS,
                                 &reply, sizeof(diosix_vfs_reply));
    
    if(err || reply.result)

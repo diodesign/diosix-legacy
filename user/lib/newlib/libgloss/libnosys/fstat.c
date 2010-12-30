@@ -28,6 +28,7 @@ extern int errno;
 /* diosix-specific definitions */
 #include "diosix.h"
 #include "functions.h"
+#include "io.h"
 
 int
 _DEFUN (_fstat, (fildes, st),
@@ -41,12 +42,12 @@ _DEFUN (_fstat, (fildes, st),
    kresult err;
 
    /* craft a request to the vfs to fstat() a file */
-   descr.filedes = filedes;
-   diosix_vfs_new_request(&req, fstat_req, &head, &descr,
+   descr.filedes = fildes;
+   diosix_vfs_new_request(req, fstat_req, &head, &descr,
                           sizeof(diosix_vfs_request_fstat));
 
    /* create the rest of the message and send */
-   err = diosix_vfs_request_msg(&msg, &req, VFS_FSTAT_PARTS,
+   err = diosix_vfs_request_msg(&msg, req, VFS_FSTAT_PARTS,
                                 st, sizeof(struct stat));
    
    if(err || !(msg.recv_size))

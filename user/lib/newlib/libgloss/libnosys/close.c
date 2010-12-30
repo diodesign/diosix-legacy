@@ -26,6 +26,7 @@ extern int errno;
 /* diosix-specific definitions */
 #include "diosix.h"
 #include "functions.h"
+#include "io.h"
 
 int
 _DEFUN (_close, (fildes),
@@ -39,12 +40,12 @@ _DEFUN (_close, (fildes),
    kresult err;
 
    /* craft a request to the vfs to close a file */
-   descr.filedes = filedes;
-   diosix_vfs_new_request(&req, close_req, &head, &descr,
+   descr.filedes = fildes;
+   diosix_vfs_new_request(req, close_req, &head, &descr,
                           sizeof(diosix_vfs_request_close));
 
    /* create the rest of the message and send */
-   err = diosix_vfs_request_msg(&msg, &req, VFS_CLOSE_PARTS,
+   err = diosix_vfs_request_msg(&msg, req, VFS_CLOSE_PARTS,
                                 &reply, sizeof(diosix_vfs_reply));
    
    if(err || reply.result)

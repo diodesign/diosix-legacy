@@ -113,53 +113,58 @@ typedef enum
    the headers for the ipc message. */
 typedef struct
 {
-   diosix_vfs_msg_type type;
+   diosix_vfs_req_type type;
 } diosix_vfs_request_head;
 
+/* define the structure of the vfs requests */
+/* chown requires new owner and group IDs and a path length */
 typedef struct
 {
-   unsigned int owner, group; /* new owner uid+gid */
-   unsigned int length; /* size of the path string */
+   unsigned int owner, group;
+   unsigned int length;
 } diosix_vfs_request_chown;
 
+/* close, read and fstat require a file handle */
 typedef struct
 {
    int filedes; /* open file descriptor */
-} diosix_vfs_request_close;
+} diosix_vfs_request_close,
+  diosix_vfs_request_read,
+  diosix_vfs_request_fstat;
 
-typedef diosix_vfs_request_close diosix_vfs_request_read;
-typedef diosix_vfs_request_close diosix_vfs_request_fstat;
-
+/* link requires two path lengths */
 typedef struct
 {
    unsigned int existing_length, new_length;
 } diosix_vfs_request_link;
 
+/* lseek requires a file handle, a new pointer and a flag */
 typedef struct
 {
-   unsigned filedescr, ptr, dir;
+   unsigned int filedesc, ptr, dir;
 } diosix_vfs_request_lseek;
 
+/* open requires a flag word, a mode word and a path length */
 typedef struct
 {
    int flags, mode, length;
 } diosix_vfs_request_open;
 
+/* readlink, stat and unlink require a path length */
 typedef struct
 {
    unsigned int length;
-} diosix_vfs_request_readlink;
+} diosix_vfs_request_readlink,
+  diosix_vfs_request_stat,
+  diosix_vfs_request_unlink;
 
-typedef diosix_vfs_request_readlink diosix_vfs_request_stat;
-typedef diosix_vfs_request_readlink diosix_vfs_request_unlink;
-
+/* write requires a file handle and a source buffer length */
 typedef struct
 {
    unsigned int filedescr, length;
 } diosix_vfs_request_write;
 
-/* similarly, a reply from the vfs has a header and
-   a possible payload of data. */
+/* a reply from the vfs has a header and a possible payload of data. */
 typedef struct
 {
    kresult result;  /* the diosix error or success code */

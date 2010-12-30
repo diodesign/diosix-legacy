@@ -43,12 +43,12 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 kresult diosix_vfs_new_request(diosix_msg_multipart *array,
                                diosix_vfs_req_type type,
                                diosix_vfs_request_head *head,
-                               void *descr, unsigned int size)
+                               void *request, unsigned int size)
 {
    /* sanity checks */
    if(!array || !head) return e_bad_params;
 
-   head.type = type;
+   head->type = type;
    DIOSIX_WRITE_MULTIPART(array, VFS_REQ_HEADER, head, sizeof(diosix_vfs_request_head));
    
    if(request)
@@ -56,7 +56,7 @@ kresult diosix_vfs_new_request(diosix_msg_multipart *array,
       /* check the size is sane */
       if(!size) return e_bad_params;
       
-      DIOSIX_WRITE_MULTIPART(array, VFS_REQ_DESCRIBE, descr, size);
+      DIOSIX_WRITE_MULTIPART(array, VFS_REQ_REQUEST, request, size);
    }
    
    return success;
@@ -81,7 +81,7 @@ kresult diosix_vfs_request_msg(diosix_msg_info *msg,
 {
    /* sanity check */
    if(!msg || !parts || !parts_count || !reply || !reply_size)
-      return e_bad_parmas;
+      return e_bad_params;
 
    /* fill out all the details */
    msg->pid   = DIOSIX_MSG_ANY_PROCESS;
@@ -95,80 +95,4 @@ kresult diosix_vfs_request_msg(diosix_msg_info *msg,
    
    /* send the message */
    return diosix_msg_send(msg);
-}
-
-/* ----------------------------------------------------
-   client interface: manipulating file contents
-   ------------------------------------------------- */
-
-kresult diosix_io_open(char *filename, unsigned int flags, unsigned int mode)
-{
-   return success;
-}
-
-kresult diosix_io_close(void)
-{
-   return success;
-}
-
-kresult diosix_io_read(unsigned int flags, char *buffer, unsigned int size)
-{
-   return success;
-}
-
-kresult diosix_io_write(char *buffer, unsigned int size)
-{
-   return success;
-}
-
-kresult diosix_io_lseek(unsigned int file, unsigned int ptr, unsigned int dir)
-{
-   return success;
-}
-
-/* ----------------------------------------------------
-   client interface: manipulating the filesystem
-   ------------------------------------------------- */
-
-kresult diosix_io_link(char *old, char *new)
-{
-   return success;
-}
-
-kresult diosix_io_unlink(char *victim)
-{
-   return success;
-}
-
-kresult diosix_io_fstat(int file, struct stat *st)
-{
-	return success;
-}
-
-kresult diosix_io_stat(const char *file, struct stat *st)
-{
-	return success;
-}
-
-/* ----------------------------------------------------
-   server interface
-   ------------------------------------------------- */
-kresult diosix_io_register(diosix_server *server)
-{
-   return success;
-}
-
-kresult diosix_io_deregister(diosix_server *server)
-{
-   return success;
-}
-
-kresult diosix_io_get_work(diosix_server_request *job)
-{
-   return success;
-}
-
-kresult diosix_io_work_done(diosix_server_request *job)
-{
-   return success;
 }
