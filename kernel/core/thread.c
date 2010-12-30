@@ -242,7 +242,7 @@ thread *thread_new(process *proc)
       return NULL; /* fail if we can't alloc a new thread */
    }
    vmm_memset(new, 0, sizeof(thread));
-   
+
    /* kernel stack initialisation - just 4K per thread for now */
    err = vmm_malloc((void **)&kstack, MEM_PGSIZE);
    if(err)

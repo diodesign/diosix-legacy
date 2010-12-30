@@ -54,8 +54,11 @@ int main(void)
    diosix_priv_layer_up();
    if(diosix_driver_register()) diosix_exit(1); /* or exit on failure */
    
+   /* allow other processes to find this one */
+   diosix_set_role(DIOSIX_ROLE_CONSOLEKEYBOARD);
+   
    /* prepare the signal sending message block */
-   smsg.role = DIOSIX_ROLE_CONSOLEVIDEO;
+   smsg.role = DIOSIX_ROLE_VFS;
    smsg.tid = DIOSIX_MSG_ANY_THREAD;
    smsg.pid = DIOSIX_MSG_ANY_PROCESS;
    smsg.flags = DIOSIX_MSG_SIGNAL | DIOSIX_MSG_SENDASUSR;

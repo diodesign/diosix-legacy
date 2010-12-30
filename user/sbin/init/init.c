@@ -21,12 +21,9 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #include "roles.h"
 
 int main(void)
-{   
-   volatile unsigned char *ptr = (volatile unsigned char *)0x1000;
-   unsigned int size = 4096 * 4;
-   
+{
    /* name this process so others can find it */
    diosix_set_role(DIOSIX_ROLE_SYSTEM_EXECUTIVE);
    
-   while(1); /* halt */
+   while(1); /* idle */
 }
