@@ -26,26 +26,40 @@ extern int errno;
 #include "diosix.h"
 #include "functions.h"
 
+/* describe this process's heap area */
+char *heap_end;
+unsigned int heap_inuse, heap_size_max, heap_size_min;
+
+/* spinlock to protect critical values */
+volatile unsigned int heap_lock;
+
 void *
 _sbrk (incr)
      int incr;
 {
    extern char end; /* set by the linker  */ 
-   static char *heap_end;
-   static unsigned int heap_inuse, heap_size_max, heap_size_min;
    char *ptr;
 
+   /* critical section - keep other threads out */
+   DIOSIX_SPINLOCK_ACQUIRE(&heap_lock);
+   
    if(heap_end == 0)
    {
       /* need to create a heap area, but what if
          incr is zero? return where the heap 
          will start if so */
-      if(incr == 0) return (void *)&end;
+      if(incr == 0)
+      {
+         DIOSIX_SPINLOCK_RELEASE(&heap_lock);
+         return (void *)&end;
+      }
    
       /* can't shrink a non-existent heap */
       if(incr < 0)
       {
          errno = ENOMEM;
+         
+         DIOSIX_SPINLOCK_RELEASE(&heap_lock);
          return (void *)-1;
       }
    
@@ -53,6 +67,8 @@ _sbrk (incr)
       if(diosix_memory_create(&end, incr))
       {
          errno = ENOMEM;
+         
+         DIOSIX_SPINLOCK_RELEASE(&heap_lock);
          return (void *)-1;
       }
       
@@ -60,6 +76,8 @@ _sbrk (incr)
       heap_inuse = incr;
       heap_size_max = DIOSIX_PAGE_ROUNDUP(incr);
       heap_size_min = DIOSIX_PAGE_ROUNDDOWN(incr);
+      
+      DIOSIX_SPINLOCK_RELEASE(&heap_lock);
       return (void *)&end;
    }
  
@@ -67,6 +85,8 @@ _sbrk (incr)
    if(incr < 0) if(heap_inuse > abs(incr))
    {
       errno = ENOMEM;
+      
+      DIOSIX_SPINLOCK_RELEASE(&heap_lock);
       return (void *)-1;
    }
  
@@ -80,6 +100,8 @@ _sbrk (incr)
       if(diosix_memory_resize(&end, incr))
       {
          errno = ENOMEM;
+         
+         DIOSIX_SPINLOCK_RELEASE(&heap_lock);
          return (void *)-1;
       }
    }
@@ -102,5 +124,7 @@ _sbrk (incr)
       ptr = heap_end;
    }
 
+   /* end critical section */
+   DIOSIX_SPINLOCK_RELEASE(&heap_lock);
    return (void *)ptr;
 }

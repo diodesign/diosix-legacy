@@ -34,6 +34,7 @@ _DEFUN (_write, (file, ptr, len),
         char *ptr   _AND
         int   len)
 {
+   /* structures to hold the message for the fs system */
    diosix_msg_info msg;
    diosix_msg_multipart req[VFS_WRITE_PARTS];
    diosix_vfs_request_head head;
@@ -41,17 +42,25 @@ _DEFUN (_write, (file, ptr, len),
    diosix_vfs_reply reply;
    kresult err;
 
+   /* the pid of the filesystem that will carry out
+      the write() for us */
+   unsigned int fspid = diosix_vfs_get_fs(file);
+   if(!fspid) return -1;
+   
    /* craft a request to the vfs to write data to a file */
    descr.filedescr = file;
    descr.length = len;
-   diosix_vfs_new_request(req, write_req, &head,
-                          &descr, sizeof(diosix_vfs_request_write));
+   diosix_vfs_new_req(req, write_req, &head,
+                      &descr, sizeof(diosix_vfs_request_write));
+   
+   /* add an entry into the multipart array to point to
+      the data in memory to write to the file */
    DIOSIX_WRITE_MULTIPART(req, VFS_MSG_WRITE_DATA, ptr,
                           descr.length);
    
    /* create the rest of the message and send */
-   err = diosix_vfs_request_msg(&msg, req, VFS_WRITE_PARTS,
-                                &reply, sizeof(diosix_vfs_reply));
+   err = diosix_vfs_send_req(fspid, &msg, req, VFS_WRITE_PARTS,
+                             &reply, sizeof(diosix_vfs_reply));
    
    if(err || reply.result)
    {

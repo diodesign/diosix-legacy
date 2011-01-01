@@ -36,6 +36,7 @@ _DEFUN (_chown, (path, owner, group),
         uid_t owner _AND
         gid_t group)
 {
+   /* structures to hold the message for the fs system */
    diosix_msg_info msg;
    diosix_msg_multipart req[VFS_CHOWN_PARTS];
    diosix_vfs_request_head head;
@@ -51,14 +52,17 @@ _DEFUN (_chown, (path, owner, group),
    descr.owner = owner;
    descr.group = group;
    descr.length = strlen(path) + sizeof(unsigned char);
-   diosix_vfs_new_request(req, chown_req, &head, &descr,
-                          sizeof(diosix_vfs_request_chown));
+   diosix_vfs_new_req(req, chown_req, &head, &descr,
+                      sizeof(diosix_vfs_request_chown));
+   
+   /* add an entry into the multipart array to point to
+      the chown() path */
    DIOSIX_WRITE_MULTIPART(req, VFS_MSG_CHOWN_PATH, path,
                           descr.length);
 
    /* create the rest of the message and send */
-   err = diosix_vfs_request_msg(&msg, req, VFS_CHOWN_PARTS,
-                                &reply, sizeof(diosix_vfs_reply));
+   err = diosix_vfs_send_req(0, &msg, req, VFS_CHOWN_PARTS,
+                             &reply, sizeof(diosix_vfs_reply));
    
    if(err || reply.result)
    {

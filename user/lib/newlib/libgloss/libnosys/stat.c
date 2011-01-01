@@ -36,6 +36,7 @@ _DEFUN (_stat, (file, st),
         const char  *file _AND
         struct stat *st)
 {
+   /* structures to hold the message for the fs system */
    diosix_msg_info msg;
    diosix_msg_multipart req[VFS_STAT_PARTS];
    diosix_vfs_request_head head;
@@ -49,13 +50,16 @@ _DEFUN (_stat, (file, st),
    /* craft a request to the vfs to get a file's statistics
       using a given pathname (don't forget the null term) */
    descr.length = strlen(file) + sizeof(unsigned char);
-   diosix_vfs_new_request(req, stat_req, &head, &descr,
-                          sizeof(diosix_vfs_request_stat));
-   DIOSIX_WRITE_MULTIPART(req, VFS_MSG_STAT_FILE, file, descr.length);
+   diosix_vfs_new_req(req, stat_req, &head, &descr,
+                      sizeof(diosix_vfs_request_stat));
+   
+   /* add an entry into the multipart array to point to
+      the path of the file to inspect */
+   DIOSIX_WRITE_MULTIPART(req, VFS_MSG_STAT_PATH, file, descr.length);
 
    /* create the rest of the message and send */
-   err = diosix_vfs_request_msg(&msg, req, VFS_STAT_PARTS,
-                                st, sizeof(*st));
+   err = diosix_vfs_send_req(0, &msg, req, VFS_STAT_PARTS,
+                             st, sizeof(*st));
    
    if(err)
    {

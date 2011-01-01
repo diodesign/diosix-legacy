@@ -33,6 +33,7 @@ int
 _DEFUN (_unlink, (name),
         char *name)
 {
+   /* structures to hold the message for the fs system */
    diosix_msg_info msg;
    diosix_msg_multipart req[VFS_UNLINK_PARTS];
    diosix_vfs_request_head head;
@@ -46,13 +47,16 @@ _DEFUN (_unlink, (name),
    /* craft a request to the vfs to unlink (and possibly delete) 
       a file using a given pathname (don't forget the null term) */
    descr.length = strlen(name) + sizeof(unsigned char);
-   diosix_vfs_new_request(req, unlink_req, &head, &descr,
-                          sizeof(diosix_vfs_request_unlink));
-   DIOSIX_WRITE_MULTIPART(req, VFS_MSG_UNLINK_FILE, name, descr.length);
+   diosix_vfs_new_req(req, unlink_req, &head, &descr,
+                      sizeof(diosix_vfs_request_unlink));
+   
+   /* add an entry into the multipart array to point to
+      the path of the file to unlink/delete */
+   DIOSIX_WRITE_MULTIPART(req, VFS_MSG_UNLINK_PATH, name, descr.length);
 
    /* create the rest of the message and send */
-   err = diosix_vfs_request_msg(&msg, req, VFS_UNLINK_PARTS,
-                                &reply, sizeof(diosix_vfs_reply));
+   err = diosix_vfs_send_req(0, &msg, req, VFS_UNLINK_PARTS,
+                             &reply, sizeof(diosix_vfs_reply));
    
    if(err || reply.result)
    {

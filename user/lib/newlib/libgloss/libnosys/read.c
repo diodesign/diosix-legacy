@@ -34,12 +34,18 @@ _DEFUN (_read, (file, ptr, len),
         char *ptr   _AND
         int   len)
 {
+   /* structures to hold the message for the fs system */
    diosix_msg_info msg;
    diosix_msg_multipart req[VFS_READ_PARTS];
    diosix_vfs_request_head head;
    diosix_vfs_request_read descr;
    kresult err;
 
+   /* the pid of the filesystem that will carry out
+      the read() for us */
+   unsigned int fspid = diosix_vfs_get_fs(file);
+   if(!fspid) return -1;
+   
    /* sanity check */
    if(!ptr) return -1;
    if(!len) return 0;
@@ -47,12 +53,12 @@ _DEFUN (_read, (file, ptr, len),
    /* craft a request to the vfs to read data from a
       previously open file */
    descr.filedes = file;
-   diosix_vfs_new_request(req, read_req, &head, &descr,
-                          sizeof(diosix_vfs_request_read));
+   diosix_vfs_new_req(req, read_req, &head, &descr,
+                      sizeof(diosix_vfs_request_read));
 
    /* create the rest of the message and send */
-   err = diosix_vfs_request_msg(&msg, req, VFS_READ_PARTS,
-                                ptr, len);
+   err = diosix_vfs_send_req(fspid, &msg, req, VFS_READ_PARTS,
+                             ptr, len);
    
    if(err)
    {

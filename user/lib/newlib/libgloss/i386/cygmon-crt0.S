@@ -86,3 +86,21 @@ __start:
 	call	SYM(exit)
 3:
 	jmp	3b
+   
+   
+   /* some i386-specific code to atomically test and set a variable
+      from user mode with the value 1. this is calld from a higher-level
+      language so the stack should be:
+      +0 return eip
+      +4 pointer to the volatile variable
+      On exit, eax is the variable's previous value. Therefore, if
+      this function returns 1 then the lock is held by some other code. 
+      if it returns 0, then the lock is now held by the calling code. */
+   .align 4
+   .globl _diosix_atomic_exchange
+_diosix_atomic_exchange:
+    movl $1, %eax
+    movl 4(%esp),%edx
+    lock
+    xchgl %eax,(%edx)
+    ret

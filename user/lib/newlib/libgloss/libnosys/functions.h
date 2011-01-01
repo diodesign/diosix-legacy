@@ -29,6 +29,13 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #define DIOSIX_PAGE_ROUNDDOWN(a) ( (unsigned int)(a) & ((1 << 12) - 1) )
 
 /* --------------------------------------------
+   atomic locking support
+   -------------------------------------------- */
+extern unsigned int diosix_atomic_exchange(volatile unsigned int *ptr);
+#define DIOSIX_SPINLOCK_ACQUIRE(p) { while(diosix_atomic_exchange(p)); }
+#define DIOSIX_SPINLOCK_RELEASE(p) { *((volatile unsigned int *)(p)) = 0; }
+
+/* --------------------------------------------
    veneers to syscalls
    -------------------------------------------- */
 
@@ -97,9 +104,14 @@ kresult diosix_vfs_new_request(diosix_msg_multipart *array,
                                diosix_vfs_req_type type,
                                diosix_vfs_request_head *head,
                                void *request, unsigned int size);
-kresult diosix_vfs_request_msg(diosix_msg_info *msg,
-                               diosix_msg_multipart *parts,
-                               unsigned int parts_count,
-                               void *reply, unsigned int reply_size);
+kresult diosix_vfs_send_req(unsigned int target_pid, diosix_msg_info *msg,
+                            diosix_msg_multipart *parts,
+                            unsigned int parts_count,
+                            void *reply, unsigned int reply_size);
+
+/* associate file handles with fs processes */
+unsigned int diosix_vfs_get_fs(int filehandle);
+void diosix_vfs_disassociate_handle(int filehandle);
+void diosix_vfs_associate_handle(int filehandle, unsigned int pid);
 
 #endif

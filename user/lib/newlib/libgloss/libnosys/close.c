@@ -32,6 +32,7 @@ int
 _DEFUN (_close, (fildes),
         int fildes)
 {
+   /* structures to hold the message for the fs system */
    diosix_msg_info msg;
    diosix_msg_multipart req[VFS_CLOSE_PARTS];
    diosix_vfs_request_head head;
@@ -39,20 +40,29 @@ _DEFUN (_close, (fildes),
    diosix_vfs_reply reply;
    kresult err;
 
+   /* the pid of the filesystem that will carry out
+      the close() for us */
+   unsigned int fspid = diosix_vfs_get_fs(fildes);
+   if(!fspid) return -1;
+   
    /* craft a request to the vfs to close a file */
    descr.filedes = fildes;
-   diosix_vfs_new_request(req, close_req, &head, &descr,
-                          sizeof(diosix_vfs_request_close));
+   diosix_vfs_new_req(req, close_req, &head, &descr,
+                      sizeof(diosix_vfs_request_close));
 
    /* create the rest of the message and send */
-   err = diosix_vfs_request_msg(&msg, req, VFS_CLOSE_PARTS,
-                                &reply, sizeof(diosix_vfs_reply));
+   err = diosix_vfs_send_req(fspid, &msg, req, VFS_CLOSE_PARTS,
+                             &reply, sizeof(diosix_vfs_reply));
    
    if(err || reply.result)
    {
       errno = ENOSYS;
       return -1;
    }
+   
+   /* a filesystem process will have handled this request. end the
+      association between the file handle and the fs pid */
+   diosix_vfs_disassociate_handle(fildes);
    
    return 0; /* success */
 }

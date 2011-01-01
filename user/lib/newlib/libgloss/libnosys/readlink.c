@@ -36,6 +36,7 @@ _DEFUN (_readlink, (path, buf, bufsize),
         char *buf _AND
         size_t bufsize)
 {
+   /* structures to hold the message for the fs system */
    diosix_msg_info msg;
    diosix_msg_multipart req[VFS_READLINK_PARTS];
    diosix_vfs_request_head head;
@@ -45,17 +46,19 @@ _DEFUN (_readlink, (path, buf, bufsize),
    /* sanity check */
    if(!path || !buf || !bufsize) return -1;
    
-   /* craft a request to the vfs to read data from a
-      previously open file */
+   /* craft a request to the vfs to read the value of a symbolic link */
    descr.length = strlen(path) + sizeof(unsigned char);
-   diosix_vfs_new_request(req, readlink_req, &head, &descr,
-                          sizeof(diosix_vfs_request_readlink));
-   DIOSIX_WRITE_MULTIPART(req, VFS_MSG_READLINK_FILE, path,
+   diosix_vfs_new_req(req, readlink_req, &head, &descr,
+                      sizeof(diosix_vfs_request_readlink));
+   
+   /* add an entry into the multipart array to point to
+      the path of the symbolic link to inspect */
+   DIOSIX_WRITE_MULTIPART(req, VFS_MSG_READLINK_PATH, path,
                           descr.length);
 
    /* create the rest of the message and send */
-   err = diosix_vfs_request_msg(&msg, req, VFS_READLINK_PARTS,
-                                buf, bufsize);
+   err = diosix_vfs_send_req(0, &msg, req, VFS_READLINK_PARTS,
+                             buf, bufsize);
    
    if(err)
    {

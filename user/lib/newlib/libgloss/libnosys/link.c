@@ -34,6 +34,7 @@ _DEFUN (_link, (existing, new),
         char *existing _AND
         char *new)
 {
+   /* structures to hold the message for the fs system */
    diosix_msg_info msg;
    diosix_msg_multipart req[VFS_LINK_PARTS];
    diosix_vfs_request_head head;
@@ -45,16 +46,22 @@ _DEFUN (_link, (existing, new),
       the terminating byte in the strings */
    descr.existing_length = strlen(existing) + sizeof(unsigned char);
    descr.new_length = strlen(new) + sizeof(unsigned char);
-   diosix_vfs_new_request(req, link_req, &head,
-                          &descr, sizeof(diosix_vfs_request_link));
+   diosix_vfs_new_req(req, link_req, &head,
+                      &descr, sizeof(diosix_vfs_request_link));
+   
+   /* add an entry into the multipart array to point to
+      the path of the source file */
    DIOSIX_WRITE_MULTIPART(req, VFS_MSG_LINK_EXISTING, existing,
                           descr.existing_length);
+   
+   /* add an entry into the multipart array to point to
+      the path of the new file */
    DIOSIX_WRITE_MULTIPART(req, VFS_MSG_LINK_NEW, new,
                           descr.new_length);
    
    /* create the rest of the message and send */
-   err = diosix_vfs_request_msg(&msg, req, VFS_LINK_PARTS,
-                                &reply, sizeof(diosix_vfs_reply));
+   err = diosix_vfs_send_req(0, &msg, req, VFS_LINK_PARTS,
+                             &reply, sizeof(diosix_vfs_reply));
    
    if(err || reply.result)
    {

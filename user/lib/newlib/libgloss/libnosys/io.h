@@ -63,6 +63,18 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #define KEY_NLOCK    (0)
 #define KEY_BREAK    (0)
 
+/* describe a filehandle-to-fs association */
+typedef struct diosix_vfs_handle_assoc diosix_vfs_handle_assoc;
+struct diosix_vfs_handle_assoc
+{
+   unsigned int filedesc;  /* the file handle */
+   unsigned int pid;       /* the fs handling it */
+   
+   /* the associations are usually stored in a double
+      linked list from a hash table */
+   diosix_vfs_handle_assoc *prev, *next;
+};
+
 /* define vfs multipart message layout */
 #define VFS_REQ_HEADER        (0) /* start with a header */
 #define VFS_REQ_REQUEST       (1) /* next add information describing the request */
@@ -71,10 +83,10 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #define VFS_MSG_CHOWN_PATH    (2)
 #define VFS_MSG_LINK_EXISTING (2)
 #define VFS_MSG_LINK_NEW      (3)
-#define VFS_MSG_OPEN_FILE     (2)
-#define VFS_MSG_READLINK_FILE (2)
-#define VFS_MSG_STAT_FILE     (2)
-#define VFS_MSG_UNLINK_FILE   (2)
+#define VFS_MSG_OPEN_PATH     (2)
+#define VFS_MSG_READLINK_PATH (2)
+#define VFS_MSG_STAT_PATH     (2)
+#define VFS_MSG_UNLINK_PATH   (2)
 #define VFS_MSG_WRITE_DATA    (2)
 
 /* total number of parts for these requests */
@@ -168,7 +180,19 @@ typedef struct
 typedef struct
 {
    kresult result;  /* the diosix error or success code */
-   int posix_result; /* the POSIX-conformant non-error value */
 } diosix_vfs_reply;
+
+/* a reply from the vfs has a header and a possible payload of data. */
+typedef struct
+{
+   kresult result;  /* the diosix error or success code */
+   
+   /* the PID of a filesystem process relevant to the vfs call.
+    when a file is asked to be opened, the vfs will generate 
+    a per-process file handle in conlusion with the relevant fs.
+    this fs's PID is passed back to the caller for future use. */
+   unsigned int fspid;
+   int filedesc; /* the file handle */
+} diosix_vfs_pid_reply;
 
 #endif

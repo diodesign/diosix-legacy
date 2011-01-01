@@ -35,20 +35,25 @@ _DEFUN (_fstat, (fildes, st),
         int          fildes _AND
         struct stat *st)
 {
+   /* structures to hold the message for the fs system */
    diosix_msg_info msg;
    diosix_msg_multipart req[VFS_FSTAT_PARTS];
    diosix_vfs_request_head head;
    diosix_vfs_request_fstat descr;
    kresult err;
 
+   /* the pid of the filesystem that will carry out
+      the fstat() for us */
+   unsigned int fspid = diosix_vfs_get_fs(fildes);
+   
    /* craft a request to the vfs to fstat() a file */
    descr.filedes = fildes;
-   diosix_vfs_new_request(req, fstat_req, &head, &descr,
-                          sizeof(diosix_vfs_request_fstat));
+   diosix_vfs_new_req(req, fstat_req, &head, &descr,
+                      sizeof(diosix_vfs_request_fstat));
 
    /* create the rest of the message and send */
-   err = diosix_vfs_request_msg(&msg, req, VFS_FSTAT_PARTS,
-                                st, sizeof(struct stat));
+   err = diosix_vfs_send_req(fspid, &msg, req, VFS_FSTAT_PARTS,
+                             st, sizeof(struct stat));
    
    if(err || !(msg.recv_size))
    {

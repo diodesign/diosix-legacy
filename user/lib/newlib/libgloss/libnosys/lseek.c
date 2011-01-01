@@ -34,6 +34,7 @@ _DEFUN (_lseek, (file, ptr, dir),
         int   ptr   _AND
         int   dir)
 {
+   /* structures to hold the message for the fs system */
    diosix_msg_info msg;
    diosix_msg_multipart req[VFS_LSEEK_PARTS];
    diosix_vfs_request_head head;
@@ -41,16 +42,21 @@ _DEFUN (_lseek, (file, ptr, dir),
    diosix_vfs_reply reply;
    kresult err;
 
+   /* the pid of the filesystem that will carry out
+      the lseek() for us */
+   unsigned int fspid = diosix_vfs_get_fs(file);
+   if(!fspid) return -1;
+   
    /* craft a request to the vfs to move the file pointer */
    descr.filedesc = file;
    descr.ptr = ptr;
    descr.dir = dir;
-   diosix_vfs_new_request(req, lseek_req, &head, &descr,
-                          sizeof(diosix_vfs_request_lseek));
+   diosix_vfs_new_req(req, lseek_req, &head, &descr,
+                      sizeof(diosix_vfs_request_lseek));
 
    /* create the rest of the message and send */
-   err = diosix_vfs_request_msg(&msg, req, VFS_LSEEK_PARTS,
-                                &reply, sizeof(diosix_vfs_reply));
+   err = diosix_vfs_send_req(fspid, &msg, req, VFS_LSEEK_PARTS,
+                             &reply, sizeof(diosix_vfs_reply));
    
    if(err || reply.result)
    {
