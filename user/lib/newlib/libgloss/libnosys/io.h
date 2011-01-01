@@ -104,6 +104,12 @@ struct diosix_vfs_handle_assoc
 #define VFS_WRITE_PARTS       (3)
 #define VFS_REGISTER_PARTS    (3)
 
+/* do some pointer math to get the contents of a request message
+   base = pointer to start of a request message data
+   offset = offset after the request header in bytes
+   <= pointer (as a uint) within the request message data */
+#define VFS_MSG_EXTRACT(base, offset) ( (unsigned int)(base) + sizeof(diosix_vfs_request_head) + (unsigned int)(offset) )
+
 /* define vfs request message types */
 typedef enum
 {

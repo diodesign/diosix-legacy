@@ -27,6 +27,36 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 /* default size of the initial receive buffer */
 #define RECEIVE_BUFFER_SIZE   (2048)
 
+/* ------------------------------------------
+   manage the filespace
+   ------------------------------------------ */
+
+/* register_process
+   Add a process to the filespace
+   => msg = message requesting to join the filespace
+      path = root path of the filesystem/device
+   <= 0 for success, or an error code
+*/
+kresult register_process(diosix_msg_info *msg, char *path)
+{
+   return success;
+}
+
+/* deregister_process
+   Remove a process from the filespace
+   => msg = message requesting to leave the filespace
+      path = root path of the filesystem/device
+   <= 0 for success, or an error code
+*/
+kresult deregister_process(diosix_msg_info *msg, char *path)
+{
+   return success;
+}
+
+/* ------------------------------------------
+   message interface with other processes
+   ------------------------------------------ */
+
 /* reply_to_request
    Send a reply to a vfs request
    => msg = message block to use, will contain
@@ -89,10 +119,28 @@ void wait_for_request(void)
          case symlink_req:
          case unlink_req:
          case write_req:
+
+         /* register a filesystem/device in the vfs filespace */
          case register_req:
+         {
+            kresult result;
+            char *path = (char *)VFS_MSG_EXTRACT(req_head, sizeof(diosix_vfs_request_register));
+            
+            result = register_process(&msg, path);
+            reply_to_request(&msg, result);
+         }
+         break;
+
+         /* deregister a filesystem/device in the vfs filespace */
          case deregister_req:
-            reply_to_request(&msg, success);
-            break;
+         {
+            kresult result;
+            char *path = (char *)VFS_MSG_EXTRACT(req_head, sizeof(diosix_vfs_request_register));
+            
+            result = deregister_process(&msg, path);
+            reply_to_request(&msg, result);
+         }
+         break;
             
          /* if the type is unknown then fail it */
          default:
@@ -100,6 +148,10 @@ void wait_for_request(void)
       }
    }
 }
+
+/* ------------------------------------------
+   greetings, program
+   ------------------------------------------ */
 
 int main(void)
 {   
