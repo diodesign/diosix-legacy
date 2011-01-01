@@ -49,25 +49,25 @@ int main(void)
    unsigned char shift = 0, control = 0, escaped = 0;
    unsigned char code;
    unsigned int finalcode;
-
+   
    /* move into driver layer and get access to IO ports */
    diosix_priv_layer_up();
    if(diosix_driver_register()) diosix_exit(1); /* or exit on failure */
-   
+
    /* allow other processes to find this one */
    diosix_set_role(DIOSIX_ROLE_CONSOLEKEYBOARD);
 
-   /* prepare to sleep until an interrupt comes in */
-   msg.role = msg.pid = DIOSIX_MSG_ANY_PROCESS;
-   msg.tid = DIOSIX_MSG_ANY_THREAD;
-   msg.flags = DIOSIX_MSG_SIGNAL | DIOSIX_MSG_KERNELONLY;
+   /* register this device with the vfs */
+   diosix_vfs_register("/dev/ps2kbd"); 
    
    /* accept the keyboard irq */
    diosix_signals_kernel(SIGX_ENABLE(SIGXIRQ));
    diosix_driver_register_irq(PS2KBD_IRQ);
    
-   /* register this device with the vfs */
-   diosix_vfs_register("/dev/ps2kbd");     
+   /* prepare to sleep until an interrupt comes in */
+   msg.role = msg.pid = DIOSIX_MSG_ANY_PROCESS;
+   msg.tid = DIOSIX_MSG_ANY_THREAD;
+   msg.flags = DIOSIX_MSG_SIGNAL | DIOSIX_MSG_KERNELONLY;
    
    for(;;)
    {

@@ -53,6 +53,9 @@ void syscall_do_driver(int_registers_block *regs)
             
             current->flags |= THREAD_FLAG_ISDRIVER;
             
+            /* update the thread's priority now */
+            sched_move_to_end(current->cpu, current);
+            
             SYSCALL_DEBUG("[sys:%i] thread registered as a driver\n", CPU_ID);
             SYSCALL_RETURN(success);
          }
@@ -64,6 +67,9 @@ void syscall_do_driver(int_registers_block *regs)
             if(err) SYSCALL_RETURN(err);
 
             current->flags &= (~THREAD_FLAG_ISDRIVER);
+            
+            /* update the thread's priority now */
+            sched_move_to_end(current->cpu, current);
             
             SYSCALL_DEBUG("[sys:%i] thread deregistered as a driver\n", CPU_ID);
             SYSCALL_RETURN(success);
