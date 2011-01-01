@@ -45,7 +45,7 @@ unsigned int lookup_code(unsigned char code, unsigned char shift, unsigned escap
    ---------------------------------------------------------------------- */
 int main(void)
 {
-   diosix_msg_info msg, smsg;
+   diosix_msg_info msg;
    unsigned char shift = 0, control = 0, escaped = 0;
    unsigned char code;
    unsigned int finalcode;
@@ -56,14 +56,7 @@ int main(void)
    
    /* allow other processes to find this one */
    diosix_set_role(DIOSIX_ROLE_CONSOLEKEYBOARD);
-   
-   /* prepare the signal sending message block */
-   smsg.role = DIOSIX_ROLE_VFS;
-   smsg.tid = DIOSIX_MSG_ANY_THREAD;
-   smsg.pid = DIOSIX_MSG_ANY_PROCESS;
-   smsg.flags = DIOSIX_MSG_SIGNAL | DIOSIX_MSG_SENDASUSR;
-   smsg.signal.number = 64;
-   
+
    /* prepare to sleep until an interrupt comes in */
    msg.role = msg.pid = DIOSIX_MSG_ANY_PROCESS;
    msg.tid = DIOSIX_MSG_ANY_THREAD;
@@ -72,6 +65,9 @@ int main(void)
    /* accept the keyboard irq */
    diosix_signals_kernel(SIGX_ENABLE(SIGXIRQ));
    diosix_driver_register_irq(PS2KBD_IRQ);
+   
+   /* register this device with the vfs */
+   diosix_vfs_register("/dev/ps2kbd");     
    
    for(;;)
    {
@@ -113,14 +109,6 @@ int main(void)
                   {
                      /* set the control key flag if necessary */
                      if(control) finalcode |= KEY_CONTROL;
-
-                     /* send the final ASCII code + flags to a receiver */
-                     smsg.signal.extra = finalcode;
-                     diosix_msg_send(&smsg);
-                     
-                     /* to avoid looking up the video driver each time,
-                        clear the role field once we've got a pid */
-                     if(smsg.pid) smsg.role = DIOSIX_ROLE_NONE;
                   }
             }
          }

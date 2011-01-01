@@ -98,6 +98,8 @@ __start:
       if it returns 0, then the lock is now held by the calling code. */
    .align 4
    .globl _diosix_atomic_exchange
+   .globl diosix_atomic_exchange
+diosix_atomic_exchange:
 _diosix_atomic_exchange:
     movl $1, %eax
     movl 4(%esp),%edx

@@ -39,6 +39,7 @@ typedef enum
    e_not_contiguous,
    e_not_enough_bytes,
    e_too_big,
+   e_too_small,
    e_phys_stk_overflow,
    e_payload_obj_here,
    e_payload_missing,

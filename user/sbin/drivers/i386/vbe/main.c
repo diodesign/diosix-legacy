@@ -254,8 +254,6 @@ void boot_screen(void)
    ---------------------------------------------------------------------- */
 int main(void)
 {
-   diosix_msg_info msg;
-
    /* move into driver layer and get access to IO ports */
    diosix_priv_layer_up();
    if(diosix_driver_register()) diosix_exit(1); /* or exit on failure */
@@ -265,38 +263,13 @@ int main(void)
    
    /* name this process so others can find it */
    diosix_set_role(DIOSIX_ROLE_CONSOLEVIDEO);
-   
-   boot_screen();
-   
-   /* prepare to receive signals to write to the screen */
-   msg.role = msg.pid = DIOSIX_MSG_ANY_PROCESS;
-   msg.tid = DIOSIX_MSG_ANY_THREAD;
-   msg.flags = DIOSIX_MSG_SIGNAL;
 
-   /* begin polling for requests */
-   for(;;)
-   {
-      /* wait for signal 64 to arrive */
-      if(diosix_msg_receive(&msg) == success && msg.signal.number == 64)
-      {
-         unsigned char ascii = msg.signal.extra & 0xff;
-         
-         /* if it's ascii, then do it */
-         if(ascii >= 32 && ascii < 127)
-            write_character(ascii, VBE_COLOUR_GREY(FB_FOREGROUND));
-         else
-         {
-            switch(msg.signal.extra)
-            {
-               case KEY_ENTER:
-                  line_break();
-                  break;
-                  
-               case KEY_BSPACE:
-                  backspace();
-                  break;
-            }
-         }
-      }
-   }
+   /* welcome the user */
+   boot_screen();
+
+   /* register this device with the vfs */
+   diosix_vfs_register("/dev/vbe");
+   
+   while(1); /* wait */
+
 }
