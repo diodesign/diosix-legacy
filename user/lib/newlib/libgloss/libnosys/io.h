@@ -88,6 +88,7 @@ struct diosix_vfs_handle_assoc
 #define VFS_MSG_STAT_PATH     (2)
 #define VFS_MSG_UNLINK_PATH   (2)
 #define VFS_MSG_WRITE_DATA    (2)
+#define VFS_MSG_REGISTER_PATH (2)
 
 /* total number of parts for these requests */
 #define VFS_CHOWN_PARTS       (3)
@@ -101,10 +102,12 @@ struct diosix_vfs_handle_assoc
 #define VFS_STAT_PARTS        (3)
 #define VFS_UNLINK_PARTS      (3)
 #define VFS_WRITE_PARTS       (3)
+#define VFS_REGISTER_PARTS    (3)
 
 /* define vfs request message types */
 typedef enum
 {
+   /* posix-style file IO requests */
    chown_req,
    close_req,
    fstat_req,
@@ -116,7 +119,11 @@ typedef enum
    stat_req,
    symlink_req,
    unlink_req,
-   write_req
+   write_req,
+   
+   /* diosix-specific requests */
+   register_req,
+   deregister_req
 } diosix_vfs_req_type;
 
 /* define the interface between clients and servers.
@@ -168,7 +175,8 @@ typedef struct
    unsigned int length;
 } diosix_vfs_request_readlink,
   diosix_vfs_request_stat,
-  diosix_vfs_request_unlink;
+  diosix_vfs_request_unlink,
+  diosix_vfs_request_register;
 
 /* write requires a file handle and a source buffer length */
 typedef struct

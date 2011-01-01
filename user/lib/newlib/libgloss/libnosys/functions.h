@@ -114,4 +114,8 @@ unsigned int diosix_vfs_get_fs(int filehandle);
 void diosix_vfs_disassociate_handle(int filehandle);
 void diosix_vfs_associate_handle(int filehandle, unsigned int pid);
 
+/* register a filesystem or device with the vfs */
+kresult diosix_vfs_register(char *path);
+kresult diosix_vfs_deregister(char *path);
+
 #endif

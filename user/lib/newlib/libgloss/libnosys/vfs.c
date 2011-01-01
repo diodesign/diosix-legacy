@@ -31,6 +31,7 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 diosix_vfs_handle_assoc *diosix_open_files[DIOSIX_OPEN_FILES_HASH_MAX];
 unsigned int diosix_open_files_lock;
 
+
 /* ----------------------------------------------------
    send a request to the vfs / fs system
    ------------------------------------------------- */
@@ -126,6 +127,88 @@ kresult diosix_vfs_send_req(unsigned int target_pid, diosix_msg_info *msg,
    return diosix_msg_send(msg);
 }
 
+
+/* ----------------------------------------------------
+   register a process as a filesystem/device
+   ------------------------------------------------- */
+
+/* diosix_vfs_register
+   Register a process as one capable of providing a
+   filesystem or a device within the vfs's namespace.
+   => path = filesystem or device's root path
+   <= 0 for success, or an error code
+*/
+kresult diosix_vfs_register(char *path)
+{
+   /* structures to hold the message for the vfs */
+   diosix_msg_info msg;
+   diosix_msg_multipart req[VFS_REGISTER_PARTS];
+   diosix_vfs_request_head head;
+   diosix_vfs_request_register descr;
+   diosix_vfs_reply reply;
+   kresult err;
+   
+   /* sanity check */
+   if(!path) return e_bad_params;
+   
+   /* craft a request to the vfs to register as a filesystem or device */
+   descr.length = strlen(path) + sizeof(unsigned char);
+   diosix_vfs_new_req(req, register_req, &head, &descr,
+                      sizeof(diosix_vfs_request_register));
+   
+   /* add an entry into the multipart array to point to
+      the root path to register */
+   DIOSIX_WRITE_MULTIPART(req, VFS_MSG_REGISTER_PATH, path,
+                          descr.length);
+   
+   /* create the rest of the message and send */
+   err = diosix_vfs_send_req(0, &msg, req, VFS_REGISTER_PARTS,
+                             &reply, sizeof(diosix_vfs_reply));
+   
+   if(err) return err;
+   return reply.result;
+}
+
+/* diosix_vfs_deregister
+   Deregister a process previously registered to handle
+   part of the vfs's filespace.
+   => path = filesystem or device's root path
+   <= 0 for success, or an error code
+*/
+kresult diosix_vfs_deregister(char *path)
+{
+   /* structures to hold the message for the vfs.
+      this code is the same as registering except it
+      sends a deregister_req message */
+   diosix_msg_info msg;
+   diosix_msg_multipart req[VFS_REGISTER_PARTS];
+   diosix_vfs_request_head head;
+   diosix_vfs_request_register descr;
+   diosix_vfs_reply reply;
+   kresult err;
+   
+   /* sanity check */
+   if(!path) return e_bad_params;
+   
+   /* craft a request to the vfs to register as a filesystem or device */
+   descr.length = strlen(path) + sizeof(unsigned char);
+   diosix_vfs_new_req(req, deregister_req, &head, &descr,
+                      sizeof(diosix_vfs_request_register));
+   
+   /* add an entry into the multipart array to point to
+    the root path to deregister */
+   DIOSIX_WRITE_MULTIPART(req, VFS_MSG_REGISTER_PATH, path,
+                          descr.length);
+   
+   /* create the rest of the message and send */
+   err = diosix_vfs_send_req(0, &msg, req, VFS_REGISTER_PARTS,
+                             &reply, sizeof(diosix_vfs_reply));
+   
+   if(err) return err;
+   return reply.result;
+}
+
+
 /* ----------------------------------------------------
    associate a file handle with a fs process
    ------------------------------------------------- */
@@ -135,7 +218,7 @@ kresult diosix_vfs_send_req(unsigned int target_pid, diosix_msg_info *msg,
    so that messages can be directly routed at the fs
    process managing the file.
    => filehandle = handle to associate with the fs pid
-       pid = pid of the fs process
+      pid = pid of the fs process
 */
 void diosix_vfs_associate_handle(int filehandle, unsigned int pid)
 {
