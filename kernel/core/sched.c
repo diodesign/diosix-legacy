@@ -56,8 +56,8 @@ unsigned char sched_determine_priority(thread *target)
 {
    unsigned char priority;
    
-   /* driver threads always get priority 0 */
-   if(target->flags & THREAD_FLAG_ISDRIVER) return SCHED_PRIORITY_INTERRUPTS;
+   /* driver threads always get priority 0 (or 1 if punished) */
+   if(target->flags & THREAD_FLAG_ISDRIVER) return target->priority;
    
    /* if the thread's been granted a better priority then use that */
    if(target->priority_granted != SCHED_PRIORITY_INVALID &&
@@ -97,7 +97,8 @@ thread *sched_get_next_to_run(unsigned char cpuid)
    points to their base score for its priority level or subtract a point or 
    add a point or sanity check the points score.
    => tocalc = pointer to thread to operate on
-      request = priority_reset, priority_reward, priority_punish or priority_check
+      request = priority_reset, priority_reward, priority_punish,
+                priority_expiry_punish or priority_check
 */
 void sched_priority_calc(thread *tocalc, sched_priority_request request)
 {
@@ -111,8 +112,23 @@ void sched_priority_calc(thread *tocalc, sched_priority_request request)
       return;
    }
    
-   /* interrupt-handling driver threads are immune to this */
-   if(tocalc->flags & THREAD_FLAG_ISDRIVER) return;
+   /* interrupt-handling driver threads are immune to these checks
+      except punishment for exceeding their timeslice, which shouldn't
+      happen to a well-behaving driver thread */
+   if(tocalc->flags & THREAD_FLAG_ISDRIVER)
+   {
+      lock_gate(&(tocalc->lock), LOCK_WRITE);
+      
+      if(request == priority_expiry_punish)
+         /* a punished driver thread sits in priority queue above the
+            well-behaved interrupt driver threads */
+         tocalc->priority = SCHED_PRIORITY_INTERRUPTS + 1;
+      else
+         tocalc->priority = SCHED_PRIORITY_INTERRUPTS;
+      
+      unlock_gate(&(tocalc->lock), LOCK_WRITE);
+      return;
+   }
    
    lock_gate(&(tocalc->lock), LOCK_WRITE);
    
@@ -154,6 +170,7 @@ void sched_priority_calc(thread *tocalc, sched_priority_request request)
          break;
          
       /* subtract a scheduling point */   
+      case priority_expiry_punish:
       case priority_punish:
          if(tocalc->priority_points > 0)
             tocalc->priority_points--;
@@ -504,7 +521,7 @@ void sched_tick(int_registers_block *regs)
       unlock_gate(&(cpu->current->lock), LOCK_WRITE);
       
       /* punish the thread for using up all its timeslice */
-      sched_priority_calc(cpu->current, priority_punish);
+      sched_priority_calc(cpu->current, priority_expiry_punish);
       sched_move_to_end(CPU_ID, cpu->current);
 
       sched_pick(regs);

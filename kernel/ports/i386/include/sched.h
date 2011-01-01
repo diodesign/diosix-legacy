@@ -51,6 +51,7 @@ typedef enum
 {
    priority_reward,
    priority_punish,
+   priority_expiry_punish,
    priority_reset,
    priority_check
 } sched_priority_request;
