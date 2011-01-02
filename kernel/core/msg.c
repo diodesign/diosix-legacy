@@ -124,11 +124,14 @@ kresult msg_send_signal(process *target, thread *sender, unsigned int signum, un
          towake->msg.tid = sender->tid;
          towake->msg.uid = sender->proc->uid.effective;
          towake->msg.gid = sender->proc->gid.effective;
+         towake->msg.role = sender->proc->role;
       }
       else
       {
+         /* sender is the kernel */
          towake->msg.pid = towake->msg.tid = RESERVED_PID;
          towake->msg.uid = towake->msg.gid = SUPERUSER_ID;
+         towake->msg.role = DIOSIX_ROLE_NONE;
       }
       
       towake->msg.signal.number = signum;
