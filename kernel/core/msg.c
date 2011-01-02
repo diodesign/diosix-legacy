@@ -512,6 +512,7 @@ kresult msg_deliver(thread *receiver, diosix_msg_info *rmsg, thread *sender, dio
    rmsg->tid = sender->tid;
    rmsg->uid = sender->proc->uid.effective;
    rmsg->gid = sender->proc->gid.effective;
+   rmsg->role = sender->proc->role;
 
    /* did the message include a share request? */
    if(smsg->flags & DIOSIX_MSG_SHAREVMA)
