@@ -91,6 +91,9 @@ typedef enum
 /* diosix-specific process credential management */
 #define DIOSIX_SET_ROLE  (9) /* register a role in the system */
 
+/* the root uid/gid */
+#define DIOSIX_SUPERUSER_ID (0)
+
 /* contains the POSIX-defined real, effective and saved-set ids for processes */
 typedef struct
 {

@@ -50,8 +50,8 @@ int main(void)
    unsigned char code;
    unsigned int finalcode;
    
-   /* move into driver layer and get access to IO ports */
-   diosix_priv_layer_up();
+   /* move into driver layer (1) and get access to IO ports */
+   diosix_priv_layer_up(1);
    if(diosix_driver_register()) diosix_exit(1); /* or exit on failure */
 
    /* allow other processes to find this one */

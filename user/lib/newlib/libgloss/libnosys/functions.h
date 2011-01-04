@@ -60,7 +60,7 @@ unsigned int diosix_msg_receive(diosix_msg_info *info);
 unsigned int diosix_msg_reply(diosix_msg_info *info);
 
 /* rights and privilege layer management */
-unsigned int diosix_priv_layer_up(void);
+unsigned int diosix_priv_layer_up(unsigned int count);
 unsigned int diosix_priv_rights_clear(unsigned int bits);
 unsigned int diosix_iorights_remove(void);
 unsigned int diosix_iorights_clear(unsigned int index, unsigned int bits);
@@ -100,10 +100,10 @@ unsigned int diosix_memory_locate(void **ptr, unsigned int type);
    -------------------------------------------- */
    
 /* send requests to the vfs */
-kresult diosix_vfs_new_request(diosix_msg_multipart *array,
-                               diosix_vfs_req_type type,
-                               diosix_vfs_request_head *head,
-                               void *request, unsigned int size);
+kresult diosix_vfs_new_req(diosix_msg_multipart *array,
+                           diosix_vfs_req_type type,
+                           diosix_vfs_request_head *head,
+                           void *request, unsigned int size);
 kresult diosix_vfs_send_req(unsigned int target_pid, diosix_msg_info *msg,
                             diosix_msg_multipart *parts,
                             unsigned int parts_count,

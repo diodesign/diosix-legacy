@@ -22,7 +22,6 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #define RESERVED_PID (0)
 #define FIRST_PID    (RESERVED_PID + 1)
 #define FIRST_TID    (FIRST_PID)
-#define SUPERUSER_ID (0)
 
 /* thread states */
 typedef enum

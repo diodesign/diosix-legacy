@@ -17,7 +17,7 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 #include <portdefs.h>
 #include <multiboot.h>
-#include <sglib.h>
+#include "sglib.h"
 
 rw_gate vmm_lock;
 

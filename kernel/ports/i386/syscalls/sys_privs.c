@@ -87,7 +87,7 @@ kresult syscall_do_id_change(unsigned int uid, posix_id_set *id, unsigned int ac
       case DIOSIX_SETEUID:
       case DIOSIX_SETEGID:
       {         
-         if((uid == SUPERUSER_ID) || (id->real == eid) ||
+         if((uid == DIOSIX_SUPERUSER_ID) || (id->real == eid) ||
             (id->effective == eid) || (id->saved == eid))
             id->effective = eid;
          else
@@ -107,7 +107,7 @@ kresult syscall_do_id_change(unsigned int uid, posix_id_set *id, unsigned int ac
          /* check we want to change the effective id */
          if((signed int)eid != -1)
          {
-            if((uid == SUPERUSER_ID) || (id->real == eid) ||
+            if((uid == DIOSIX_SUPERUSER_ID) || (id->real == eid) ||
                (id->effective == eid) || (id->saved == eid))
             {
                if(eid != id->real) do_save = 1;
@@ -120,7 +120,7 @@ kresult syscall_do_id_change(unsigned int uid, posix_id_set *id, unsigned int ac
          /* check we want to change the real id */
          if((signed int)rid != -1)
          {
-            if((uid == SUPERUSER_ID) || (id->real == rid) ||
+            if((uid == DIOSIX_SUPERUSER_ID) || (id->real == rid) ||
                (id->effective == rid))
             {
                id->real = rid;
@@ -142,7 +142,7 @@ kresult syscall_do_id_change(unsigned int uid, posix_id_set *id, unsigned int ac
          /* check we want to change the effective id */
          if((signed int)id->effective != -1)
          {
-            if((uid == SUPERUSER_ID) || (id->real == eid) ||
+            if((uid == DIOSIX_SUPERUSER_ID) || (id->real == eid) ||
                (id->effective == eid) || (id->saved == eid))
                id->effective = eid;
             else
@@ -152,7 +152,7 @@ kresult syscall_do_id_change(unsigned int uid, posix_id_set *id, unsigned int ac
          /* check we want to change the real id */
          if((signed int)id->real != -1)
          {
-            if((uid == SUPERUSER_ID) || (id->real == rid) ||
+            if((uid == DIOSIX_SUPERUSER_ID) || (id->real == rid) ||
                (id->effective == rid) || (id->saved == rid))
                id->real = rid;
             else
@@ -162,7 +162,7 @@ kresult syscall_do_id_change(unsigned int uid, posix_id_set *id, unsigned int ac
          /* check we want to change the saved id */
          if((signed int)id->saved != -1)
          {
-            if((uid == SUPERUSER_ID) || (id->real == sid) ||
+            if((uid == DIOSIX_SUPERUSER_ID) || (id->real == sid) ||
                (id->effective == sid) || (id->saved == sid))
                id->saved = sid;
             else

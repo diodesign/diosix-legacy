@@ -130,7 +130,7 @@ kresult msg_send_signal(process *target, thread *sender, unsigned int signum, un
       {
          /* sender is the kernel */
          towake->msg.pid = towake->msg.tid = RESERVED_PID;
-         towake->msg.uid = towake->msg.gid = SUPERUSER_ID;
+         towake->msg.uid = towake->msg.gid = DIOSIX_SUPERUSER_ID;
          towake->msg.role = DIOSIX_ROLE_NONE;
       }
       
@@ -167,7 +167,7 @@ kresult msg_send_signal(process *target, thread *sender, unsigned int signum, un
       {
          /* sender is the kernel */
          newsig->sender_pid = newsig->sender_tid = RESERVED_PID;
-         newsig->sender_uid = newsig->sender_gid = SUPERUSER_ID;
+         newsig->sender_uid = newsig->sender_gid = DIOSIX_SUPERUSER_ID;
       }
       
       /* mark UNIX signal as in progress if need be */

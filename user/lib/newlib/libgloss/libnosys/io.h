@@ -78,6 +78,7 @@ struct diosix_vfs_handle_assoc
 /* define vfs multipart message layout */
 #define VFS_REQ_HEADER        (0) /* start with a header */
 #define VFS_REQ_REQUEST       (1) /* next add information describing the request */
+#define VFS_MSG_MAGIC         (0xd1000001)
 
 /* request-specific elements in a multipart message */
 #define VFS_MSG_CHOWN_PATH    (2)
@@ -89,6 +90,8 @@ struct diosix_vfs_handle_assoc
 #define VFS_MSG_UNLINK_PATH   (2)
 #define VFS_MSG_WRITE_DATA    (2)
 #define VFS_MSG_REGISTER_PATH (2)
+#define VFS_MSG_MOUNT_PATH    (2)
+#define VFS_MSG_UMOUNT_PATH   (2)
 
 /* total number of parts for these requests */
 #define VFS_CHOWN_PARTS       (3)
@@ -103,6 +106,8 @@ struct diosix_vfs_handle_assoc
 #define VFS_UNLINK_PARTS      (3)
 #define VFS_WRITE_PARTS       (3)
 #define VFS_REGISTER_PARTS    (3)
+#define VFS_MOUNT_PARTS       (3)
+#define VFS_UMOUNT_PARTS      (3)
 
 /* do some pointer math to get the contents of a request message
    base = pointer to start of a request message data
@@ -127,6 +132,10 @@ typedef enum
    unlink_req,
    write_req,
    
+   /* unix-world requests */
+   mount_req,
+   umount_req,
+   
    /* diosix-specific requests */
    register_req,
    deregister_req
@@ -138,6 +147,7 @@ typedef enum
    the headers for the ipc message. */
 typedef struct
 {
+   unsigned int magic; /* to verify the version and sanity */
    diosix_vfs_req_type type;
 } diosix_vfs_request_head;
 
@@ -173,22 +183,36 @@ typedef struct
 typedef struct
 {
    int flags, mode, length;
+   
+   /* these are used only for vfs->fs communication to
+      handle the open request and are ignored by clients */
+   unsigned int pid; /* pid of requesting process */
+   unsigned int uid; /* uid of requesting process */
+   int filesdesc; /* file handle allocated by the vfs */
 } diosix_vfs_request_open;
 
-/* readlink, stat and unlink require a path length */
+/* readlink, stat, unlink and umount require a path length */
 typedef struct
 {
    unsigned int length;
 } diosix_vfs_request_readlink,
   diosix_vfs_request_stat,
   diosix_vfs_request_unlink,
-  diosix_vfs_request_register;
+  diosix_vfs_request_register,
+  diosix_vfs_request_umount;
 
 /* write requires a file handle and a source buffer length */
 typedef struct
 {
    unsigned int filedescr, length;
 } diosix_vfs_request_write;
+
+/* a mount request requires the new fs/device driver's pid,
+   effective uid and gid and the path length size */
+typedef struct
+{
+   unsigned int pid, uid, gid, length;
+} diosix_vfs_request_mount;
 
 /* a reply from the vfs has a header and a possible payload of data. */
 typedef struct

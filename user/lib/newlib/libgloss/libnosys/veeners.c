@@ -140,11 +140,15 @@ unsigned int diosix_msg_reply(diosix_msg_info *info)
 }
 
 /* -------------- process rights and privileges basics ------------ */
-unsigned int diosix_priv_layer_up(void)
-/* move up the privilege stack: the higher a process the less privileged it is */
+unsigned int diosix_priv_layer_up(unsigned int count)
+/* move up the privilege stack by count number of layers: the higher a process the less privileged it is */
 {
    unsigned int retval;
-   __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (DIOSIX_PRIV_LAYER_UP), "d" (SYSCALL_PRIVS));
+   while(count)
+   {
+      __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (DIOSIX_PRIV_LAYER_UP), "d" (SYSCALL_PRIVS));
+      count--;
+   }
    return retval;  
 }
 

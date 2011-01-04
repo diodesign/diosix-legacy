@@ -61,6 +61,7 @@ kresult diosix_vfs_new_req(diosix_msg_multipart *array,
    if(!array || !head) return e_bad_params;
 
    head->type = type;
+   head->magic = VFS_MSG_MAGIC;
    DIOSIX_WRITE_MULTIPART(array, VFS_REQ_HEADER, head, sizeof(diosix_vfs_request_head));
    
    if(request)
