@@ -237,9 +237,10 @@ void wait_for_request(void)
    {
       diosix_vfs_request_head *req_head = (diosix_vfs_request_head *)recv_buffer;
       
-      if(msg.recv_size < sizeof(diosix_vfs_request_head))
+      /* we cannot trust anything in the message payload */
+      if(VFS_MSG_SIZE_CHECK(msg, 0, 0))
       {
-         /* malformed request, it's too small to even hold a request type */
+         /* malformed request, it's too small */
          reply_to_request(&msg, e_too_small);
          return;
       }
@@ -260,14 +261,40 @@ void wait_for_request(void)
          case unlink_req:
          case write_req:
 
-         /* register a filesystem/device in the vfs filespace */
+         /* request to register a filesystem/device in the vfs filespace */
          case register_req:
          {
             kresult result;
-            char *path = (char *)VFS_MSG_EXTRACT(req_head, sizeof(diosix_vfs_request_register));
             
+            /* extract the request's data from the message payload */
+            diosix_vfs_request_register *req_info = VFS_MSG_EXTRACT(req_head, 0);
+            char *path = VFS_MSG_EXTRACT(req_head, sizeof(diosix_vfs_request_register));
+            
+            /* the payload might not be big enough to contain the request details */
+            if(VFS_MSG_SIZE_CHECK(msg, 0, sizeof(diosix_vfs_request_register)))
+            {
+               reply_to_request(&msg, e_too_big);
+               return;
+            }
+            
+            /* we cannot trust the string length parameter in the payload, so check it */
+            if(VFS_MSG_SIZE_CHECK(msg, sizeof(diosix_vfs_request_register), req_info->length))
+            {
+               reply_to_request(&msg, e_too_big);
+               return;
+            }
+            
+            /* is the path zero-terminated? */
+            if(path[req_info->length])
+            {
+               reply_to_request(&msg, e_bad_params);
+               return;
+            }
+            
+            /* all seems clear */
             result = register_process(&msg, path);
             reply_to_request(&msg, result);
+
          }
          break;
 
@@ -275,7 +302,22 @@ void wait_for_request(void)
          case deregister_req:
          {
             kresult result;
+            diosix_vfs_request_register *req_info = VFS_MSG_EXTRACT(req_head, 0);
             char *path = (char *)VFS_MSG_EXTRACT(req_head, sizeof(diosix_vfs_request_register));
+            
+            /* the payload might not be big enough to contain the request details */
+            if(VFS_MSG_SIZE_CHECK(msg, 0, sizeof(diosix_vfs_request_register)))
+            {
+               reply_to_request(&msg, e_too_big);
+               return;
+            }
+            
+            /* we cannot trust the string length parameter in the payload, so check it */
+            if(VFS_MSG_SIZE_CHECK(msg, sizeof(diosix_vfs_request_register), req_info->length))
+            {
+               reply_to_request(&msg, e_too_big);
+               return;
+            }
             
             result = deregister_process(&msg, path);
             reply_to_request(&msg, result);

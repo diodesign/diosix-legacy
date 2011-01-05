@@ -113,7 +113,18 @@ struct diosix_vfs_handle_assoc
    base = pointer to start of a request message data
    offset = offset after the request header in bytes
    <= pointer (as a uint) within the request message data */
-#define VFS_MSG_EXTRACT(base, offset) ( (unsigned int)(base) + sizeof(diosix_vfs_request_head) + (unsigned int)(offset) )
+#define VFS_MSG_EXTRACT(base, offset) (void *)( (unsigned int)(base) + sizeof(diosix_vfs_request_head) + (unsigned int)(offset) )
+
+/* check that a length variable inside a request message doesn't
+   exceed the received message's total payload length to avoid
+   running beyond the received data
+   m = received message block
+   o = offset into the data buffer to start from
+   l = length to check against
+   <= 1 for overrun or 0 for safe
+*/
+#define VFS_MSG_SIZE_CHECK(m, o, l) ( (m).recv_size > sizeof(diosix_vfs_request_head) + (unsigned int)(o) + (unsigned int)(l) || \
+                                      (unsigned int)((m).recv) + sizeof(diosix_vfs_request_head) + (unsigned int)(o) >= (unsigned int)((m).recv) + sizeof(diosix_vfs_request_head) + (unsigned int)(o) + (unsigned int)(l) ? 1 : 0 )
 
 /* define vfs request message types */
 typedef enum

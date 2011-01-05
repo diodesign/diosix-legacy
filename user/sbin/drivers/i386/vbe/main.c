@@ -332,17 +332,19 @@ void wait_for_request(void)
 
          /* open device exclusively for root only */
          case open_req:
-            if(msg.uid == DIOSIX_SUPERUSER_ID && !connected_pid)
+            /* discard if something other than the VFS is
+               handling this request */
+            if(msg.role != DIOSIX_ROLE_VFS)
             {
+               diosix_vfs_request_open *req_info = VFS_MSG_EXTRACT(req_head, 0);
                connected_pid = msg.pid;
                reply_to_request(&msg, success);
-               break;
+               return;
             }
-            else
-            {
-               reply_to_request(&msg, e_no_rights);
-               break;
-            }
+            
+            /* fall through to sending back an error */
+            reply_to_request(&msg, e_no_rights);
+            break;
 
          case close_req:
          case read_req:
