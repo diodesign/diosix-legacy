@@ -1,5 +1,5 @@
 #
-# virtual filesystem process 'vas'
+# virtual filesystem process 'vfs'
 #
 
 # prettify the output
@@ -18,13 +18,17 @@ PATHTOMKFS = ../../../release/makeiso.sh
 FLAGS		= -O2 -std=c99 -Wall -static -I../../lib/newlib/libgloss/libnosys
 CC		= $(PREFIX)gcc $(FLAGS)
 LD		= $(PREFIX)gcc $(FLAGS)
-OBJS	 	= objs/main.o
+OBJS	 	= objs/main.o objs/vfstree.o
 
 # targets
 all: vfs
 
 # dependencies
 objs/main.o:		main.c	makefile
+			$(WRITE) '==> COMPILE: $<'
+			$(Q)$(CC) -c -o $@ $<
+
+objs/vfstree.o:		vfstree.c	makefile
 			$(WRITE) '==> COMPILE: $<'
 			$(Q)$(CC) -c -o $@ $<
 

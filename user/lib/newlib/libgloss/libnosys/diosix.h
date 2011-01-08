@@ -52,6 +52,7 @@ typedef enum
    e_bad_exec,
    e_bad_params,
    e_vma_exists,
+   e_exists,
    e_max_layer
 } kresult;
 
