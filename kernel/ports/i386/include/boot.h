@@ -25,7 +25,7 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
                      " _|    _|  _|  _|    _|    _|_|    _|    _|_|    \n" \
                      " _|    _|  _|  _|    _|        _|  _|  _|    _|  \n" \
                      " _|_|_|    _|    _|_|    _|_|_|    _|  _|    _|  \n\n" \
-                     " Copyright (c) Chris Williams and contributors, 2007-2010.\n" \
+                     " Copyright (c) Chris Williams and contributors, 2007-2011.\n" \
                      " See http://diodesign.co.uk/ for usage and licence.\n"
 
 /* kernel payload */
