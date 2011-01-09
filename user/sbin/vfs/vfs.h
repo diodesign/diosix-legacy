@@ -22,7 +22,7 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 typedef struct vfs_tree_node vfs_tree_node;
 struct vfs_tree_node
 {
-   const char *path; /* node pathname */
+   char *path; /* node pathname */
    unsigned int pid; /* process managing this node */
    
    /* child nodes */

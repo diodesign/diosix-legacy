@@ -43,11 +43,82 @@ volatile unsigned int vfs_tree_lock = 0;
 */
 unsigned int fs_from_path(char *path)
 {
-   kresult result = success;
+   vfs_tree_node *search;
+   unsigned int result = 0;
+   
+   /* set this to 1 when we're process the last
+      component in the path */
+   unsigned char at_final_leafnode = 0;
+   
+   char *str = strdup(path);
+   if(!str) return 0;
    
    /* make this thread-safe */
    DIOSIX_SPINLOCK_ACQUIRE(&vfs_tree_lock);
    
+   /* start with the tree root */
+   search = vfs_tree_root;
+   if(!search) goto fs_from_path_exit; /* return 0 */
+   
+   /* break down the path */
+   while(!at_final_leafnode)
+   {
+      /* record the start of the leafname */
+      char *leafname = str;
+      
+      vfs_tree_node *next_node = NULL;
+
+      /* keep a note of the last seen FS PID */
+      if(search->pid) result = search->pid;
+      
+      /* search forward to a null or a '/' terminator */
+      while(*str != '\0' && *str != '/') str++;
+      
+      /* ascertain whether or not we're at the last leafname */
+      if(*str == '\0')
+      {
+         at_final_leafnode = 1;
+      }
+      else
+      {
+         /* if the byte after the / is a null then effectively
+          strip the trailing / */
+         if(str[1] == '\0') at_final_leafnode = 1;
+         
+         /* terminate the leafname so that it can be used as a 
+          standalone string */
+         *str = '\0';
+      }
+      
+      /* try to find a match in the current node's children */
+      if(search->child_count)
+      {
+         unsigned int child_loop;
+         
+         for(child_loop = 0; child_loop < search->child_count; child_loop++)
+         {
+            if(strcmp(leafname, search->children[child_loop].path) == 0)
+            {
+               /* got a match */
+               next_node = &(search->children[child_loop]);
+               break;
+            }
+         }
+      }
+      
+      /* make a decision based on the outcome of the leafname matching */
+      if(!next_node)
+         /* we've run out of nodes to search, so return the last seen
+            FS PID */
+         goto fs_from_path_exit;
+      
+      /* prepare for next iteration */
+      search = next_node;
+      str++;
+   }
+   
+fs_from_path_exit:
+   free(str);
    DIOSIX_SPINLOCK_RELEASE(&vfs_tree_lock);
    return result;
 }
@@ -66,6 +137,7 @@ unsigned int parent_fs_from_path(char *path)
    Add a process to the filespace (mount by any other name)
    => msg = message requesting to join the filespace
       path = root path of the filesystem/device
+             (this string is modified)
    <= 0 for success, or an error code
 */
 kresult register_process(diosix_msg_info *msg, char *path)
@@ -171,7 +243,7 @@ kresult register_process(diosix_msg_info *msg, char *path)
    while(!at_final_leafnode)
    {
       /* record the start of the leafname */
-      const char *leafname = path;
+      char *leafname = path;
       vfs_tree_node *next_node = NULL;
       
       /* search forward to a null or a '/' terminator */
