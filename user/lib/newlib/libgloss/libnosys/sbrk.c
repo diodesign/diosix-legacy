@@ -27,7 +27,7 @@ extern int errno;
 #include "functions.h"
 
 /* describe this process's heap area */
-char *heap_end;
+char *heap_start = 0, *heap_end = 0;
 unsigned int heap_inuse, heap_size_max, heap_size_min;
 
 /* spinlock to protect critical values */
@@ -40,52 +40,59 @@ _sbrk (incr)
    extern char end; /* set by the linker  */ 
    char *ptr;
 
+   diosix_debug_write("sbrk() called");
+   
    /* critical section - keep other threads out */
    DIOSIX_SPINLOCK_ACQUIRE(&heap_lock);
    
-   if(heap_end == 0)
+   if(heap_start == 0)
    {
       /* need to create a heap area, but what if
          incr is zero? return where the heap 
          will start if so */
       if(incr == 0)
       {
+         diosix_debug_write("sbrk() incr == 0 for uninitialised heap");
          DIOSIX_SPINLOCK_RELEASE(&heap_lock);
-         return (void *)&end;
+         return (void *)DIOSIX_PAGE_ROUNDUP(&end);
       }
    
       /* can't shrink a non-existent heap */
       if(incr < 0)
       {
          errno = ENOMEM;
-         
+         diosix_debug_write("sbrk() failed at incr < 0 check");
          DIOSIX_SPINLOCK_RELEASE(&heap_lock);
          return (void *)-1;
       }
    
       /* create the initial memory area */
-      if(diosix_memory_create(&end, incr))
+      if(diosix_memory_create((void *)DIOSIX_PAGE_ROUNDUP(&end), incr))
       {
          errno = ENOMEM;
-         
+         diosix_debug_write("sbrk() failed at heap creation syscall");
          DIOSIX_SPINLOCK_RELEASE(&heap_lock);
          return (void *)-1;
       }
       
+      /* set the access rights */
+      diosix_memory_access((void *)DIOSIX_PAGE_ROUNDUP(&end), VMA_WRITEABLE);
+      
       /* initialise the heap's statistics and return */
+      heap_start = heap_end = (void *)DIOSIX_PAGE_ROUNDUP(&end);
       heap_inuse = incr;
       heap_size_max = DIOSIX_PAGE_ROUNDUP(incr);
       heap_size_min = DIOSIX_PAGE_ROUNDDOWN(incr);
       
       DIOSIX_SPINLOCK_RELEASE(&heap_lock);
-      return (void *)&end;
+      return (void *)heap_start;
    }
  
    /* sanity check - don't shrink beyond the heap's size */
-   if(incr < 0) if(heap_inuse > abs(incr))
+   if(incr < 0 && heap_inuse < abs(incr))
    {
       errno = ENOMEM;
-      
+      diosix_debug_write("sbrk() failed at heap shrink check");
       DIOSIX_SPINLOCK_RELEASE(&heap_lock);
       return (void *)-1;
    }
@@ -97,10 +104,10 @@ _sbrk (incr)
       ((heap_inuse + incr) < heap_size_min))
    {
       /* we'll cross a page boundary so try to resize the heap area */
-      if(diosix_memory_resize(&end, incr))
+      if(diosix_memory_resize(heap_start, incr))
       {
          errno = ENOMEM;
-         
+         diosix_debug_write("sbrk() failed at heap resize syscall");
          DIOSIX_SPINLOCK_RELEASE(&heap_lock);
          return (void *)-1;
       }
