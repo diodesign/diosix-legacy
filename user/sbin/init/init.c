@@ -25,5 +25,7 @@ int main(void)
    /* name this process so others can find it */
    diosix_set_role(DIOSIX_ROLE_SYSTEM_EXECUTIVE);
    
+   diosix_debug_write("init running");
+   
    while(1); /* idle */
 }

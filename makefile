@@ -58,7 +58,7 @@ FLAGS		= -g -std=c99 -Wall -nostdlib -nostartfiles \
 # DEBUGFLAGS	= -DDEBUG -DMSG_DEBUG -DBUS_DEBUG -DPROC_DEBUG -DSCHED_DEBUG -DTHREAD_DEBUG -DVMM_DEBUG -DXPT_DEBUG -DINT_DEBUG -DIRQ_DEBUG -DMP_DEBUG -DPAGE_DEBUG -DKSYM_DEBUG -DIOAPIC_DEBUG -DLAPIC_DEBUG -DLOCK_DEBUG -DLOLVL_DEBUG -DPIC_DEBUG -DSYSCALL_DEBUG -DPERFORMANCE_DEBUG -DLOCK_TIME_CHECK
 
 # basic debugging
-DEBUGFLAGS	= -DDEBUG -DLOCK_TIME_CHECK -DMSG_DEBUG -DPROC_DEBUG -DSYSCALL_DEBUG
+DEBUGFLAGS	= -DDEBUG -DLOCK_TIME_CHECK -DPROC_DEBUG -DSYSCALL_DEBUG
 
 CC		= $(CCbin) $(SVNDEF) $(FLAGS) -I$(INCDIR) -I$(COREDIR) -I$(LIBDIOSIXDIR) $(DEBUGFLAGS) $(VERSION)
 LD		= $(CCbin) $(FLAGS) -Xlinker --script=$(LDSCRIPT) -Xlinker
@@ -69,7 +69,7 @@ LD		= $(CCbin) $(FLAGS) -Xlinker --script=$(LDSCRIPT) -Xlinker
 OBJS	 = $(OBJSDIR)/locore.o \
 	   $(OBJSDIR)/lowlevel.o $(OBJSDIR)/exceptions.o $(OBJSDIR)/irqs.o $(OBJSDIR)/msg.o $(OBJSDIR)/sched.o \
 	   $(OBJSDIR)/sys_driver.o $(OBJSDIR)/sys_info.o $(OBJSDIR)/sys_memory.o $(OBJSDIR)/sys_msg.o $(OBJSDIR)/sys_privs.o \
-	   $(OBJSDIR)/sys_proc.o $(OBJSDIR)/sys_thread.o \
+	   $(OBJSDIR)/sys_proc.o $(OBJSDIR)/sys_thread.o $(OBJSDIR)/sys_debug.o \
 	   $(OBJSDIR)/vmm.o $(OBJSDIR)/page.o $(OBJSDIR)/thread.o $(OBJSDIR)/proc.o $(OBJSDIR)/ioapic.o $(OBJSDIR)/pic.o \
 	   $(OBJSDIR)/lapic.o $(OBJSDIR)/buses.o \
 	   $(OBJSDIR)/intcontrol.o $(OBJSDIR)/mp.o $(OBJSDIR)/boot.o $(OBJSDIR)/payload.o \
@@ -193,7 +193,11 @@ $(OBJSDIR)/sys_proc.o:		$(PORTDIR)/syscalls/sys_proc.c		$(MAKEDEP)
 
 $(OBJSDIR)/sys_thread.o:	$(PORTDIR)/syscalls/sys_thread.c	$(MAKEDEP)
 				$(WRITE) '==> COMPILE: $<'
-				$(COMPILE.c)				
+				$(COMPILE.c)
+
+$(OBJSDIR)/sys_debug.o:		$(PORTDIR)/syscalls/sys_debug.c		$(MAKEDEP)
+				$(WRITE) '==> COMPILE: $<'
+				$(COMPILE.c)			
 
 # explicit rules
 

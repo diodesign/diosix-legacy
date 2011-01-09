@@ -75,6 +75,7 @@ typedef enum
 #define SYSCALL_THREAD_SLEEP  (13)
 #define SYSCALL_ALARM         (14)
 #define SYSCALL_SET_ID        (15)
+#define SYSCALL_USRDEBUG      (16)
 
 /* manage a process's POSIX-conformant ids */
 #define DIOSIX_SETPGID   (1) /* set process group id */
@@ -179,6 +180,9 @@ typedef struct
 #define DIOSIX_IORIGHTS_CLEAR  (3)
 #define DIOSIX_UNIX_SIGNALS    (4)
 #define DIOSIX_KERNEL_SIGNALS  (5)
+
+/* reason codes for debugging with the kernel */
+#define DIOSIX_DEBUG_WRITE     (0)
 
 /* reason codes for requesting info from the kernel */
 #define DIOSIX_THREAD_INFO  (0)

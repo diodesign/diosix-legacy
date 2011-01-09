@@ -370,3 +370,12 @@ unsigned int diosix_memory_locate(void **ptr, unsigned int type)
    __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (DIOSIX_MEMORY_LOCATE), "b" (ptr), "c" (type), "d" (SYSCALL_MEMORY));  
    return retval; 
 }
+
+/* ----------------------- debugging support ---------------- */
+unsigned int diosix_debug_write(const char *ptr)
+/* write C-string ptr out to the kernel's debug channel (such as serial IO) (root-only) */
+{
+   unsigned int retval;
+   __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (DIOSIX_DEBUG_WRITE), "b" (ptr), "d" (SYSCALL_USRDEBUG));  
+   return retval;  
+}

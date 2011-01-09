@@ -95,6 +95,9 @@ unsigned int diosix_memory_resize(void *ptr, signed int change);
 unsigned int diosix_memory_access(void *ptr, unsigned int bits);
 unsigned int diosix_memory_locate(void **ptr, unsigned int type);
 
+/* debugging */
+unsigned int diosix_debug_write(const char *ptr);
+
 /* --------------------------------------------
    interface with the vfs 
    -------------------------------------------- */

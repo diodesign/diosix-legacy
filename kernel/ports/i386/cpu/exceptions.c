@@ -201,6 +201,10 @@ void exception_handler(int_registers_block regs)
                syscall_do_set_id(&regs);
                break;
 
+            case SYSCALL_USRDEBUG:
+               syscall_do_debug(&regs);
+               break;
+               
             default:
                XPT_DEBUG("[xpt:%i] unknown syscall %x by thread %i in process %i\n",
                          CPU_ID, regs.edx, cpu_table[CPU_ID].current->tid,

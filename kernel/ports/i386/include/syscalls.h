@@ -40,5 +40,6 @@ void syscall_do_info(int_registers_block *regs);
 void syscall_do_driver(int_registers_block *regs);
 void syscall_do_set_id(int_registers_block *regs);
 void syscall_do_memory(int_registers_block *regs);
+void syscall_do_debug(int_registers_block *regs);
 
 #endif
