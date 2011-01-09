@@ -8,7 +8,7 @@
 #include <errno.h>
 #undef errno
 extern int errno;
-#include "warning.h"
+
 
 int
 _DEFUN (_isatty, (file),
@@ -18,4 +18,3 @@ _DEFUN (_isatty, (file),
   return 0;
 }
 
-stub_warning(_isatty)

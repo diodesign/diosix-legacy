@@ -19,6 +19,8 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #include "config.h"
 #include <_ansi.h>
 #include <_syslist.h>
+#include <stdlib.h>
+#include <string.h>
 #include <errno.h>
 #undef errno
 extern int errno;
@@ -42,6 +44,22 @@ _DEFUN (_write, (file, ptr, len),
    diosix_vfs_reply reply;
    kresult err;
 
+   /* copy stdout to the debug channel */
+   if(file == 1)
+   {
+      char *str;
+      diosix_debug_write("write() called!");
+      
+      str = malloc(len + 1);
+      if(str)
+      {
+         memcpy(str, ptr, len);
+         str[len] = 0;
+         diosix_debug_write(str);
+         free(str);
+      }
+   }
+   
    /* the pid of the filesystem that will carry out
       the write() for us */
    unsigned int fspid = diosix_vfs_get_fs(file);

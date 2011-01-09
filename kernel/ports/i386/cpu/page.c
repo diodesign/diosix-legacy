@@ -67,7 +67,10 @@ kresult pg_do_fault(thread *target, unsigned int faultaddr, unsigned int cpuflag
    
    /* ask the vmm for a decision */
    decision = vmm_fault(proc, faultaddr, errflags, &rw_flag);
-   if(rw_flag) rw_flag = PG_RW; /* use to mark new pages as read-only or read-write */
+   
+   /* use to mark new pages as read-only or read-write */
+   if(rw_flag) rw_flag = PG_RW;
+   
    switch(decision)
    {
       case newsharedpage:

@@ -145,7 +145,7 @@ kresult register_process(diosix_msg_info *msg, char *path)
    unsigned int pid;
    vfs_tree_node *tree_node;
    kresult result;
-   
+
    /* set this to 1 when we're process the last
     component in the path */
    unsigned char at_final_leafnode = 0;
@@ -157,7 +157,7 @@ kresult register_process(diosix_msg_info *msg, char *path)
    /* if the first character isn't / (and thus this isn't a
       full pathname) then give up */
    if(*path != '/') return e_bad_params;
-   
+      
    /* identify the process managing the point in the
       filespace where this new filesystem or device
       would like to start */

@@ -15,6 +15,9 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 */
 
+#include <stdio.h>
+#include <unistd.h>
+
 #include "diosix.h"
 #include "functions.h"
 #include "async.h"
@@ -25,7 +28,7 @@ int main(void)
    /* name this process so others can find it */
    diosix_set_role(DIOSIX_ROLE_SYSTEM_EXECUTIVE);
    
-   diosix_debug_write("init running");
+   printf("hello world!\n");
    
    while(1); /* idle */
 }

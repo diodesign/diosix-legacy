@@ -6,6 +6,6 @@ kernel /boot/kernel
 
 module /boot/kernel.sym
 module /sbin/init
-module /sbin/vfs
-module /sbin/drivers/i386/vbe
-module /sbin/drivers/i386/ps2kbd
+#module /sbin/vfs
+#module /sbin/drivers/i386/vbe
+#module /sbin/drivers/i386/ps2kbd

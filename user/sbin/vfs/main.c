@@ -98,7 +98,7 @@ void wait_for_request(void)
          case register_req:
          {
             kresult result;
-            
+
             /* extract the request's data from the message payload */
             diosix_vfs_request_register *req_info = VFS_MSG_EXTRACT(req_head, 0);
             char *path = VFS_MSG_EXTRACT(req_head, sizeof(diosix_vfs_request_register));

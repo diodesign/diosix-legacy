@@ -40,8 +40,8 @@ void syscall_do_memory(int_registers_block *regs)
    thread *current = cpu_table[CPU_ID].current;
    unsigned int vma_base = regs->ebx;
 
-   SYSCALL_DEBUG("[sys:%i] SYSCALL_MEMORY(%i, %x) called by thread %x in process %x\n",
-                 CPU_ID, regs->eax, regs->ebx, current->tid, current->proc->pid);
+   SYSCALL_DEBUG("[sys:%i] SYSCALL_MEMORY(%i, %x, %i) called by thread %x in process %x\n",
+                 CPU_ID, regs->eax, regs->ebx, regs->ecx, current->tid, current->proc->pid);
    
    switch(regs->eax)
    {
