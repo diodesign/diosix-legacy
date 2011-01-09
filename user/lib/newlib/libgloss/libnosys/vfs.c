@@ -118,7 +118,7 @@ kresult diosix_vfs_send_req(unsigned int target_pid, diosix_msg_info *msg,
     
    /* fill out the rest of the message structure */
    msg->tid   = DIOSIX_MSG_ANY_THREAD;
-   msg->flags = DIOSIX_MSG_GENERIC | DIOSIX_MSG_QUEUEME | DIOSIX_MSG_MULTIPART;
+   msg->flags = DIOSIX_MSG_GENERIC | DIOSIX_MSG_QUEUEME | DIOSIX_MSG_MULTIPART | DIOSIX_MSG_SENDASUSR;
    msg->send  = parts;
    msg->send_size = parts_count;
    msg->recv  = reply;
