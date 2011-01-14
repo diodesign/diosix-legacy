@@ -15,6 +15,7 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 */
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 

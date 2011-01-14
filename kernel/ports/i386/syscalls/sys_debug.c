@@ -45,14 +45,12 @@ void syscall_do_debug(int_registers_block *regs)
          if(current->proc->uid.effective != DIOSIX_SUPERUSER_ID)
             SYSCALL_RETURN(e_no_rights);
        
-         dprintf("[debug:%i] *** pid %i tid %i role %i: '",
+         dprintf("[debug:%i] *** pid %i tid %i role %i: ",
                  CPU_ID, current->proc->pid, current->tid, current->proc->role);
          
          /* output one byte at a time, checking not to collide with kernel space */
          while((unsigned int)str < KERNEL_SPACE_BASE && *str)
             dprintf("%c", *str++);
-         
-         dprintf("'\n");
          
          SYSCALL_RETURN(success);
       }

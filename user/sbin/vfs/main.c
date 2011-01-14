@@ -15,6 +15,7 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 */
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -109,7 +110,7 @@ void wait_for_request(void)
                reply_to_request(&msg, e_too_big);
                return;
             }
-            
+
             /* we cannot trust the string length parameter in the payload, so check it */
             if(VFS_MSG_SIZE_CHECK(msg, sizeof(diosix_vfs_request_register), req_info->length))
             {
@@ -118,7 +119,7 @@ void wait_for_request(void)
             }
             
             /* is the path zero-terminated? */
-            if(path[req_info->length])
+            if(path[req_info->length - 1])
             {
                reply_to_request(&msg, e_bad_params);
                return;
@@ -153,7 +154,7 @@ void wait_for_request(void)
             }
             
             /* is the path zero-terminated? */
-            if(path[req_info->length])
+            if(path[req_info->length - 1])
             {
                reply_to_request(&msg, e_bad_params);
                return;
@@ -182,9 +183,6 @@ int main(void)
 
    /* step into the correct layer - layer 3 */
    diosix_priv_layer_up(3);
-   
-   /* fork so that we have multiple worker threads */
-   diosix_thread_fork(); diosix_thread_fork();
    
    /* get some work to do */
    while(1) wait_for_request();

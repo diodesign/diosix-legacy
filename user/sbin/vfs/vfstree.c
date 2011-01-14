@@ -15,6 +15,7 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 */
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -25,6 +26,10 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #include "io.h"
 
 #include "vfs.h"
+
+#ifndef strdup
+char *strdup(const char *s1);
+#endif
 
 /* pointer to the tree root node */
 vfs_tree_node *vfs_tree_root;
@@ -162,7 +167,7 @@ kresult register_process(diosix_msg_info *msg, char *path)
       filespace where this new filesystem or device
       would like to start */
    pid = fs_from_path(path);
-   
+      
    /* send a request to the parent fs process to check the
       requesting process has sufficient privileges */
    if(pid)
@@ -264,7 +269,7 @@ kresult register_process(diosix_msg_info *msg, char *path)
             standalone string */
          *path = '\0';
       }
-      
+
       /* try to find a match in the current node's children */
       if(tree_node->child_count)
       {
