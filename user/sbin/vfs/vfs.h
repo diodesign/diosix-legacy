@@ -30,14 +30,38 @@ struct vfs_tree_node
    vfs_tree_node *children;
 };
 
+#define PROCESS_HASH_SIZE     (128)
+
+/* describe a process with open files */
+typedef struct vfs_process vfs_process;
+struct vfs_process
+{
+   unsigned int pid;
+   
+   /* describe a table of pids that match a given file handle */
+   unsigned int available_filedesc; /* total available */
+   unsigned int highest_filedesc; /* table count */
+   unsigned int *filedesc_table;
+   
+   /* linked list within hash table */
+   vfs_process *prev, *next;
+};
+
 /* default size of the initial receive buffer */
 #define RECEIVE_BUFFER_SIZE   (2048)
 
+/* in main.c */
 void reply_to_request(diosix_msg_info *msg, kresult result);
+void reply_to_pid_request(diosix_msg_info *msg, diosix_vfs_pid_reply *reply);
 void wait_for_request(void);
+
+/* in vfstree.c */
 unsigned int fs_from_path(char *path);
 unsigned int parent_fs_from_path(char *path);
 kresult register_process(diosix_msg_info *msg, char *path);
 kresult deregister_process(diosix_msg_info *msg, char *path);
+
+/* in files.c */
+kresult open_file(diosix_msg_info *msg, int flags, int mode, char *path, diosix_vfs_pid_reply *reply);
 
 #endif

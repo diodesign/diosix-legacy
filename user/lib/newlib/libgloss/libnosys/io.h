@@ -198,8 +198,8 @@ typedef struct
    /* these are used only for vfs->fs communication to
       handle the open request and are ignored by clients */
    unsigned int pid; /* pid of requesting process */
-   unsigned int uid; /* uid of requesting process */
-   int filesdesc; /* file handle allocated by the vfs */
+   unsigned int uid, gid; /* uid + gid of requesting process */
+   int filedesc; /* file handle allocated by the vfs */
 } diosix_vfs_request_open;
 
 /* readlink, stat, unlink and umount require a path length */
