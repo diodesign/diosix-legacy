@@ -1,5 +1,5 @@
-/* user/sbin/drivers/i386/vbe/vbe.h
- * Defines for the userspace VBE driver
+/* user/sbin/drivers/i386/ps2kbd/ps2kbd.h
+ * Defines for the userspace ps2 keyboard driver
  * Author : Chris Williams
  * Date   : Tue,7 Dec 2010.06:55:00
 
@@ -126,11 +126,5 @@ unsigned int ps2kbd_scancodes[PS2KBD_KEYS][3] =
    /* Alt-SysRq */
    /* 0x54 */ { 0, 0, 0 }
 };
-
-/* x86-specific stuff */
-unsigned char read_port_byte(unsigned short port);
-unsigned short read_port(unsigned short port);
-void write_port_byte(unsigned short port, unsigned char val);
-void write_port(unsigned short port, unsigned short val);
 
 #endif

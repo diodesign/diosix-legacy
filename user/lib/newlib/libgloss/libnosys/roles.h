@@ -29,7 +29,10 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #define DIOSIX_ROLE_CONSOLEVIDEO     (4) /* default display hardware */
 #define DIOSIX_ROLE_CONSOLEKEYBOARD  (5) /* default keyboard hardware */
 
+/* system architecture */
+#define DIOSIX_ROLE_PCIMANAGER       (6) /* the PCI bus driver */
+
 /* total number of roles - not including DIOSIX_ROLE_NONE */
-#define DIOSIX_ROLES_NR              (5)
+#define DIOSIX_ROLES_NR              (6)
 
 #endif

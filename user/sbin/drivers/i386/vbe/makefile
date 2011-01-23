@@ -14,7 +14,7 @@ OBJDUMPbin = $(PREFIX)objdump
 PATHTOROOT = ../../../../../release/root
 
 # defines
-FLAGS		= -O2 -std=c99 -Wall -static -I../../../../../user/lib/newlib/libgloss/libnosys
+FLAGS		= -O2 -std=c99 -Wall -static -I../../../../../user/lib/newlib/libgloss/libnosys -I../common
 CC		= $(PREFIX)gcc $(FLAGS)
 LD		= $(PREFIX)gcc $(FLAGS)
 OBJS	 	= objs/main.o objs/vbe.o objs/lowlevel.o
@@ -27,7 +27,7 @@ objs/main.o:	main.c	makefile vbe.h
 		$(WRITE) '==> COMPILE: $<'
 		$(Q)$(CC) -c -o $@ $<
 
-objs/lowlevel.o:	lowlevel.c	makefile vbe.h
+objs/lowlevel.o:	../common/lowlevel.c	makefile vbe.h
 			$(WRITE) '==> COMPILE: $<'
 			$(Q)$(CC) -c -o $@ $<
 

@@ -20,6 +20,7 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #include "async.h"
 #include "roles.h"
 #include "io.h"
+
 #include "vbe.h"
 #include "font.h"
 
@@ -336,7 +337,6 @@ void wait_for_request(void)
                handling this request */
             if(msg.role != DIOSIX_ROLE_VFS)
             {
-               diosix_vfs_request_open *req_info = VFS_MSG_EXTRACT(req_head, 0);
                connected_pid = msg.pid;
                reply_to_request(&msg, success);
                return;

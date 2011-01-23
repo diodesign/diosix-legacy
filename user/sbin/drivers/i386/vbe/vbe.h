@@ -65,12 +65,6 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #define FB_WORDSPERPIXEL   (FB_DEPTH >> 5) /* 32bits per word */
 #define FB_BYTESPERPIXEL   (FB_DEPTH >> 3) /* 8bits per byte */
 
-/* x86-specific stuff */
-unsigned char read_port_byte(unsigned short port);
-unsigned short read_port(unsigned short port);
-void write_port_byte(unsigned short port, unsigned char val);
-void write_port(unsigned short port, unsigned short val);
-
 /* access the graphics hardware */
 void vbe_set_mode(unsigned short width, unsigned short height, unsigned char bpp);
 void vbe_write(unsigned short index, unsigned short val);

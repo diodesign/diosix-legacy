@@ -1,11 +1,20 @@
+# diosix-hyatt pre-Release1.0 i386 boot agenda
+
 timeout 1
 
 title diosix-hyatt
 root (cd)
 kernel /boot/kernel
 
+# kernel symbol table
 module /boot/kernel.sym
+
+# system services
 module /sbin/init
 module /sbin/vfs
+
+# base device drivers
+module /sbin/drivers/i386/pcimngr
 module /sbin/drivers/i386/vbe
 module /sbin/drivers/i386/ps2kbd
+module /sbin/drivers/i386/atapi

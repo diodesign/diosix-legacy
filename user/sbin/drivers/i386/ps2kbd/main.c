@@ -20,7 +20,9 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #include "async.h"
 #include "roles.h"
 #include "io.h"
+
 #include "ps2kbd.h"
+#include "lowlevel.h"
 
 /* lookup_code
    Convert a keyboard controller code into ASCII

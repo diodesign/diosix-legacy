@@ -1,7 +1,7 @@
-/* user/sbin/drivers/i386/vbe/lowlevel.c
- * Low-level x86-specific routines
+/* user/sbin/drivers/i386/common/lowlevel.h
+ * Function prototypes for common x86-specific driver routines
  * Author : Chris Williams
- * Date   : Tue,7 Dec 2010.06:55:00
+ * Date   : Sun,16 Jan 2011.23:21:00
 
 Copyright (c) Chris Williams and individual contributors
 
@@ -15,38 +15,15 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 */
 
+#ifndef _LOWLEVEL_H
+#define _LOWLEVEL_H 1
 
-unsigned char read_port_byte(unsigned short port)
-{
-   unsigned char ret_val;
-   
-   __asm__ __volatile__("inb %1,%0"
-                        : "=a"(ret_val)
-                        : "d"(port));
-   return ret_val;
-}
+/* x86-specific stuff */
+unsigned char read_port_byte(unsigned short port);
+unsigned short read_port(unsigned short port);
+unsigned int read_port_word(unsigned short port);
+void write_port_byte(unsigned short port, unsigned char val);
+void write_port(unsigned short port, unsigned short val);
+void write_port_word(unsigned short port, unsigned int val);
 
-unsigned short read_port(unsigned short port)
-{
-   unsigned char ret_val;
-   
-   __asm__ __volatile__("in %1,%0"
-                        : "=a"(ret_val)
-                        : "d"(port));
-   return ret_val;
-}
-
-void write_port_byte(unsigned short port, unsigned char val)
-{
-   __asm__ __volatile__("outb %0,%1"
-                        :
-                        : "a"(val), "d"(port));
-}
-
-
-void write_port(unsigned short port, unsigned short val)
-{
-   __asm__ __volatile__("out %0,%1"
-                        :
-                        : "a"(val), "d"(port));
-}
+#endif

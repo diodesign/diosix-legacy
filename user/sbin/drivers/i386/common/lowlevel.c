@@ -1,4 +1,4 @@
-/* user/sbin/drivers/i386/ps2kbd/lowlevel.c
+/* user/sbin/drivers/i386/common/lowlevel.c
  * Low-level x86-specific routines
  * Author : Chris Williams
  * Date   : Tue,7 Dec 2010.06:55:00
@@ -22,7 +22,7 @@ unsigned char read_port_byte(unsigned short port)
    
    __asm__ __volatile__("inb %1,%0"
                         : "=a"(ret_val)
-                        : "d"(port));
+                        : "dN"(port));
    return ret_val;
 }
 
@@ -32,7 +32,17 @@ unsigned short read_port(unsigned short port)
    
    __asm__ __volatile__("in %1,%0"
                         : "=a"(ret_val)
-                        : "d"(port));
+                        : "dN"(port));
+   return ret_val;
+}
+
+unsigned int read_port_word(unsigned short port)
+{
+   unsigned int ret_val;
+   
+   __asm__ __volatile__("inl %1,%0"
+                        : "=a"(ret_val)
+                        : "dN"(port));
    return ret_val;
 }
 
@@ -40,7 +50,7 @@ void write_port_byte(unsigned short port, unsigned char val)
 {
    __asm__ __volatile__("outb %0,%1"
                         :
-                        : "a"(val), "d"(port));
+                        : "a"(val), "dN"(port));
 }
 
 
@@ -48,5 +58,12 @@ void write_port(unsigned short port, unsigned short val)
 {
    __asm__ __volatile__("out %0,%1"
                         :
-                        : "a"(val), "d"(port));
+                        : "a"(val), "dN"(port));
+}
+
+void write_port_word(unsigned short port, unsigned int val)
+{
+   __asm__ __volatile__("outl %0,%1"
+                        :
+                        : "a"(val), "dN"(port));
 }
