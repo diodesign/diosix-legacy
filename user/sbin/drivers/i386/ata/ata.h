@@ -1,4 +1,4 @@
-/* user/sbin/drivers/i386/ata/atapi.h
+/* user/sbin/drivers/i386/ata/ata.h
  * Defines for the userspace ATAPI driver
  * Author : Chris Williams
  * Date   : Sun,16 Jan 2011.23:21:00
@@ -17,6 +17,20 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 #ifndef _ATA_H
 #define _ATA_H 1
+
+#define ATA_PATHNAME_BASE "/dev/ata"
+
+#define ATA_MAX_CONTROLLERS   (4)
+
+/* define an ATA controller */
+typedef struct
+{
+   /* PCI location */
+   unsigned short bus, slot;
+   
+   /* location in the FS */
+   char *pathname;
+} ata_controller;
 
 /* prototype functions in fs.c */
 void wait_for_request(void);

@@ -24,11 +24,8 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #include "roles.h"
 #include "io.h"
 
-#include "atapi.h"
-#include "lowlevel.h"
-#include "pci.h"
+#include "ata.h"
 
-#define DEVICE_PATHNAME_BASE "/dev/ata"
 #define RECEIVE_BUFFER_SIZE   (2048)
 
 /* ----------------------------------------------------------------------

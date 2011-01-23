@@ -23,7 +23,7 @@ OBJS	 	= objs/main.o objs/fs.o objs/lowlevel.o objs/pci.o
 all: ata
 
 # dependencies
-objs/main.o:	main.c	makefile atapi.h
+objs/main.o:	main.c	makefile ata.h
 		$(WRITE) '==> COMPILE: $<'
 		$(Q)$(CC) -c -o $@ $<
 

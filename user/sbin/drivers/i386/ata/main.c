@@ -16,6 +16,7 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "diosix.h"
@@ -24,26 +25,60 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #include "roles.h"
 #include "io.h"
 
-#include "atapi.h"
+#include "ata.h"
 #include "lowlevel.h"
 #include "pci.h"
+
+/* table of controllers */
+ata_controller controllers[ATA_MAX_CONTROLLERS];
 
 /* find_controllers
    Detect and setup ATAPI controllers and return number of devices */
 unsigned int find_controllers(void)
 {
-   unsigned char count = 0;
-   unsigned short class = PCI_CLASS_CALC(PCI_CLASS_MASSSTORAGE, PCI_SUBCLASS_IDE);
+   unsigned char dcount = 0, ccount = 0;
    kresult err;
    
-   /* run through the available IDE controllers on the PCI sub-system */
+   /* try to find mass storage IDE controllers */
+   unsigned short class = PCI_CLASS_CALC(PCI_CLASS_MASSSTORAGE, PCI_SUBCLASS_IDE);
+   
+   /* run through the available controllers on the PCI sub-system */
    do
    {
-      pci_find_device(class, count, &bus, &slot, );
+      unsigned short bus, slot;
+      unsigned int pid;
       
-      count++;
+      err = pci_find_device(class, dcount, &bus, &slot, &pid);
+      
+      if(!err && pid == 0)
+      {
+         /* path includes 2 digits and NULL byte */
+         unsigned int path_length = strlen(ATA_PATHNAME_BASE) + (3 * sizeof(char));
+         char *pathname = malloc(path_length);
+         if(!pathname)
+         {
+            printf("ata: malloc() failed during controller discovery\n");
+            return ccount;
+         }
+         
+         /* record the bus+slot */
+         controllers[ccount].bus = bus;
+         controllers[ccount].slot = slot;
+         controllers[ccount].pathname = pathname;
+         
+         /* register this device with the vfs */         
+         snprintf(pathname, path_length, "%s%i", ATA_PATHNAME_BASE, ccount);
+         diosix_vfs_register(pathname);
+
+         printf("found controller in %x:%x (created %s)\n", bus, slot, pathname);
+         ccount++;
+      }
+      
+      dcount++;
    }
-   while(err == success);
+   while(!err && ccount < ATA_MAX_CONTROLLERS);
+   
+   return ccount;
 }
 
 int main(void)
@@ -52,10 +87,7 @@ int main(void)
    diosix_priv_layer_up(1);
    if(diosix_driver_register()) diosix_exit(1); /* or exit on failure */
 
-   if(find_controllers == 0) return; /* exit if there's no ATAPI controllers */
-      
-   /* register this device with the vfs */
-   diosix_vfs_register(DEVICE_PATHNAME);
+   if(find_controllers() == 0) return 1; /* exit if there's no ATAPI controllers */
    
    /* wait for work to come in */
    while(1) wait_for_request();
