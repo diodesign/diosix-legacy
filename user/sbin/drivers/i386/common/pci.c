@@ -15,7 +15,12 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 */
 
+#include <string.h>
+#include <unistd.h>
+
 #include "diosix.h"
+#include "functions.h"
+#include "roles.h"
 #include "pci.h"
 
 /* pci_prep_message
@@ -26,18 +31,21 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 */
 void pci_prep_message(diosix_msg_info *msg, pci_request_msg *req, pci_reply_msg *reply)
 {
+   memset(msg, 0, sizeof(diosix_msg_info));
+   memset(req, 0, sizeof(pci_request_msg));
+   
    /* set up a blocking message to the manager  */
-   msg.role = DIOSIX_ROLE_PCIMANAGER;
-   msg.pid = msg.tid = DIOSIX_MSG_ANY_THREAD;
-   msg.flags = DIOSIX_MSG_GENERIC | DIOSIX_MSG_SENDASUSR | DIOSIX_MSG_QUEUEME;
-   msg.send_size = sizeof(pci_request_msg);
-   msg.send = &req;
-   msg.recv_max_size = sizeof(pci_reply_msg);
-   msg.reply = &reply;
+   msg->role = DIOSIX_ROLE_PCIMANAGER;
+   msg->pid = msg->tid = DIOSIX_MSG_ANY_THREAD;
+   msg->flags = DIOSIX_MSG_GENERIC | DIOSIX_MSG_SENDASUSR | DIOSIX_MSG_QUEUEME;
+   msg->send_size = sizeof(pci_request_msg);
+   msg->send = &req;
+   msg->recv_max_size = sizeof(pci_reply_msg);
+   msg->recv = &reply;
    
    /* fill out the pci request message */
-   pci_msg.bus_type = pci_bus;
-   pci_msg.magic = PCI_REQ_MAGIC;
+   req->bus_type = pci_bus;
+   req->magic = PCI_MSG_MAGIC;
 }
 
 /* pci_read_config
@@ -137,7 +145,7 @@ kresult pci_release_device(unsigned short bus, unsigned short slot)
    pci_request_msg pci_msg;
    pci_reply_msg reply;
    kresult err;
-   
+
    /* fill out the diosix message header to send
     the claim request to any available thread in 
     the PCI manager process */
@@ -157,4 +165,49 @@ kresult pci_release_device(unsigned short bus, unsigned short slot)
    if(err) return err;
    
    return reply.result;
+}
+
+/* pci_find_device
+   Look up the bus and slot numbers of a detected device from its class
+   => class = high byte is the class, low byte is the sub-class
+      count = for a machine with multiple cards with the same class+subclass,
+              this index selects the required card (starting from 0)
+      bus, slot = pointers to variables to write bus and slot numbers in, if successful
+      pid = pointer to store PID of owning process, or 0 if none, if successful
+   <= 0 for success, or an error code
+*/
+kresult pci_find_device(unsigned short class, unsigned char count,
+                        unsigned short *bus, unsigned short *slot, unsigned int *pid)
+{
+   /* structures to hold the message */
+   diosix_msg_info msg;
+   pci_request_msg pci_msg;
+   pci_reply_msg reply;
+   kresult err;
+      
+   /* fill out the diosix message header to send
+    the claim request to any available thread in 
+    the PCI manager process */
+   pci_prep_message(&msg, &pci_msg, &reply);
+   
+   /* fill out the pci request message */
+   pci_msg.req = find_device;
+   
+   /* here's the device we want to find */
+   pci_msg.class = class;
+   pci_msg.count = count;
+   
+   /* send the message and update the result variable
+    if successful */
+   err = diosix_msg_send(&msg);
+   if(err) return err;
+   
+   /* give up if the manager gave us an error */
+   if(reply.result) return reply.result;
+   
+   /* write back the found device's details */
+   *bus = reply.bus;
+   *slot = reply.slot;
+   *pid = reply.pid;
+   return success;
 }

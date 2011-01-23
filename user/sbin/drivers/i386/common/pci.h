@@ -20,8 +20,14 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 #include "diosix.h" /* for kresult */
 
+/* IO port access */
 #define PCI_CONFIG_ADDRESS (0xcf8)
 #define PCI_CONFIG_DATA    (0xcfc)
+
+/* PCI config header values */
+#define PCI_HEADER_VENDORID   (0x00)
+#define PCI_HEADER_DEVICEID   (0x02)
+#define PCI_HEADER_CLASS      (0x0a)
 
 /* PCI message definitions */
 #define PCI_MSG_MAGIC  (0xd1000002)
@@ -37,7 +43,8 @@ typedef enum
 {
    read_config,
    claim_device,
-   release_device
+   release_device,
+   find_device
 } pci_req_type;
 
 /* the main request structure */
@@ -53,18 +60,29 @@ typedef struct
 
    /* used for read_config requests */
    unsigned short func, offset;
+   
+   /* used for find_device requests */
+   unsigned short class;
+   unsigned char count;
 } pci_request_msg;
 
 /* the main reply structure */
 typedef struct
 {
    kresult result; /* return code */
-   unsigned int value; /* any extra data */
+   
+   /* read_config data */
+   unsigned int value;
+   
+   /* find_device results */
+   unsigned short bus, slot;
+   unsigned int pid;
 } pci_reply_msg;
 
 /* prototypes */
 kresult pci_read_config(unsigned short bus, unsigned short slot, unsigned short func, unsigned short offset, unsigned short *result);
 kresult pci_claim_device(unsigned short bus, unsigned short slot, unsigned int pid);
 kresult pci_release_device(unsigned short bus, unsigned short slot);
+kresult pci_find_device(unsigned short class, unsigned char count, unsigned short *bus, unsigned short *slot, unsigned int *pid);
 
 #endif

@@ -48,8 +48,7 @@ _DEFUN (_write, (file, ptr, len),
    if(file == 1)
    {
       char *str;
-      diosix_debug_write("write() called!\n");
-      
+
       str = malloc(len + 1);
       if(str)
       {
