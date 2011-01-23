@@ -1,5 +1,5 @@
 #
-# ATAPI device driver
+# ATA device driver
 #
 
 # prettify the output
@@ -17,13 +17,17 @@ PATHTOROOT = ../../../../../release/root
 FLAGS		= -O2 -std=c99 -Wall -static -I../../../../../user/lib/newlib/libgloss/libnosys -I../common
 CC		= $(PREFIX)gcc $(FLAGS)
 LD		= $(PREFIX)gcc $(FLAGS)
-OBJS	 	= objs/main.o objs/lowlevel.o objs/pci.o
+OBJS	 	= objs/main.o objs/fs.o objs/lowlevel.o objs/pci.o
 
 # targets
-all: atapi
+all: ata
 
 # dependencies
 objs/main.o:	main.c	makefile atapi.h
+		$(WRITE) '==> COMPILE: $<'
+		$(Q)$(CC) -c -o $@ $<
+
+objs/fs.o:	fs.c	makefile
 		$(WRITE) '==> COMPILE: $<'
 		$(Q)$(CC) -c -o $@ $<
 
@@ -37,9 +41,9 @@ objs/pci.o:		../common/pci.c	makefile
 
 # explicit rules
 
-atapi:	$(OBJS)
-	$(WRITE) '==> LINK: atapi'
+ata:	$(OBJS)
+	$(WRITE) '==> LINK: ata'
 	$(Q)$(LD) $^ -o $@
-	$(Q)$(OBJDUMPbin) --source $@ >atapi.lst
-	$(Q)cp atapi $(PATHTOROOT)/sbin/drivers/i386/
+	$(Q)$(OBJDUMPbin) --source $@ >ata.lst
+	$(Q)cp ata $(PATHTOROOT)/sbin/drivers/i386/
 

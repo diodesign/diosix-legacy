@@ -1,5 +1,5 @@
-/* user/sbin/drivers/i386/atapi/main.c
- * Driver for ATAPI-connected storage devices 
+/* user/sbin/drivers/i386/ata/fs.c
+ * Driver for ATA-connected storage devices 
  * Author : Chris Williams
  * Date   : Sun,16 Jan 2011.22:54:00
 
@@ -15,6 +15,9 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 */
 
+#include <stdio.h>
+#include <string.h>
+
 #include "diosix.h"
 #include "functions.h"
 #include "async.h"
@@ -23,11 +26,9 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 #include "atapi.h"
 #include "lowlevel.h"
+#include "pci.h"
 
-#include <stdio.h>
-#include <string.h>
-
-#define DEVICE_PATHNAME "/dev/atapi0"
+#define DEVICE_PATHNAME_BASE "/dev/ata"
 #define RECEIVE_BUFFER_SIZE   (2048)
 
 /* ----------------------------------------------------------------------
@@ -113,18 +114,4 @@ void wait_for_request(void)
             reply_to_request(&msg, e_bad_params);
       }
    }
-}
-
-
-int main(void)
-{
-   /* move into driver layer (1) and get access to IO ports */
-   diosix_priv_layer_up(1);
-   if(diosix_driver_register()) diosix_exit(1); /* or exit on failure */
-
-   /* register this device with the vfs */
-   diosix_vfs_register(DEVICE_PATHNAME);
-   
-   /* wait for work to come in */
-   while(1) wait_for_request();
 }

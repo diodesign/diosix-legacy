@@ -43,7 +43,7 @@ struct pci_device
 
 #define PCI_HASH_MAX         (16)
 #define PCI_PHYS_INDEX(b, s) (((b) + (s)) % PCI_HASH_MAX)
-#define PCI_CLASS_INDEX(c) ((((c) >> 8) + ((c) & 0xf)) % PCI_HASH_MAX)
+#define PCI_CLASS_INDEX(c) ((((c) >> 8) + ((c) & 0xff)) % PCI_HASH_MAX)
 
 /* table to store detected PCI devices, hashed by physical connection */
 pci_device *pci_phys_tbl[PCI_HASH_MAX];

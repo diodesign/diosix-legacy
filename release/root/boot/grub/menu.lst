@@ -17,4 +17,4 @@ module /sbin/vfs
 module /sbin/drivers/i386/pcimngr
 module /sbin/drivers/i386/vbe
 module /sbin/drivers/i386/ps2kbd
-module /sbin/drivers/i386/atapi
+module /sbin/drivers/i386/ata

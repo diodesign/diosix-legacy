@@ -1,5 +1,5 @@
-/* user/sbin/drivers/i386/atapi/atapi.h
- * Defines for the userspace ATAPI cdrom driver
+/* user/sbin/drivers/i386/ata/atapi.h
+ * Defines for the userspace ATAPI driver
  * Author : Chris Williams
  * Date   : Sun,16 Jan 2011.23:21:00
 
@@ -15,13 +15,10 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 */
 
-#ifndef _ATAPI_H
-#define _ATAPI_H 1
+#ifndef _ATA_H
+#define _ATA_H 1
 
-/* x86-specific stuff */
-unsigned char read_port_byte(unsigned short port);
-unsigned short read_port(unsigned short port);
-void write_port_byte(unsigned short port, unsigned char val);
-void write_port(unsigned short port, unsigned short val);
+/* prototype functions in fs.c */
+void wait_for_request(void);
 
 #endif
