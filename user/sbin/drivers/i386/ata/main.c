@@ -49,7 +49,6 @@ unsigned int find_controllers(void)
       unsigned int pid;
       
       err = pci_find_device(class, dcount, &bus, &slot, &pid);
-      
       if(!err && pid == 0)
       {
          /* path includes 2 digits and NULL byte */
@@ -61,17 +60,28 @@ unsigned int find_controllers(void)
             return ccount;
          }
          
-         /* record the bus+slot */
-         controllers[ccount].bus = bus;
-         controllers[ccount].slot = slot;
-         controllers[ccount].pathname = pathname;
-         
-         /* register this device with the vfs */         
-         snprintf(pathname, path_length, "%s%i", ATA_PATHNAME_BASE, ccount);
-         diosix_vfs_register(pathname);
-
-         printf("found controller in %x:%x (created %s)\n", bus, slot, pathname);
-         ccount++;
+         err = pci_claim_device(bus, slot, 0);
+         if(!err)
+         {
+            /* register this device with the vfs */         
+            snprintf(pathname, path_length, "%s%i", ATA_PATHNAME_BASE, ccount);
+            if(diosix_vfs_register(pathname) == success)
+            {
+               /* record the bus+slot */
+               controllers[ccount].bus = bus;
+               controllers[ccount].slot = slot;
+               controllers[ccount].pathname = pathname;
+            
+               printf("claimed controller in PCI bus %x slot %x (created %s)\n", bus, slot, pathname);
+               ccount++;
+            }
+            else
+               /* failed! */
+               free(pathname);
+         }
+         else
+            /* failed! */
+            free(pathname);
       }
       
       dcount++;

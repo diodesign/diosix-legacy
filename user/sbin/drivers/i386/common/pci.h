@@ -46,7 +46,7 @@ typedef enum
 /* define the types of request */
 typedef enum
 {
-   read_config,
+   read_config = 0,
    claim_device,
    release_device,
    find_device

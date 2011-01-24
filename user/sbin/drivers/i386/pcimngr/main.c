@@ -137,7 +137,7 @@ kresult pci_find_device(unsigned short class, unsigned char count,
    pci_device *search = pci_class_tbl[index];
    
    if(!bus || !slot) return e_bad_params;
-   
+      
    while(search)
    {
       if(search->class == class)
@@ -276,7 +276,7 @@ void wait_for_request(void)
    msg.recv_max_size = sizeof(pci_request_msg);
    
    if(diosix_msg_receive(&msg) == success)
-   {      
+   {
       if(msg.recv_size < sizeof(pci_request_msg))
       {
          /* malformed request, it's too small to even hold a request type */

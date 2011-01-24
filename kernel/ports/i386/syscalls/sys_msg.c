@@ -73,7 +73,7 @@ void syscall_do_msg_send(int_registers_block *regs)
    
    /* bail out if it's not a generic sync message */
    if(!(msg->flags & DIOSIX_MSG_GENERIC)) SYSCALL_RETURN(e_bad_params);
-   
+
    /* do the actual sending */
    send_result = msg_send(current, msg);
    

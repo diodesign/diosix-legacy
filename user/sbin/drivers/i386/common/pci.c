@@ -15,6 +15,7 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 */
 
+#include <stdio.h>
 #include <string.h>
 #include <unistd.h>
 
@@ -39,9 +40,9 @@ void pci_prep_message(diosix_msg_info *msg, pci_request_msg *req, pci_reply_msg 
    msg->pid = msg->tid = DIOSIX_MSG_ANY_THREAD;
    msg->flags = DIOSIX_MSG_GENERIC | DIOSIX_MSG_SENDASUSR | DIOSIX_MSG_QUEUEME;
    msg->send_size = sizeof(pci_request_msg);
-   msg->send = &req;
+   msg->send = req;
    msg->recv_max_size = sizeof(pci_reply_msg);
-   msg->recv = &reply;
+   msg->recv = reply;
    
    /* fill out the pci request message */
    req->bus_type = pci_bus;
