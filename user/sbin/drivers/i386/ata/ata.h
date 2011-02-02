@@ -20,16 +20,49 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 #define ATA_PATHNAME_BASE "/dev/ata"
 
-#define ATA_MAX_CONTROLLERS   (4)
+#define ATA_MAX_CONTROLLERS      (4)
+
+#define ATA_IOPORT_PRIMARY       (0x1F0)
+#define ATA_IOPORT_PRIMARYCTRL   (0x3F4)
+#define ATA_IOPORT_SECONDARY     (0x170)
+#define ATA_IOPORT_SECONDARYCTRL (0x374)
+
+#define ATA_IRQ_PRIMARY          (14)
+#define ATA_IRQ_SECONDARY        (15)
+
+#define 
+
+/* define a drive connected to a channel */
+typedef struct
+{
+   unsigned char flags; /* set the type and status */
+} ata_device;
+
+/* define a controller channel */
+typedef struct
+{
+   unsigned short ioport, control_ioport, busmaster_ioport;
+   unsigned char irq;
+   ata_device drive;
+} ata_channel;
+
+#define ATA_CONTROLLER_PCI       (1 << 0)  /* controller is a PCI device */
+#define ATA_CONTROLLER_BUILTIN   (1 << 1)  /* controller is an ISA/chipset device */
 
 /* define an ATA controller */
 typedef struct
 {
+   unsigned char flags; /* set the type and status */
+
    /* PCI location */
    unsigned short bus, slot;
    
-   /* location in the FS */
-   char *pathname;
+   /* PCI interrupt handling */
+   unsigned char irq_line, irq_pin;
+   
+   /* hardware interfaces */
+   ata_channel primary;
+   ata_channel secondary;
 } ata_controller;
 
 /* prototype functions in fs.c */

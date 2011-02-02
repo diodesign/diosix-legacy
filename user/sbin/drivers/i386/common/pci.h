@@ -21,13 +21,36 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #include "diosix.h" /* for kresult */
 
 /* IO port access */
-#define PCI_CONFIG_ADDRESS (0xcf8)
-#define PCI_CONFIG_DATA    (0xcfc)
+#define PCI_CONFIG_ADDRESS    (0xcf8)
+#define PCI_CONFIG_DATA       (0xcfc)
+
+/* PCI config header bits */
+#define PCI_HEADER_MULTIFUNC  (1 << 7)
+
+/* PCI config header types */
+#define PCI_HEADER_GENERIC    (0)
+#define PCI_HEADER_PCI2PCI    (1)
+#define PCI_HEADER_CARDBUS    (2)
 
 /* PCI config header values */
 #define PCI_HEADER_VENDORID   (0x00)
 #define PCI_HEADER_DEVICEID   (0x02)
 #define PCI_HEADER_CLASS      (0x0a)
+#define PCI_HEADER_TYPE       (0x0e)
+#define PCI_HEADER_BAR0_LOW   (0x10)
+#define PCI_HEADER_BAR0_HIGH  (PCI_HEADER_BAR1_LOW + 2)
+#define PCI_HEADER_BAR1_LOW   (0x14)
+#define PCI_HEADER_BAR1_HIGH  (PCI_HEADER_BAR2_LOW + 2)
+#define PCI_HEADER_BAR2_LOW   (0x18)
+#define PCI_HEADER_BAR2_HIGH  (PCI_HEADER_BAR3_LOW + 2)
+#define PCI_HEADER_BAR3_LOW   (0x1c)
+#define PCI_HEADER_BAR3_HIGH  (PCI_HEADER_BAR4_LOW + 2)
+#define PCI_HEADER_BAR4_LOW   (0x20)
+#define PCI_HEADER_BAR4_HIGH  (PCI_HEADER_BAR5_LOW + 2)
+#define PCI_HEADER_BAR5_LOW   (0x24)
+#define PCI_HEADER_BAR5_HIGH  (PCI_HEADER_BAR6_LOW + 2)
+#define PCI_HEADER_INT_LINE   (0x3c)
+#define PCI_HEADER_INT_PIN    (0x3d)
 
 /* PCI class and sub-classes */
 #define PCI_CLASS_CALC(c, s) (unsigned short)((((c) & 0xff) << 8) | ((s) & 0xff))

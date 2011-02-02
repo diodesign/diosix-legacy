@@ -211,6 +211,8 @@ void discover_devices(void)
             new->class = class;
             new->pid = 0; /* no registered process yet */
             
+            printf("bus = %i slot = %i class = %x\n", bus, slot, class);
+            
             /* add into the hash tables */
             phys_index = PCI_PHYS_INDEX(bus, slot);
             class_index = PCI_CLASS_INDEX(class);
