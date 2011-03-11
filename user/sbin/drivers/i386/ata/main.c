@@ -32,6 +32,34 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 /* table of controllers */
 ata_controller controllers[ATA_MAX_CONTROLLERS];
 
+/* detect_drive_type
+   Detect the type of drive attached to a channel and convert the returned values into
+   something sane
+   => conroller = controller structure to work on
+      slave = either ATA_SLAVE or ATA_MASTER to select primary or secondary device
+   <= ata_drive_type number for the drive
+*/
+ata_drive_type detect_drive_type(ata_controller *controller, unsigned char slave)
+{
+	ata_soft_reset(ctrl->dev_ctl);		/* waits until master drive is ready again */
+
+	outb(ctrl->base + REG_DEVSEL, 0xA0 | slavebit<<4);
+	inb(ctrl->dev_ctl);			/* wait 400ns for drive select to work */
+	inb(ctrl->dev_ctl);
+	inb(ctrl->dev_ctl);
+	inb(ctrl->dev_ctl);
+	unsigned cl=inb(ctrl->base + REG_CYL_LO);	/* get the "signature bytes" */
+	unsigned ch=inb(ctrl->base + REG_CYL_HI);
+   
+	/* differentiate ATA, ATAPI, SATA and SATAPI */
+	if (cl==0x14 && ch==0xEB) return ata_type_patapi;
+	if (cl==0x69 && ch==0x96) return ata_type_satapi;
+	if (cl==0 && ch == 0) return ata_type_pata;
+	if (cl==0x3c && ch==0xc3) return ata_type_sata;
+   
+	return ata_type_unknown;
+}
+
 /* detect_drives
    Discover the ATA/ATAPI drives attached to a controller's channels
    => controller = pointer to ata controller structure
@@ -39,7 +67,7 @@ ata_controller controllers[ATA_MAX_CONTROLLERS];
 */
 unsigned char detect_drives(ata_controller *controller)
 {
-   return 0;
+   
 }
 
 /* discover_controllers
@@ -150,7 +178,7 @@ int main(void)
    diosix_priv_layer_up(1);
    if(diosix_driver_register()) diosix_exit(1); /* or exit on failure */
 
-   if(discover_controllers() == 0) return 1; /* exit if there's no ATAPI controllers */
+   if(discover_controllers() == 0) return 1; /* exit if there's no ATA drives */
    
    /* wait for work to come in */
    while(1) wait_for_request();

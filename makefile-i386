@@ -1,5 +1,5 @@
 #
-# diosix hyatt
+# diosix hyatt - PC i386 port
 #
 # makefile for the kernel and libdiosix
 #
@@ -43,7 +43,7 @@ OBJSDIR  = $(PORTDIR)/objs
 LIBDIOSIXDIR = user/lib/newlib/libgloss/libnosys
 SVNDEF := -D'SVN_REV="$(shell svnversion -n .)"'
 
-MAKEFILE	= makefile
+MAKEFILE	= makefile-i386
 MAKEDEP		= $(MAKEFILE) $(PORTDIR)/include/portdefs.h $(PORTDIR)/include/processes.h $(PORTDIR)/include/boot.h $(PORTDIR)/include/cpu.h $(PORTDIR)/include/buses.h $(PORTDIR)/include/debug.h $(PORTDIR)/include/elf.h $(PORTDIR)/include/interrupts.h $(PORTDIR)/include/ipc.h $(PORTDIR)/include/locks.h $(PORTDIR)/include/lowlevel.h $(PORTDIR)/include/memory.h $(PORTDIR)/include/multiboot.h $(PORTDIR)/include/sched.h $(PORTDIR)/include/sglib.h $(PORTDIR)/include/syscalls.h $(LIBDIOSIXDIR)/diosix.h $(LIBDIOSIXDIR)/async.h
 
 INCDIR		= $(PORTDIR)/include
