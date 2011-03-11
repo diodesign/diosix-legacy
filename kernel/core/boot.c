@@ -18,7 +18,7 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #include <portdefs.h>
 
 /* main
-   The portable side of the kernel starts here. It is called by some bootstrap
+   The portable side of a multiboot-loaded kernel starts here. It is called by some bootstrap
    code, initialises the system and begins running programs. We'll assume the
    following:
    1. The kernel is mapped into 0xC0400000 (4MB into top 1GB) logical,
