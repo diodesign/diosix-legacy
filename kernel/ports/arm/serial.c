@@ -1,7 +1,7 @@
-/* kernel/ports/arm/boot.c
- * ARM-specific low-level start-up routines
+/* kernel/ports/arm/serial.c
+ * ARM-specific low-level UART serial port routines
  * Author : Chris Williams
- * Date   : Fri,11 Mar 2011.16:54:00
+ * Date   : Sat,12 Mar 2011.00:29:00
  
 Copyright (c) Chris Williams and individual contributors
 
@@ -15,13 +15,20 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 */
 
-#include <portdefs.h>
+#define UART0DR   (0x101f1000)
 
-/* welcome to Earth */
-int main()
+/* serial_writebyte
+   Write a byte out out to the serial port
+   => c = character to output
+*/
+void serial_writebyte(unsigned char c)
 {
-   if(DEBUG) debug_initialise();
-   dprintf("[core] %s rev %s" " " __TIME__ " " __DATE__ " (built with GCC " __VERSION__ ")\n", KERNEL_IDENTIFIER, SVN_REV);
-   
-   return 0;
+   (volatile unsigned int *)UART0DR = (unsigned int)c; /* bang out char */
+}
+
+/* serial_initialise
+ Start up the serial debugging output */
+void serial_initialise(void)
+{
+   /* do nothing for the moment */
 }

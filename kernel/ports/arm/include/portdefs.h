@@ -1,8 +1,8 @@
-/* kernel/ports/arm/boot.c
- * ARM-specific low-level start-up routines
+/* kernel/ports/arm/include/portdefs.h
+ * master header for the ARM port of the kernel 
  * Author : Chris Williams
- * Date   : Fri,11 Mar 2011.16:54:00
- 
+ * Date   : Sat, 12 Mar 2011.00:33:00
+
 Copyright (c) Chris Williams and individual contributors
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
@@ -15,13 +15,15 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 */
 
-#include <portdefs.h>
+#ifndef _PORTDEFS_H
+#define   _PORTDEFS_H
 
-/* welcome to Earth */
-int main()
-{
-   if(DEBUG) debug_initialise();
-   dprintf("[core] %s rev %s" " " __TIME__ " " __DATE__ " (built with GCC " __VERSION__ ")\n", KERNEL_IDENTIFIER, SVN_REV);
-   
-   return 0;
-}
+/* this is not an SMP system */
+#define CPU_ID       (0)
+
+#include "diosix.h"
+
+/* declare stuff exclusive to the microkernel */
+#include <debug.h>
+
+#endif
