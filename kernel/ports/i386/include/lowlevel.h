@@ -57,6 +57,8 @@ void x86_load_gdtr(unsigned int ptr); /* defined in start.s */
 void x86_timer_init(unsigned char freq);
 void x86_enable_interrupts(void);
 void x86_disable_interrupts(void);
+#define lowlevel_disable_interrupts x86_disable_interrupts
+#define lowlevel_enable_interrupts x86_enable_interrupts
 void x86_change_tss(gdtptr_descr *cpugdt, gdt_entry *gdt, tss_descr *tss, unsigned char flags);
 kresult x86_init_tss(thread *toinit);
 void x86_start_ap(void);
