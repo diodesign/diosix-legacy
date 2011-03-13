@@ -66,6 +66,7 @@ void x86_start_ap_end(void);
 unsigned long long x86_read_cyclecount(void);
 void lowlevel_thread_switch(thread *now, thread *next, int_registers_block *regs);
 void lowlevel_proc_preinit(void);
+void lowlevel_stackbacktrace(void);
 void lowlevel_kickstart(void);
 void lowlevel_ioports_clone(process *new, process *current);
 void lowlevel_ioports_new(process *new);

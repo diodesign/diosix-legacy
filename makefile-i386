@@ -44,7 +44,7 @@ LIBDIOSIXDIR = user/lib/newlib/libgloss/libnosys
 SVNDEF := -D'SVN_REV="$(shell svnversion -n .)"'
 
 MAKEFILE	= makefile-i386
-MAKEDEP		= $(MAKEFILE) $(PORTDIR)/include/portdefs.h $(PORTDIR)/include/processes.h $(PORTDIR)/include/boot.h $(PORTDIR)/include/cpu.h $(PORTDIR)/include/buses.h $(PORTDIR)/include/debug.h $(PORTDIR)/include/elf.h $(PORTDIR)/include/interrupts.h $(PORTDIR)/include/ipc.h $(PORTDIR)/include/locks.h $(PORTDIR)/include/lowlevel.h $(PORTDIR)/include/memory.h $(PORTDIR)/include/multiboot.h $(PORTDIR)/include/sched.h $(PORTDIR)/include/sglib.h $(PORTDIR)/include/syscalls.h $(LIBDIOSIXDIR)/diosix.h $(LIBDIOSIXDIR)/async.h
+MAKEDEP		= $(MAKEFILE) $(PORTDIR)/include/portdefs.h $(COREDIR)/include/processes.h $(COREDIR)/include/boot.h $(PORTDIR)/include/cpu.h $(PORTDIR)/include/buses.h $(COREDIR)/include/debug.h $(COREDIR)/include/elf.h $(PORTDIR)/include/interrupts.h $(COREDIR)/include/ipc.h $(COREDIR)/include/locks.h $(PORTDIR)/include/lowlevel.h $(PORTDIR)/include/memory.h $(PORTDIR)/include/multiboot.h $(COREDIR)/include/sched.h $(COREDIR)/include/sglib.h $(PORTDIR)/include/syscalls.h $(PORTDIR)/include/registers.h $(LIBDIOSIXDIR)/diosix.h $(LIBDIOSIXDIR)/async.h
 
 INCDIR		= $(PORTDIR)/include
 LDSCRIPT	= $(PORTDIR)/diosix.ld
@@ -60,7 +60,7 @@ FLAGS		= -g -std=c99 -Wall -nostdlib -nostartfiles \
 # basic debugging
 DEBUGFLAGS	= -DDEBUG -DLOCK_TIME_CHECK
 
-CC		= $(CCbin) $(SVNDEF) $(FLAGS) -I$(INCDIR) -I$(COREDIR) -I$(LIBDIOSIXDIR) $(DEBUGFLAGS) $(VERSION)
+CC		= $(CCbin) $(SVNDEF) $(FLAGS) -I$(INCDIR) -I$(COREDIR)/include -I$(LIBDIOSIXDIR) $(DEBUGFLAGS) $(VERSION)
 LD		= $(CCbin) $(FLAGS) -Xlinker --script=$(LDSCRIPT) -Xlinker
 
 
@@ -73,7 +73,7 @@ OBJS	 = $(OBJSDIR)/locore.o \
 	   $(OBJSDIR)/vmm.o $(OBJSDIR)/page.o $(OBJSDIR)/thread.o $(OBJSDIR)/proc.o $(OBJSDIR)/ioapic.o $(OBJSDIR)/pic.o \
 	   $(OBJSDIR)/lapic.o $(OBJSDIR)/buses.o \
 	   $(OBJSDIR)/intcontrol.o $(OBJSDIR)/mp.o $(OBJSDIR)/boot.o $(OBJSDIR)/payload.o \
-	   $(OBJSDIR)/serial.o $(COREDIR)/debug.o
+	   $(OBJSDIR)/serial.o $(OBJSDIR)/debug.o
 
 
 # targets

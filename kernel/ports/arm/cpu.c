@@ -1,7 +1,7 @@
-/* kernel/ports/arm/include/portdefs.h
- * master header for the ARM port of the kernel 
+/* kernel/ports/arm/cpu.c
+ * ARM-specific multiprocessor support
  * Author : Chris Williams
- * Date   : Sat, 12 Mar 2011.00:33:00
+ * Date   : Sun,12 Mar 2011.03:39.00
 
 Copyright (c) Chris Williams and individual contributors
 
@@ -15,21 +15,13 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 */
 
-#ifndef _PORTDEFS_H
-#define   _PORTDEFS_H
+#include <portdefs.h>
 
-#include "diosix.h"
+/* totals of resources available on this system */
+unsigned char mp_cpus = 0;
+unsigned char mp_ioapics = 0;
+unsigned char mp_boot_cpu = 0;
+unsigned char mp_domains = 0;
 
-/* declare stuff exclusive to the microkernel */
-#include <debug.h>
-#include <multiboot.h>
-#include <locks.h>
-#include <registers.h>
-#include <processes.h>
-
-#include <memory.h>
-#include <cpu.h>
-#include <lowlevel.h>
-
-
-#endif
+/* pointer to table of cpu descriptors */
+mp_core *cpu_table = NULL;

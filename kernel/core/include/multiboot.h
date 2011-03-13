@@ -1,4 +1,4 @@
-/* kernel/ports/i386/include/multiboot.h
+/* kernel/core/include/multiboot.h
  * structures for interfacing with a multiboot bootloader
  * Author : Chris Williams
  * Date   : Mon,26 Mar 2007.23:09:39

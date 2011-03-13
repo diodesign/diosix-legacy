@@ -15,6 +15,7 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 */
 
+/* address of the first UART's data register */
 #define UART0DR   (0x101f1000)
 
 /* serial_writebyte
@@ -23,11 +24,11 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 */
 void serial_writebyte(unsigned char c)
 {
-   (volatile unsigned int *)UART0DR = (unsigned int)c; /* bang out char */
+   *(volatile unsigned int *)UART0DR = (unsigned int)c; /* bang out char */
 }
 
 /* serial_initialise
- Start up the serial debugging output */
+   Start up the serial debugging output */
 void serial_initialise(void)
 {
    /* do nothing for the moment */

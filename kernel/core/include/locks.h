@@ -1,5 +1,5 @@
-/* kernel/ports/i386/include/portdefs.h
- * master header for the i386 port of the kernel 
+/* kernel/ports/i386/include/locks.h
+ * prototypes and structures for the i386 port of the kernel 
  * Author : Chris Williams
  * Date   : Mon,26 Mar 2007.23:09:39
 
@@ -15,31 +15,34 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 */
 
-#ifndef _PORTDEFS_H
-#define   _PORTDEFS_H
+#ifndef _LOCKS_H
+#define   _LOCKS_H
 
-/* declare stuff shared with the userspace libraries */
-#include "diosix.h"
-#include "async.h"
-#include "roles.h"
+/* allow a lock_gate timeout (in cpu cycles) if LOCK_TIME_CHECK is defined */
+#define LOCK_TIMEOUT         (0xffffffff)
 
-/* declare stuff exclusive to the microkernel */
-#include <debug.h>
-#include <multiboot.h>
-#include <locks.h>
-#include <registers.h>
-#include <processes.h>
+/* lock settings */
+#define LOCK_READ           (0)
+#define LOCK_WRITE          (1 << 0)
+#define LOCK_SELFDESTRUCT   (1 << 1)
+#define LOCK_WRITEWAITING   (1 << 2)
 
-/* the order of these should not be important */
-#include <boot.h>
-#include <sched.h>
-#include <buses.h>
-#include <memory.h>
-#include <interrupts.h>
-#include <chips.h>
-#include <cpu.h>
-#include <ipc.h>
-#include <lowlevel.h>
-#include <syscalls.h>
+/* Determine the owner of a lock gate (a) or set the owner (b) of a gate (a).
+   Only use once lock_gate() has been successful but before unlock_gate() is called. */
+#define LOCK_GET_OWNER(a)    (thread *)((rw_gate *)(a)->owner)
+#define LOCK_SET_OWNER(a, b) ((rw_gate *)(a))->owner = (unsigned int)(b)
+
+/* locking primitives for processes and threads */
+typedef struct
+{
+   /* lock value, owning thread, and status flags */
+   volatile unsigned int spinlock, owner, flags, refcount;
+} rw_gate;
+
+/* low-level locking mechanisms */
+void lock_spin(volatile unsigned int *spinlock);
+void unlock_spin(volatile unsigned int *spinlock);
+kresult lock_gate(rw_gate *gate, unsigned int flags);
+kresult unlock_gate(rw_gate *gate, unsigned int flags);
 
 #endif

@@ -949,6 +949,55 @@ void lowlevel_thread_switch(thread *now, thread *next, int_registers_block *regs
    }
 }
 
+/* perform a stack trace */
+void lowlevel_stacktrace(void)
+{
+   unsigned int *ptr, *base, sym_base;
+   unsigned int tid, pid;
+   char buffer[32];
+
+   /* first, work out where the stack starts */
+   if(cpu_table && cpu_table[CPU_ID].current)
+   {
+      /* we're running threads, so find the current thread's kernel
+       stack base */
+      base = (unsigned int *)cpu_table[CPU_ID].current->tss->esp0;
+      tid = cpu_table[CPU_ID].current->tid;
+      pid = cpu_table[CPU_ID].current->proc->pid;
+   }
+   else
+   {
+      /* kernel is still booting and using the initial stack */
+      base = (unsigned int *)&(KernelBootStackBase);
+      tid = pid = 0;
+   }
+
+   /* grab a copy of the stack pointer */
+   __asm__ __volatile__("movl %%esp, %0" : "=a" (ptr));
+
+   dprintf("[debug:%i] kernel stack backtrace requested: base %p stackptr %p size %i (tid %i pid %i)\n",
+           CPU_ID, base, ptr, ((unsigned int)base - (unsigned int)ptr), tid, pid);
+
+   while(base >= ptr)
+   {
+      /* look up a kernel symbol if relevant */
+      if(*(base) >= KERNEL_VIRTUAL_BASE)
+         {
+         if(debug_lookup_symbol(*(base), buffer, 32, &sym_base) == success)
+            {
+            dprintf("        [0x%p]  0x%x [func %s + 0x%x]\n",
+                    base, *(base), buffer, (*base) - sym_base);
+            }
+         else
+            {
+            dprintf("        [0x%p]  0x%x\n", base, *(base));
+            }
+         }
+      base--;
+   }
+   dprintf("\n");
+}
+
 void lowlevel_proc_preinit(void)
 {
    x86_proc_preinit();

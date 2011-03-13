@@ -1,7 +1,7 @@
-/* kernel/ports/arm/include/portdefs.h
- * master header for the ARM port of the kernel 
+/* kernel/core/include/ipc.h
+ * prototypes and structures for the portable part of the kernel 
  * Author : Chris Williams
- * Date   : Sat, 12 Mar 2011.00:33:00
+ * Date   : Mon,26 Mar 2007.23:09:39
 
 Copyright (c) Chris Williams and individual contributors
 
@@ -15,21 +15,14 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 */
 
-#ifndef _PORTDEFS_H
-#define   _PORTDEFS_H
+#ifndef _IPC_H
+#define   _IPC_H
 
-#include "diosix.h"
-
-/* declare stuff exclusive to the microkernel */
-#include <debug.h>
-#include <multiboot.h>
-#include <locks.h>
-#include <registers.h>
-#include <processes.h>
-
-#include <memory.h>
-#include <cpu.h>
-#include <lowlevel.h>
-
+/* message passing */
+kresult msg_send_signal(process *target, thread *sender, unsigned int signum, unsigned int sigcode);
+kresult msg_send(thread *sender, diosix_msg_info *msg);
+kresult msg_recv(thread *receiver, diosix_msg_info *msg);
+thread *msg_find_receiver(thread *sender, diosix_msg_info *msg);
+kresult msg_test_receiver(thread *sender, thread *target, diosix_msg_info *msg);
 
 #endif

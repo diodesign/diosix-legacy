@@ -14,7 +14,7 @@ VERSION		= -DKERNEL_IDENTIFIER="\"diosix-hyatt armv5 pre-Release1.0\"" \
 
 # set the architecture and any architecture flags
 ARCH = arm
-ARCH_FLAGS = -mcpu=arm926ej-s
+ARCH_FLAGS = -mcpu=arm926ej-s -mfpu=vfp -mfloat-abi=hard
 
 # ------------------------------------------------------------
 
@@ -53,7 +53,8 @@ FLAGS		= -g -std=c99 -Wall -nostdlib -nostartfiles \
 		  -nostdinc -fno-builtin -nodefaultlibs \
 		  -fomit-frame-pointer $(ARCH_FLAGS)
 
-OBJS		= $(OBJSDIR)/startup.o $(OBJSDIR)/boot.o $(OBJSDIR)/debug.o $(OBJSDIR)/serial.o
+OBJS		= $(OBJSDIR)/startup.o $(OBJSDIR)/boot.o $(OBJSDIR)/debug.o $(OBJSDIR)/serial.o \
+		  $(OBJSDIR)/lowlevel.o $(OBJSDIR)/cpu.o
 
 # all debugging flags possible
 # DEBUGFLAGS	= -DDEBUG -DMSG_DEBUG -DBUS_DEBUG -DPROC_DEBUG -DSCHED_DEBUG -DTHREAD_DEBUG -DVMM_DEBUG -DXPT_DEBUG -DINT_DEBUG -DIRQ_DEBUG -DMP_DEBUG -DPAGE_DEBUG -DKSYM_DEBUG -DIOAPIC_DEBUG -DLAPIC_DEBUG -DLOCK_DEBUG -DLOLVL_DEBUG -DPIC_DEBUG -DSYSCALL_DEBUG -DPERFORMANCE_DEBUG -DLOCK_TIME_CHECK
@@ -61,7 +62,7 @@ OBJS		= $(OBJSDIR)/startup.o $(OBJSDIR)/boot.o $(OBJSDIR)/debug.o $(OBJSDIR)/ser
 # basic debugging
 DEBUGFLAGS	= -DDEBUG
 
-CC		= $(CCbin) $(SVNDEF) $(FLAGS) -I$(INCDIR) -I$(LIBDIOSIXDIR) $(DEBUGFLAGS) $(VERSION)
+CC		= $(CCbin) $(SVNDEF) $(FLAGS) -I$(INCDIR) -I$(COREDIR)/include -I$(LIBDIOSIXDIR) $(DEBUGFLAGS) $(VERSION)
 LD		= $(CCbin) $(FLAGS) -Xlinker --script=$(LDSCRIPT) -Xlinker
 ASM		= $(ASbin) -g $(ARCH_FLAGS)
 
@@ -81,6 +82,14 @@ $(OBJSDIR)/startup.o:	$(PORTDIR)/startup.s		$(MAKEDEP)
 			$(COMPILE.s)
 
 $(OBJSDIR)/serial.o:	$(PORTDIR)/serial.c	$(MAKEDEP)
+			$(WRITE) '==> COMPILE: $<'
+			$(COMPILE.c)
+
+$(OBJSDIR)/lowlevel.o:	$(PORTDIR)/lowlevel.c	$(MAKEDEP)
+			$(WRITE) '==> COMPILE: $<'
+			$(COMPILE.c)
+
+$(OBJSDIR)/cpu.o:	$(PORTDIR)/cpu.c	$(MAKEDEP)
 			$(WRITE) '==> COMPILE: $<'
 			$(COMPILE.c)
 

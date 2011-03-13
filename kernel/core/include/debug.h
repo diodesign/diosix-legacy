@@ -1,7 +1,7 @@
-/* kernel/ports/arm/include/debug.h
- * prototypes and structures for the ARM port of the kernel 
+/* kernel/core/include/debug.h
+ * prototypes and structures for the portable part of the kernel 
  * Author : Chris Williams
- * Date   : Sat,12 Mar 2007.23:09:39
+ * Date   : Mon,26 Mar 2007.23:09:39
 
 Copyright (c) Chris Williams and individual contributors
 
@@ -179,10 +179,6 @@ void debug_initialise(void);
 void debug_stacktrace(void);
 kresult debug_lookup_symbol(unsigned int addr, char *buffer, unsigned int size, unsigned int *symbol);
 kresult debug_init_sym_table(char *table, char *end);
-
-/* serial port handling */
-void serial_writebyte(unsigned char c);
-void serial_initialise(void);
 
 /* assert stuff */
 #ifdef DEBUG

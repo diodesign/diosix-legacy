@@ -148,6 +148,57 @@ struct mp_thread_queue
    unsigned int priority; /* priority level for this run-queue */
 };
 
+/* the x86 cpu's TSS, one needed per thread */
+struct __attribute__((packed)) tss_descr
+{
+    unsigned int prev_tss;
+    unsigned int esp0;       /* kernel stack pointer for current thread */
+    unsigned int ss0;        /* kernel stack segment for current thread */
+    unsigned int esp1;       /* not used */
+    unsigned int ss1;
+    unsigned int esp2;
+    unsigned int ss2;
+    unsigned int cr3;
+    unsigned int eip;
+    unsigned int eflags;
+    unsigned int eax;
+    unsigned int ecx;
+    unsigned int edx;
+    unsigned int ebx;
+    unsigned int esp;
+    unsigned int ebp;
+    unsigned int esi;
+    unsigned int edi;
+    unsigned int es;         
+    unsigned int cs;        
+    unsigned int ss;         
+    unsigned int ds;         
+    unsigned int fs;         
+    unsigned int gs;         
+    unsigned int ldt;        /* not used */
+    unsigned short trap;
+    unsigned short iomap_base;
+};
+
+/* low level gdt entry definition */
+typedef struct
+{
+    unsigned short limit_low;          // lower 16 bits of the limit
+    unsigned short base_low;           // lower 16 bits of the base
+    unsigned char base_middle;         // 8 bits of the base
+    unsigned char access;              // access flags, determine what ring this segment can be used in
+    unsigned char granularity;
+    unsigned char base_high;           // last 8 bits of the base
+} __attribute__((packed)) gdt_entry;
+
+/* 10-byte structure that describes a processor's GDT */
+typedef struct
+{
+    unsigned short size;
+    unsigned int ptr;
+}  __attribute__((packed)) gdtptr_descr;
+
+
 /* describe an mp core */
 typedef struct
 {

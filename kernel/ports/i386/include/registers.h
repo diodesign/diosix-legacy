@@ -1,7 +1,7 @@
-/* kernel/ports/arm/include/portdefs.h
- * master header for the ARM port of the kernel 
+/* kernel/ports/i386/include/registers.h
+ * prototypes and structures for the i386 port of the kernel 
  * Author : Chris Williams
- * Date   : Sat, 12 Mar 2011.00:33:00
+ * Date   : Sun,13 Mar 2011.02:57:00
 
 Copyright (c) Chris Williams and individual contributors
 
@@ -15,21 +15,18 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 */
 
-#ifndef _PORTDEFS_H
-#define   _PORTDEFS_H
+#ifndef _REGS_H
+#define   _REGS_H
 
-#include "diosix.h"
-
-/* declare stuff exclusive to the microkernel */
-#include <debug.h>
-#include <multiboot.h>
-#include <locks.h>
-#include <registers.h>
-#include <processes.h>
-
-#include <memory.h>
-#include <cpu.h>
-#include <lowlevel.h>
-
+/* block of registers after an int/excep occurred */
+typedef struct
+{
+   /* pushed by our interrupt code */
+   unsigned int ds, edi, esi, ebp, esp, ebx, edx, ecx, eax;
+   unsigned int intnum;
+   
+   /* pushed by the processor */
+   unsigned int errcode, eip, cs, eflags, useresp, ss;
+} int_registers_block;
 
 #endif

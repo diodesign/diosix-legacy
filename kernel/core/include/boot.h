@@ -1,7 +1,7 @@
-/* kernel/ports/arm/include/portdefs.h
- * master header for the ARM port of the kernel 
+/* kernel/core/include/boot.h
+ * prototypes and structures for the portable part of the kernel 
  * Author : Chris Williams
- * Date   : Sat, 12 Mar 2011.00:33:00
+ * Date   : Mon,26 Mar 2007.23:09:39
 
 Copyright (c) Chris Williams and individual contributors
 
@@ -15,21 +15,24 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 */
 
-#ifndef _PORTDEFS_H
-#define   _PORTDEFS_H
+#ifndef _BOOT_H
+#define   _BOOT_H
 
-#include "diosix.h"
+/* welcome fluff */
+#define PORT_BANNER  "\n" \
+                     " _|_|_|    _|    _|_|      _|_|_|  _|            \n" \
+                     " _|    _|      _|    _|  _|            _|    _|  \n" \
+                     " _|    _|  _|  _|    _|    _|_|    _|    _|_|    \n" \
+                     " _|    _|  _|  _|    _|        _|  _|  _|    _|  \n" \
+                     " _|_|_|    _|    _|_|    _|_|_|    _|  _|    _|  \n\n" \
+                     " Copyright (c) Chris Williams and contributors, 2007-2011.\n" \
+                     " See http://diodesign.co.uk/ for usage and licence.\n"
 
-/* declare stuff exclusive to the microkernel */
-#include <debug.h>
-#include <multiboot.h>
-#include <locks.h>
-#include <registers.h>
-#include <processes.h>
-
-#include <memory.h>
-#include <cpu.h>
-#include <lowlevel.h>
-
+/* kernel payload */
+extern unsigned int payload_modulemax;
+mb_module_t *payload_readmodule(unsigned int modulenum);
+payload_type payload_parsemodule(mb_module_t *module, payload_descr *payload);
+kresult payload_preinit(multiboot_info_t *mbd);
+kresult payload_exist_here(unsigned int ptr);
 
 #endif

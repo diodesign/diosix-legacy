@@ -1,7 +1,7 @@
-/* kernel/ports/arm/include/portdefs.h
- * master header for the ARM port of the kernel 
+/* kernel/ports/arm/include/cpu.h
+ * prototypes and structures for the ARM port of the kernel 
  * Author : Chris Williams
- * Date   : Sat, 12 Mar 2011.00:33:00
+ * Date   : Mon,26 Mar 2007.23:09:39
 
 Copyright (c) Chris Williams and individual contributors
 
@@ -15,21 +15,37 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 */
 
-#ifndef _PORTDEFS_H
-#define   _PORTDEFS_H
+#ifndef _CPU_H
+#define   _CPU_H
+         
+/* find this cpu's unique id */
+#define CPU_ID                 (0)
 
-#include "diosix.h"
+/* keep track of available processor resources */
+extern unsigned char mp_cpus;
+extern unsigned char mp_boot_cpu;
 
-/* declare stuff exclusive to the microkernel */
-#include <debug.h>
-#include <multiboot.h>
-#include <locks.h>
-#include <registers.h>
-#include <processes.h>
+/* the cpu's per-thread task descriptor */
+struct __attribute__((packed)) tss_descr
+{
+   unsigned int esp0; /* kernel stack for the thread */
+};
 
-#include <memory.h>
-#include <cpu.h>
-#include <lowlevel.h>
+/* chip states */
+typedef enum
+{
+   enabled = 0,  /* chip can be used */   
+   disabled       /* chip has been disabled at boot */
+} chip_state;
 
+/* describe an mp core */
+typedef struct
+{
+   chip_state state;
+   
+   thread *current;
+} mp_core;
+
+extern mp_core *cpu_table;
 
 #endif
