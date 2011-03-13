@@ -24,6 +24,7 @@
 #endif
 
 /* serial port handling */
+void serial_writeline(const char *s);
 void serial_writebyte(unsigned char c);
 void serial_initialise(void);
 

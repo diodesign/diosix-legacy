@@ -14,7 +14,7 @@ VERSION		= -DKERNEL_IDENTIFIER="\"diosix-hyatt armv5 pre-Release1.0\"" \
 
 # set the architecture and any architecture flags
 ARCH = arm
-ARCH_FLAGS = -mcpu=arm926ej-s -mfpu=vfp -mfloat-abi=hard
+ARCH_FLAGS = -mcpu=arm926ej-s -mfloat-abi=soft
 
 # ------------------------------------------------------------
 
@@ -54,7 +54,7 @@ FLAGS		= -g -std=c99 -Wall -nostdlib -nostartfiles \
 		  -fomit-frame-pointer $(ARCH_FLAGS)
 
 OBJS		= $(OBJSDIR)/startup.o $(OBJSDIR)/boot.o $(OBJSDIR)/debug.o $(OBJSDIR)/serial.o \
-		  $(OBJSDIR)/lowlevel.o $(OBJSDIR)/cpu.o
+		  $(OBJSDIR)/lowlevel.o $(OBJSDIR)/cpu.o $(OBJSDIR)/math.o
 
 # all debugging flags possible
 # DEBUGFLAGS	= -DDEBUG -DMSG_DEBUG -DBUS_DEBUG -DPROC_DEBUG -DSCHED_DEBUG -DTHREAD_DEBUG -DVMM_DEBUG -DXPT_DEBUG -DINT_DEBUG -DIRQ_DEBUG -DMP_DEBUG -DPAGE_DEBUG -DKSYM_DEBUG -DIOAPIC_DEBUG -DLAPIC_DEBUG -DLOCK_DEBUG -DLOLVL_DEBUG -DPIC_DEBUG -DSYSCALL_DEBUG -DPERFORMANCE_DEBUG -DLOCK_TIME_CHECK
@@ -90,6 +90,10 @@ $(OBJSDIR)/lowlevel.o:	$(PORTDIR)/lowlevel.c	$(MAKEDEP)
 			$(COMPILE.c)
 
 $(OBJSDIR)/cpu.o:	$(PORTDIR)/cpu.c	$(MAKEDEP)
+			$(WRITE) '==> COMPILE: $<'
+			$(COMPILE.c)
+
+$(OBJSDIR)/math.o:	$(PORTDIR)/math.c	$(MAKEDEP)
 			$(WRITE) '==> COMPILE: $<'
 			$(COMPILE.c)
 

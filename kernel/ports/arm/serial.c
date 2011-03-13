@@ -18,6 +18,18 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 /* address of the first UART's data register */
 #define UART0DR   (0x101f1000)
 
+/* serial_writeline
+ Write a string out out to the serial port
+ => s = NULL-terminated string to output
+ */
+void serial_writeline(const unsigned char *s)
+{
+   if(!s) return;
+   
+   while(*s)
+      *(volatile unsigned int *)UART0DR = (unsigned int)*s++; /* bang out char */
+}
+
 /* serial_writebyte
    Write a byte out out to the serial port
    => c = character to output

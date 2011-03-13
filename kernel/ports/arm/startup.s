@@ -15,9 +15,15 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 */
 
-.global _Reset
+.code 32
+.balign 4
 
+.global _Reset                /* entry point */
+.global KernelBootStackBase   /* top of the boot stack */
+
+/* the machine has been reset/powered-on
+   find the boot stack and enter the C kernel */
 _Reset:
- LDR sp, =stack_top
- BL main
- B .
+   LDR sp, =KernelBootStackBase
+   BL main                       
+   B .
