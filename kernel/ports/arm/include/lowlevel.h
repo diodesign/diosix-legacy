@@ -35,6 +35,6 @@ void lowlevel_stacktrace(void);
 void lowlevel_kickstart(void);
 
 /* integer division in ARM code */
-unsigned int arm_udiv32(unsigned int, unsigned int);
+unsigned int arm_udiv32(unsigned int numerator, unsigned int denominator);
 
 #endif

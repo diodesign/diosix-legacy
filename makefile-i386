@@ -44,7 +44,7 @@ LIBDIOSIXDIR = user/lib/newlib/libgloss/libnosys
 SVNDEF := -D'SVN_REV="$(shell svnversion -n .)"'
 
 MAKEFILE	= makefile-i386
-MAKEDEP		= $(MAKEFILE) $(PORTDIR)/include/portdefs.h $(COREDIR)/include/processes.h $(COREDIR)/include/boot.h $(PORTDIR)/include/cpu.h $(PORTDIR)/include/buses.h $(COREDIR)/include/debug.h $(COREDIR)/include/elf.h $(PORTDIR)/include/interrupts.h $(COREDIR)/include/ipc.h $(COREDIR)/include/locks.h $(PORTDIR)/include/lowlevel.h $(PORTDIR)/include/memory.h $(PORTDIR)/include/multiboot.h $(COREDIR)/include/sched.h $(COREDIR)/include/sglib.h $(PORTDIR)/include/syscalls.h $(PORTDIR)/include/registers.h $(LIBDIOSIXDIR)/diosix.h $(LIBDIOSIXDIR)/async.h
+MAKEDEP		= $(MAKEFILE) $(PORTDIR)/include/portdefs.h $(COREDIR)/include/processes.h $(COREDIR)/include/boot.h $(PORTDIR)/include/cpu.h $(PORTDIR)/include/buses.h $(COREDIR)/include/debug.h $(COREDIR)/include/elf.h $(PORTDIR)/include/interrupts.h $(COREDIR)/include/ipc.h $(COREDIR)/include/locks.h $(PORTDIR)/include/lowlevel.h $(PORTDIR)/include/memory.h $(COREDIR)/include/multiboot.h $(COREDIR)/include/sched.h $(COREDIR)/include/sglib.h $(PORTDIR)/include/syscalls.h $(PORTDIR)/include/registers.h $(LIBDIOSIXDIR)/diosix.h $(LIBDIOSIXDIR)/async.h
 
 INCDIR		= $(PORTDIR)/include
 LDSCRIPT	= $(PORTDIR)/diosix.ld
