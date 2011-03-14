@@ -34,4 +34,7 @@ void lowlevel_proc_preinit(void);
 void lowlevel_stacktrace(void);
 void lowlevel_kickstart(void);
 
+/* integer division in ARM code */
+unsigned int arm_udiv32(unsigned int, unsigned int);
+
 #endif

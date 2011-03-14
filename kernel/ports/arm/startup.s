@@ -25,5 +25,6 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
    find the boot stack and enter the C kernel */
 _Reset:
    LDR sp, =KernelBootStackBase
-   BL main                       
+   BIC sp, sp, #7             /* align to nearest 8-byte boundary */
+   BL main
    B .

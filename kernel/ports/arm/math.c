@@ -14,32 +14,25 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 #include <portdefs.h>
 
-/* this is horrid */
-unsigned int __aeabi_uidivmod(unsigned numerator, unsigned denominator)
-{
-   unsigned int quotient = 0;
+/* define these compiler intrinsics that may be missing */
+unsigned int __aeabi_uidivmod(unsigned int numerator, unsigned int denominator)
+{   
+   /* save us a bit of time if possible */
+   if(!numerator) return 0;
+   if(denominator == 1) return numerator;
 
-   while(numerator && denominator)
-   {
-      if(numerator >= denominator)
-      {
-         numerator -= denominator;
-         quotient++;
-      }
-      else return quotient;
-   }
-         
-   return quotient;
+   /* call the integer division ARM code */
+   return arm_udiv32(numerator, denominator);
 }
 
 int __aeabi_idiv(int numerator, int denominator)
-{   
+{      
    int neg_result = (numerator ^ denominator) & 0x80000000;
-   int result = __aeabi_uidivmod ((numerator < 0) ? -numerator : numerator, (denominator < 0) ? -denominator : denominator);
+   int result = __aeabi_uidivmod((numerator < 0) ? -numerator : numerator, (denominator < 0) ? -denominator : denominator);
    return neg_result ? -result : result;
 }
 
-unsigned __aeabi_uidiv(unsigned numerator, unsigned denominator)
+unsigned __aeabi_uidiv(unsigned int numerator, unsigned int denominator)
 {   
    return __aeabi_uidivmod (numerator, denominator);
 }
