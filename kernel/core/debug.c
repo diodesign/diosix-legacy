@@ -289,7 +289,20 @@ DO_NUM:          if(flags & PR_32)
                               *where = temp - 10 + 'A';
                            else
                               *where = temp - 10 + 'a';
-                        num = (unsigned long)num / radix;
+                        
+                        switch(radix)
+                        {
+                           case 8:
+                              num = (unsigned long)num >> 3;
+                              break;
+                              
+                           case 16:
+                              num = (unsigned long)num >> 4;
+                              break;
+                              
+                           default:
+                               num = (unsigned long)num / radix;
+                        }
                      }
                      while(num != 0);
                      goto EMIT;
