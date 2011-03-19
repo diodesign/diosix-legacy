@@ -56,7 +56,7 @@ BNE   zeroloop
 LDR   r0, =KernelBootPgTableEntry
 LDR   r0, [r0]
 MOV   r1, #1024
-LSL   r1, r1, #4
+LSL   r1, r1, #4              /* r1 = 16KB phys base */
 STR   r0, [r1]
 
 /* the kernel is going to be mapped from 0xc0000000 so
@@ -65,7 +65,41 @@ STR   r0, [r1]
 MOV   r2, #0xc00
 STR   r0, [r1, r2, LSL #2]
 
-/* point translation base register (CP15 reg 2) at KernelBootPgTable */
+/* don't forget to map the serial hardware at 0x10100000
+   phys in at 0xc0000000 + 0x10100000 virtual */
+MOV   r0, #0x100
+ADD   r0, r0, #1              /* get 0x101 into r0 */
+ADD   r2, r2, r0
+LDR   r0, =KernelBootPgTableSerial
+LDR   r0, [r0]
+STR   r0, [r1, r2, LSL #2]
+
+/* clear the translation base control address so we
+   only use TTB0 */
+MOV   r0, #0
+MCR   p15, 0, r0, c2, c0, 2
+
+/* set the translation table base 0 (TTB0) to point to
+   our boot page table at the 16K mark */
+MOV   r0, #1024
+LSL   r0, r0, #4              /* 2^4 * 1024 = 16K */
+ORR   r0, r0, #0xf            /* cachable, sharable */
+MCR   p15, 0, r0, c2, c0, 0
+
+/* enable domain 0 by setting bit 1 for this domain */
+MOV   r0, #1
+MCR   p15, 0, r0, c3, c0, 0
+
+/* disable the fast context switch extension system */
+MOV   r0, #0
+MCR   p15, 0, r0, c13, c0, 0
+MCR   p15, 0, r0, c13, c0, 1
+
+/* fingers crossed! flush entire TLB and enable the MMU */
+MCR   p15, 0, r0, c8, c7, 0
+LDR   r0, =KernelBootMMUFlags
+LDR   r0, [r0]
+MCR   p15, 0, r0, c1, c0, 0
 
 /* locate the stack base and enter the C kernel */
 LDR   sp, =KernelBootStackBase
@@ -139,6 +173,7 @@ KernelBootStrIRQ:
 .asciz "Unexpected failure: hardware interrupt"
 KernelBootStrFIQ:
 .asciz "Unexpected failure: fast hardware interrupt"
+.balign 4
 
 /* ------------------------------------------------------------ */
 
@@ -156,6 +191,17 @@ KernelBootStrFIQ:
          2     = B: 0 for strongly ordered, shareable
          1-0   = 2 for 1M section
 */
-.balign 4
 KernelBootPgTableEntry:
-   .word 0x00010402  /* point at 0x0 phys mem */
+.word 0x00010402  /* point at 0x0 phys mem */
+
+/* craft a mapping for the serial hardware */
+KernelBootPgTableSerial:
+.word 0x10102402  /* point at 0x10100000 phys mem, non-shared device */
+
+KernelBootMMUFlags:
+.word 0x800009 /* enable, write buffer, no subpages */
+
+/* ------------------------------------------------------------ */
+
+
+

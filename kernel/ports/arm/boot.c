@@ -22,8 +22,6 @@ int main()
 {   
    if(DEBUG) debug_initialise();
    dprintf("[core] %s rev %s" " " __TIME__ " " __DATE__ " (built with GCC " __VERSION__ ")\n", KERNEL_IDENTIFIER, SVN_REV);
-   
-   dprintf("... kernel boot table entry is %x\n", *(volatile unsigned int *)(16 * 1024));
-   
+
    return 0;
 }

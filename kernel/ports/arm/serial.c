@@ -15,8 +15,10 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 */
 
+#include <portdefs.h>
+
 /* address of the first UART's data register */
-#define UART0DR   (0x101f1000)
+#define UART0DR   KERNEL_PHYS2LOG(0x101f1000)
 
 /* serial_writeline
  Write a string out out to the serial port
