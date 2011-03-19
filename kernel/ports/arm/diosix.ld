@@ -17,12 +17,12 @@ SECTIONS
       *(.text)
    }
 
-   .data ALIGN (0x1000) : 
+   .data : 
    { 
       *(.data)
    }
 
-   .bss ALIGN (0x1000) : 
+   .bss : 
    {
       _sbss = .;
       *(.bss)
