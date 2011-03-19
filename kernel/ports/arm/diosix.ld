@@ -5,7 +5,7 @@ virt = 0xc0010000;
 
 SECTIONS
 {
-   . = 0x10000;
+   . = 0xc0010000;
    _knlstart = .;
 
    .startup . :

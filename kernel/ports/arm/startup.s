@@ -28,9 +28,14 @@ _Reset:
    at the 64K mark in physical memory. we're in SVC with MMU and
    interrupts off and God knows what in the ARM exception vector table */
 
+/* use r4 to convert virtual-to-physical addresses by subtracting
+   it from the virtual addresses - use before we enable the MMU */
+MOV   r4, #0xc0000000
+
 /* install default emergency handlers at 0x0 */
 MOV   r0, #0
 LDR   r1, =KernelBootExceptionTable
+SUB   r1, r1, r4
 MOV   r3, #0
 copyloop:
 LDR   r2, [r1, r0, LSL #2]
@@ -54,6 +59,7 @@ BNE   zeroloop
 
 /* write the KernelBootPgTableEntry at the 16KB marker */
 LDR   r0, =KernelBootPgTableEntry
+SUB   r0, r0, r4
 LDR   r0, [r0]
 MOV   r1, #1024
 LSL   r1, r1, #4              /* r1 = 16KB phys base */
@@ -71,6 +77,7 @@ MOV   r0, #0x100
 ADD   r0, r0, #1              /* get 0x101 into r0 */
 ADD   r2, r2, r0
 LDR   r0, =KernelBootPgTableSerial
+SUB   r0, r0, r4
 LDR   r0, [r0]
 STR   r0, [r1, r2, LSL #2]
 
@@ -98,10 +105,11 @@ MCR   p15, 0, r0, c13, c0, 1
 /* fingers crossed! flush entire TLB and enable the MMU */
 MCR   p15, 0, r0, c8, c7, 0
 LDR   r0, =KernelBootMMUFlags
+SUB   r0, r0, r4
 LDR   r0, [r0]
 MCR   p15, 0, r0, c1, c0, 0
 
-/* locate the stack base and enter the C kernel */
+/* locate the stack base in virtual space and enter the C kernel */
 LDR   sp, =KernelBootStackBase
 BL    main
 
@@ -123,14 +131,14 @@ LDR   pc, [pc, #24]     /* FIQ */
 
 /* this table must follow the above branch table */
 KernelBootExceptionVectors:
-.word _Reset
-.word KernelBootExceptionUndefInst
-.word KernelBootExceptionSWI
-.word KernelBootExceptionPreAbt
-.word KernelBootExceptionDataAbt
-.word _Reset
-.word KernelBootExceptionIRQ
-.word KernelBootExceptionFIQ
+.word _Reset - 0xc0000000
+.word KernelBootExceptionUndefInst - 0xc0000000
+.word KernelBootExceptionSWI - 0xc0000000
+.word KernelBootExceptionPreAbt - 0xc0000000
+.word KernelBootExceptionDataAbt - 0xc0000000
+.word _Reset - 0xc0000000
+.word KernelBootExceptionIRQ - 0xc0000000
+.word KernelBootExceptionFIQ - 0xc0000000
 
 /* each emergency handler will write out a panic string and halt */
 KernelBootExceptionUndefInst:

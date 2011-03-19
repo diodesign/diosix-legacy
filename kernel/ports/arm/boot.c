@@ -19,9 +19,13 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 /* welcome to Earth */
 int main()
-{   
+{
+   unsigned int x = 0;
+   
    if(DEBUG) debug_initialise();
    dprintf("[core] %s rev %s" " " __TIME__ " " __DATE__ " (built with GCC " __VERSION__ ")\n", KERNEL_IDENTIFIER, SVN_REV);
 
+   dprintf("... kernel stack is at %p\n", &x);
+   
    return 0;
 }
