@@ -1,6 +1,7 @@
 ENTRY(_Reset)
 
 phys = 0x00010000;
+virt = 0xc0010000;
 
 SECTIONS
 {

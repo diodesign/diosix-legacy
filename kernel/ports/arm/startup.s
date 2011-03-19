@@ -41,7 +41,7 @@ BNE   copyloop
 
 /* zero space from where boot page table will be stored at 16K mark
    4096 table entries (16K) for 4096 x 1M virtual memory space */
-MOV   r0, #256
+MOV   r0, #4096
 MOV   r1, #1024
 LSL   r1, r1, #4              /* 2^4 * 1024 = 16K */
 
