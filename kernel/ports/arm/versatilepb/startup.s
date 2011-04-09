@@ -1,5 +1,5 @@
-/* kernel/ports/arm/startup.s
- * ARM-specific low-level start-up routines
+/* kernel/ports/arm/versatilepb/startup.s
+ * ARM-specific low-level start-up routines for the Versatile PB dev board
  * Author : Chris Williams
  * Date   : Fri,11 Mar 2011.16:59:00
  

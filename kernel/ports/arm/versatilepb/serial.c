@@ -1,5 +1,5 @@
-/* kernel/ports/arm/serial.c
- * ARM-specific low-level UART serial port routines
+/* kernel/ports/arm/versatilepb/serial.c
+ * ARM-specific low-level UART serial port routines for the Versatile PB dev board
  * Author : Chris Williams
  * Date   : Sat,12 Mar 2011.00:29:00
  

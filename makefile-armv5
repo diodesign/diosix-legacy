@@ -1,5 +1,5 @@
 #
-# diosix hyatt - ARM integrator board port
+# diosix hyatt - ARM versatile-pb  port
 #
 # makefile for the kernel and libdiosix
 #
@@ -53,7 +53,7 @@ FLAGS		= -g -std=c99 -Wall -nostdlib -nostartfiles \
 		  -nostdinc -fno-builtin -nodefaultlibs \
 		  -fomit-frame-pointer $(ARCH_FLAGS)
 
-OBJS		= $(OBJSDIR)/startup.o $(OBJSDIR)/boot.o $(OBJSDIR)/debug.o $(OBJSDIR)/serial.o \
+OBJS		= $(OBJSDIR)/startup.o $(OBJSDIR)/preboot.o $(OBJSDIR)/debug.o $(OBJSDIR)/serial.o \
 		  $(OBJSDIR)/lowlevel.o $(OBJSDIR)/cpu.o
 
 # all debugging flags possible
@@ -73,15 +73,15 @@ COMPILE.c 	= $(CC) -c -o $@ $<
 COMPILE.s 	= $(ASM) $< -o $@
 
 # explicit rules for platform-specific code
-$(OBJSDIR)/boot.o:	$(PORTDIR)/boot.c	$(MAKEDEP)
+$(OBJSDIR)/preboot.o:	$(PORTDIR)/versatilepb/preboot.c	$(MAKEDEP)
 			$(WRITE) '==> COMPILE: $<'
 			$(COMPILE.c)
 
-$(OBJSDIR)/startup.o:	$(PORTDIR)/startup.s		$(MAKEDEP)
+$(OBJSDIR)/startup.o:	$(PORTDIR)/versatilepb/startup.s	$(MAKEDEP)
 			$(WRITE) '==> ASSEMBLE: $<'
 			$(COMPILE.s)
 
-$(OBJSDIR)/serial.o:	$(PORTDIR)/serial.c	$(MAKEDEP)
+$(OBJSDIR)/serial.o:	$(PORTDIR)/versatilepb/serial.c		$(MAKEDEP)
 			$(WRITE) '==> COMPILE: $<'
 			$(COMPILE.c)
 

@@ -1,5 +1,5 @@
-/* kernel/ports/arm/boot.c
- * ARM-specific low-level start-up routines
+/* kernel/ports/arm/versatilepb/boot.c
+ * ARM-specific low-level start-up routines for the Versatile PB dev board
  * Author : Chris Williams
  * Date   : Fri,11 Mar 2011.16:54:00
  
