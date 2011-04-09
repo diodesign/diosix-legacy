@@ -1,5 +1,5 @@
 /* kernel/ports/arm/include/lowevel.h
- * prototypes and structures for the i386 port of the kernel 
+ * prototypes and structures for the ARM port of the kernel 
  * Author : Chris Williams
  * Date   : Mon,26 Mar 2007.23:09:39
  
