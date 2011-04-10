@@ -28,6 +28,9 @@ void serial_writeline(const unsigned char *s);
 void serial_writebyte(unsigned char c);
 void serial_initialise(void);
 
+/* i2c eeprom reading */
+unsigned char eeprom_read(unsigned char bus_addr, unsigned int mem_addr);
+
 void lowlevel_enable_interrupts(void);
 void lowlevel_disable_interrupts(void);
 void lowlevel_proc_preinit(void);

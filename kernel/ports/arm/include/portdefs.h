@@ -31,5 +31,7 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #include <cpu.h>
 #include <lowlevel.h>
 
+/* access a 32bit system register */
+#define CHIPSET_REG32(a) (*(volatile unsigned int *)(a))
 
 #endif
