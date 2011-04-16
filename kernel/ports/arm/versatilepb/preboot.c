@@ -24,26 +24,22 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 /* set this bit in REG_SYS_LOCK to lock all control registers */
 #define SYS_LOCK_BIT     (1 << 16)
 
-/* I2C bus addresses of memory expansion EEPROMs */
-#define EEPROM_DRAM      (0xa0)  /* dynamic memory */
-#define EEPROM_SRAM      (0xa2)  /* static memory */
-
 /* set up a multiboot environment for the portable kernel */
-void preboot(void)
+void preboot(unsigned int magic, unsigned int machine_id, unsigned int env_table_phys)
 {
    volatile unsigned int lockval;
    
    if(DEBUG) debug_initialise();
    BOOT_DEBUG("[core] %s rev %s" " " __TIME__ " " __DATE__ " (built with GCC " __VERSION__ ")\n", KERNEL_IDENTIFIER, SVN_REV);
-   BOOT_DEBUG("[arm] system identification: %x\n", CHIPSET_REG32(REG_SYS_ID));
+   BOOT_DEBUG("[arm] system identification: %x machine type: %i env at %x sp: %p\n",
+              CHIPSET_REG32(REG_SYS_ID), machine_id, env_table_phys, &lockval);
    
-   /* detect how much memory is present */
-   /* dprintf("reading dram eeprom... %x %x %x %x\n",
-           eeprom_read(EEPROM_DRAM, 7), eeprom_read(EEPROM_DRAM, 6),
-           eeprom_read(EEPROM_DRAM, 5), eeprom_read(EEPROM_DRAM, 4)); */
-   dprintf("reading dram eeprom... %x %x\n",
-           eeprom_read(EEPROM_DRAM, 1), eeprom_read(EEPROM_DRAM, 0)); 
-
+   /* bail out if magic is non-zero */
+   if(magic)
+   {
+      BOOT_DEBUG("[arm] bootloader magic should be zero, it's actually %x\n", magic);
+      return;
+   }
    
    /* lock the control registers by setting bit 16 */
    lockval = CHIPSET_REG32(REG_SYS_LOCK);

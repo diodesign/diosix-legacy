@@ -21,108 +21,125 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 .global _Reset                /* entry point */
 .global KernelBootStackBase   /* top of the boot stack */
 
+/* kernel is expecting to run in the top 1GB of every process's
+   virtual address space, so before the MMU is enabled with the
+   kernel paged in from this high base address, we must subtract
+   it from all references */
+.set KernelVirtualBase, 0xc0000000
+
 /* ------------------------------------------------------------ */
 
 _Reset:
 /* the machine has been reset/powered-on, the kernel is loaded
    at the 64K mark in physical memory. we're in SVC with MMU and
-   interrupts off and God knows what in the ARM exception vector table */
+   interrupts off and God knows what in the ARM exception vector table.
+   we've been booted as an ARM Linux kernel, so the following applies:
+   http://www.arm.linux.org.uk/developer/booting.php
+   http://www.simtec.co.uk/products/SWLINUX/files/booting_article.html
+ 
+   => r0 = 0
+      r1 = Supported machine number
+           387 = Versatile PB
+           Full list is at: http://www.arm.linux.org.uk/developer/machines/download.php
+      r2 = physical address of environment table
+*/
 
 /* use r4 to convert virtual-to-physical addresses by subtracting
    it from the virtual addresses - use before we enable the MMU */
-MOV   r4, #0xc0000000
+MOV   r4, #KernelVirtualBase
 
 /* install default emergency handlers at 0x0 */
-MOV   r0, #0
-LDR   r1, =KernelBootExceptionTable
-SUB   r1, r1, r4
+MOV   r5, #0
+LDR   r6, =KernelBootExceptionTable
+SUB   r6, r6, r4
 MOV   r3, #0
 copyloop:
-LDR   r2, [r1, r0, LSL #2]
-STR   r2, [r3, r0, LSL #2]
-ADD   r0, r0, #1
-CMP   r0, #16                 /* 16 entries: 8 for branch tbl, 8 for vectors */
+LDR   r7, [r6, r5, LSL #2]
+STR   r7, [r3, r5, LSL #2]
+ADD   r5, r5, #1
+CMP   r5, #16                 /* 16 entries: 8 for branch tbl, 8 for vectors */
 BNE   copyloop
 
 /* zero space from where boot page table will be stored at 16K mark
    4096 table entries (16K) for 4096 x 1M virtual memory space */
-MOV   r0, #4096
-MOV   r1, #1024
-LSL   r1, r1, #4              /* 2^4 * 1024 = 16K */
+MOV   r5, #4096
+MOV   r6, #1024
+LSL   r6, r6, #4              /* 2^4 * 1024 = 16K */
 
-MOV   r2, #0x00000000         /* zero whole words at a time */
+MOV   r7, #0                  /* zero whole words at a time */
 zeroloop:
-SUB   r0, r0, #1
-STR   r2, [r1, r0, LSL #2]
-CMP   r0, #0
+SUB   r5, r5, #1
+STR   r7, [r6, r5, LSL #2]
+CMP   r5, #0
 BNE   zeroloop
 
 /* write the KernelBootPgTableEntry at the 16KB marker */
-LDR   r0, =KernelBootPgTableEntry
-SUB   r0, r0, r4
-LDR   r0, [r0]
-MOV   r1, #1024
-LSL   r1, r1, #4              /* r1 = 16KB phys base */
-STR   r0, [r1]
+LDR   r5, =KernelBootPgTableEntry
+SUB   r5, r5, r4
+LDR   r5, [r5]
+MOV   r6, #1024
+LSL   r6, r6, #4              /* r6 = 16KB phys base */
+STR   r5, [r6]
 
 /* the kernel is going to be mapped from 0xc0000000 so
    write an entry at table offset 0xc00 to point to the
    lowest 1M of physical mem */
 MOV   r3, #0xc00
-STR   r0, [r1, r3, LSL #2]
+STR   r5, [r6, r3, LSL #2]
 
 /* map 1M of the system registers at 0x10000000 physical
    into the kernel's space at 0xc0000000 + 0x10000000 */
-MOV   r0, #0x100
-ADD   r2, r3, r0
-LDR   r0, =KernelBootPgTableSysRegs
-SUB   r0, r0, r4
-LDR   r0, [r0]
-STR   r0, [r1, r2, LSL #2]
+MOV   r5, #0x100
+ADD   r7, r3, r5
+LDR   r5, =KernelBootPgTableSysRegs
+SUB   r5, r5, r4
+LDR   r5, [r5]
+STR   r5, [r6, r7, LSL #2]
 
 /* don't forget to map the serial hardware at 0x10100000
    phys in at 0xc0000000 + 0x10100000 virtual */
-MOV   r0, #0x100
-ADD   r0, r0, #1              /* get 0x101 into r0 */
-ADD   r2, r3, r0
-LDR   r0, =KernelBootPgTableSerial
-SUB   r0, r0, r4
-LDR   r0, [r0]
-STR   r0, [r1, r2, LSL #2]
+MOV   r5, #0x100
+ADD   r5, r5, #1              /* get 0x101 into r5 */
+ADD   r7, r3, r5
+LDR   r5, =KernelBootPgTableSerial
+SUB   r5, r5, r4
+LDR   r5, [r5]
+STR   r5, [r6, r7, LSL #2]
 
 /* clear the translation base control address so we
    only use TTB0 */
-MOV   r0, #0
-MCR   p15, 0, r0, c2, c0, 2
+MOV   r5, #0
+MCR   p15, 0, r5, c2, c0, 2
 
 /* set the translation table base 0 (TTB0) to point to
    our boot page table at the 16K mark */
-MOV   r0, #1024
-LSL   r0, r0, #4              /* 2^4 * 1024 = 16K */
-ORR   r0, r0, #0xf            /* cachable, sharable */
-MCR   p15, 0, r0, c2, c0, 0
+MOV   r5, #1024
+LSL   r5, r5, #4              /* 2^4 * 1024 = 16K */
+ORR   r5, r5, #0xf            /* cachable, sharable */
+MCR   p15, 0, r5, c2, c0, 0
 
 /* enable domain 0 by setting bit 1 for this domain */
-MOV   r0, #1
-MCR   p15, 0, r0, c3, c0, 0
+MOV   r5, #1
+MCR   p15, 0, r5, c3, c0, 0
 
 /* disable the fast context switch extension system */
-MOV   r0, #0
-MCR   p15, 0, r0, c13, c0, 0
-MCR   p15, 0, r0, c13, c0, 1
+MOV   r5, #0
+MCR   p15, 0, r5, c13, c0, 0
+MCR   p15, 0, r5, c13, c0, 1
 
 /* fingers crossed! flush entire TLB and enable the MMU */
-MCR   p15, 0, r0, c8, c7, 0
-LDR   r0, =KernelBootMMUFlags
-SUB   r0, r0, r4
-LDR   r0, [r0]
-MCR   p15, 0, r0, c1, c0, 0
+MCR   p15, 0, r5, c8, c7, 0
+LDR   r5, =KernelBootMMUFlags
+SUB   r5, r5, r4
+LDR   r5, [r5]
+MCR   p15, 0, r5, c1, c0, 0
 
 /* there may be pipeline issues so do nothing for a moment */
 NOP
 NOP
 
-/* locate the stack base in virtual space and enter the C kernel */
+/* locate the stack base in virtual space, restore the bootloader's
+   parameters and enter the C kernel */
 LDR   sp, =KernelBootStackBase
 BL    preboot
 
@@ -131,7 +148,7 @@ B .
 
 /* ------------------------------------------------------------ */
 
-/* emergency boot exception vector table */
+/* boot exception vector table */
 KernelBootExceptionTable:
 LDR   pc, [pc, #24]     /* reset */
 LDR   pc, [pc, #24]     /* undefined instruction */
@@ -144,14 +161,14 @@ LDR   pc, [pc, #24]     /* FIQ */
 
 /* this table must follow the above branch table */
 KernelBootExceptionVectors:
-.word _Reset - 0xc0000000
-.word KernelBootExceptionUndefInst - 0xc0000000
-.word KernelBootExceptionSWI - 0xc0000000
-.word KernelBootExceptionPreAbt - 0xc0000000
-.word KernelBootExceptionDataAbt - 0xc0000000
-.word _Reset - 0xc0000000
-.word KernelBootExceptionIRQ - 0xc0000000
-.word KernelBootExceptionFIQ - 0xc0000000
+.word _Reset                       - KernelVirtualBase
+.word KernelBootExceptionUndefInst - KernelVirtualBase
+.word KernelBootExceptionSWI       - KernelVirtualBase
+.word KernelBootExceptionPreAbt    - KernelVirtualBase
+.word KernelBootExceptionDataAbt   - KernelVirtualBase
+.word _Reset                       - KernelVirtualBase
+.word KernelBootExceptionIRQ       - KernelVirtualBase
+.word KernelBootExceptionFIQ       - KernelVirtualBase
 
 /* each emergency handler will write out a panic string and halt */
 KernelBootExceptionUndefInst:
