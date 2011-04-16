@@ -1,7 +1,7 @@
-/* kernel/ports/arm/include/portdefs.h
- * master header for the ARM port of the kernel 
+/* kernel/ports/arm/atag.c
+ * ARM-specific ATAG bootloader support
  * Author : Chris Williams
- * Date   : Sat, 12 Mar 2011.00:33:00
+ * Date   : Sun,12 Mar 2011.03:39.00
 
 Copyright (c) Chris Williams and individual contributors
 
@@ -15,24 +15,42 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 */
 
-#ifndef _PORTDEFS_H
-#define   _PORTDEFS_H
+#include <portdefs.h>
 
-#include "diosix.h"
 
-/* declare stuff exclusive to the microkernel */
-#include <debug.h>
-#include <multiboot.h>
-#include <locks.h>
-#include <registers.h>
-#include <processes.h>
-
-#include <memory.h>
-#include <cpu.h>
-#include <lowlevel.h>
-#include <armboot.h>
-
-/* access a 32bit system register */
-#define CHIPSET_REG32(a) (*(volatile unsigned int *)(a))
-
-#endif
+/* atag_process
+   Process an ATAG list supplied by a bootloader
+   => list = pointer to ATAG list to grok
+   <= 0 for success, or an error code
+*/
+kresult atag_process(atag_item *item)
+{
+   if(!item || (unsigned int)item < KERNEL_SPACE_BASE) return e_bad_params;
+   
+   /* run through the list of environment information passed to us by the bootloader */
+   while(item->type != atag_none)
+   {
+      switch(item->type)
+      {
+         case atag_core:
+            if(item->size > 2)
+            {
+               BOOT_DEBUG("[atag] flags: %x, %i bytes per page\n",
+                          item->data.core.flags, item->data.core.page_size);
+            }
+            break;
+            
+         case atag_mem:
+            BOOT_DEBUG("[atag] RAM area: %x size: %i\n",
+                       item->data.mem.physaddr, item->data.mem.size);
+            break;
+            
+         default:
+            BOOT_DEBUG("[atag] unsupported entry %x\n", item->type);
+      }
+      
+      item = ATAG_NEXT(item);
+   }
+   
+   return success;
+}

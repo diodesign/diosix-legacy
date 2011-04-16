@@ -25,21 +25,33 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #define SYS_LOCK_BIT     (1 << 16)
 
 /* set up a multiboot environment for the portable kernel */
-void preboot(unsigned int magic, unsigned int machine_id, unsigned int env_table_phys)
+void preboot(unsigned int magic, arm_machine_id machine_id, void *atag_list)
 {
    volatile unsigned int lockval;
    
    if(DEBUG) debug_initialise();
    BOOT_DEBUG("[core] %s rev %s" " " __TIME__ " " __DATE__ " (built with GCC " __VERSION__ ")\n", KERNEL_IDENTIFIER, SVN_REV);
-   BOOT_DEBUG("[arm] system identification: %x machine type: %i env at %x sp: %p\n",
-              CHIPSET_REG32(REG_SYS_ID), machine_id, env_table_phys, &lockval);
+   BOOT_DEBUG("[arm] system identification: %x machine type: %i atag list at %p\n",
+              CHIPSET_REG32(REG_SYS_ID), machine_id, atag_list);
    
-   /* bail out if magic is non-zero */
+   /* sanity checks */
    if(magic)
    {
-      BOOT_DEBUG("[arm] bootloader magic should be zero, it's actually %x\n", magic);
+      /* bail out if magic is non-zero */
+      KOOPS_DEBUG("[arm] bootloader magic should be zero, it's actually %x\n", magic);
       return;
    }
+   
+   if(machine_id != versatilepb)
+   {
+      /* bail out if trying to boot on a non-supported board - this error message 
+         may not be displayed because the serial hardware isn't where we expect it :( */
+      KOOPS_DEBUG("[arm] this kernel doesn't not support this machine type\n", magic);
+      return;
+   }
+   
+   /* process the atag list for the core kernel, which expects multiboot */
+   atag_process(KERNEL_PHYS2LOG(atag_list));
    
    /* lock the control registers by setting bit 16 */
    lockval = CHIPSET_REG32(REG_SYS_LOCK);

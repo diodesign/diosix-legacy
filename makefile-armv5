@@ -54,7 +54,7 @@ FLAGS		= -g -std=c99 -Wall -nostdlib -nostartfiles \
 		  -fomit-frame-pointer $(ARCH_FLAGS)
 
 OBJS		= $(OBJSDIR)/startup.o $(OBJSDIR)/preboot.o $(OBJSDIR)/debug.o $(OBJSDIR)/serial.o \
-		  $(OBJSDIR)/lowlevel.o $(OBJSDIR)/cpu.o
+		  $(OBJSDIR)/lowlevel.o $(OBJSDIR)/cpu.o $(OBJSDIR)/atag.o
 #		  $(OBJSDIR)/eeprom.o
 
 # all debugging flags possible
@@ -99,10 +99,15 @@ $(OBJSDIR)/cpu.o:	$(PORTDIR)/cpu.c	$(MAKEDEP)
 			$(WRITE) '==> COMPILE: $<'
 			$(COMPILE.c)
 
+$(OBJSDIR)/atag.o:	$(PORTDIR)/atag.c	$(MAKEDEP)
+			$(WRITE) '==> COMPILE: $<'
+			$(COMPILE.c)
+
 # explicit rules for portable code
 $(OBJSDIR)/debug.o:	$(COREDIR)/debug.c	$(MAKEDEP)
 			$(WRITE) '==> COMPILE: $<'
 			$(COMPILE.c)
+
 
 
 # link the kernel
