@@ -41,8 +41,10 @@ multiboot_info_t *atag_process(atag_item *item)
             break;
             
          case atag_mem:
-            BOOT_DEBUG("[atag] RAM area: %x size: %i\n",
-                       item->data.mem.physaddr, item->data.mem.size);
+            BOOT_DEBUG("[atag] RAM area: %x - %x size: %iMB (%i bytes)\n",
+                       item->data.mem.physaddr,
+                       item->data.mem.physaddr + item->data.mem.size - 1,
+                       item->data.mem.size >> 20, item->data.mem.size);
             break;
             
          default:
