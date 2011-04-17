@@ -40,21 +40,23 @@ extern unsigned int KernelBootStackBase;
 #define KERNEL_LOG2PHYS(a)   ((void *)((unsigned int)(a) - KERNEL_SPACE_BASE))
 #define KERNEL_PHYS2LOG(a)   ((void *)((unsigned int)(a) + KERNEL_SPACE_BASE))
 
-/* the kernel is loaded at the 64K mark and the physical page stack
-   descends from this mark. these are critical kernel areas */
-#define KERNEL_CRITICAL_BASE (0x00000000)
+/* the kernel is loaded at the 64K mark and the 16K boot page directory is placed at
+   the 48K mark - all must be included in the critical section */
+#define KERNEL_CRITICAL_BASE (KERNEL_PHYSICAL_BASE - (16 * 1024))
 #define KERNEL_CRITICAL_END  KERNEL_PHYSICAL_END_ALIGNED
 
-/* the boot page directory is stored at the 16K mark in phys mem */
-#define KernelPageDirectory  (KERNEL_PHYS2LOG(0x4000))
+/* the boot page directory is stored at the 48K mark in phys mem */
+#define KernelPageDirectory  (KERNEL_PHYS2LOG(0xC000))
 
 #define MEM_PGSIZE           (4 * 1024)
 #define MEM_4M_PGSIZE        (4 * 1024 * 1024)
 #define MEM_PGSHIFT          (12)
 #define MEM_PGMASK           ((1 << MEM_PGSHIFT) - 1)
 #define MEM_PGALIGN(a)       ((void *)((unsigned int)(a) & ~MEM_PGMASK))
-#define MEM_PHYS_STACK_BASE  (KERNEL_PHYSICAL_BASE)
-#define MEM_DMA_REGION_MARK  (64 * 1024 * 1024)
+
+/* the physical page stack is stored at the 2M mark, descending */
+#define MEM_PHYS_STACK_BASE  (2 * 1024 * 1024)
+#define MEM_DMA_REGION_MARK  (16 * 1024 * 1024)
 #define MEM_HIGH_PG          (2)
 #define MEM_ANY_PG           (1)
 #define MEM_LOW_PG           (0)

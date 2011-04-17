@@ -60,11 +60,10 @@ ADD   r5, r5, #1
 CMP   r5, #16                 /* 16 entries: 8 for branch tbl, 8 for vectors */
 BNE   copyloop
 
-/* zero space from where boot page table will be stored at 16K mark
-   4096 table entries (16K) for 4096 x 1M virtual memory space */
-MOV   r5, #4096
-MOV   r6, #1024
-LSL   r6, r6, #4              /* 2^4 * 1024 = 16K */
+/* zero space from where boot page table will be stored at 48K mark, allowing
+   for 4096 table entries (16K) to represent 4096 x 1M of virtual memory space */
+MOV   r5, #4096               /* 4096 entries in the table */
+MOV   r6, #0xc000             /* 48K mark */
 
 MOV   r7, #0                  /* zero whole words at a time */
 zeroloop:
@@ -73,12 +72,12 @@ STR   r7, [r6, r5, LSL #2]
 CMP   r5, #0
 BNE   zeroloop
 
-/* write the KernelBootPgTableEntry at the 16KB marker */
+/* write the KernelBootPgTableEntry at the 64KB marker */
 LDR   r5, =KernelBootPgTableEntry
 SUB   r5, r5, r4
 LDR   r5, [r5]
 MOV   r6, #1024
-LSL   r6, r6, #4              /* r6 = 16KB phys base */
+LSL   r6, r6, #4              /* r6 = 48KB phys base */
 STR   r5, [r6]
 
 /* the kernel is going to be mapped from 0xc0000000 so
@@ -112,7 +111,7 @@ MOV   r5, #0
 MCR   p15, 0, r5, c2, c0, 2
 
 /* set the translation table base 0 (TTB0) to point to
-   our boot page table at the 16K mark */
+   our boot page table */
 MOV   r5, #1024
 LSL   r5, r5, #4              /* 2^4 * 1024 = 16K */
 ORR   r5, r5, #0xf            /* cachable, sharable */
