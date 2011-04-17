@@ -1,8 +1,10 @@
-/* kernel/ports/arm/cpu.c
- * ARM-specific multiprocessor support
+/* kernel/ports/arm/arm9int.c
+ * i386-specific interrupt initialisation and control for ARM9 processors
  * Author : Chris Williams
- * Date   : Sun,12 Mar 2011.03:39.00
+ * Date   : Sun,17 Apr 2011.03:25:00
 
+Cribbed from... http://www.jamesmolloy.co.uk/tutorial_html/
+ 
 Copyright (c) Chris Williams and individual contributors
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
@@ -17,11 +19,10 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 #include <portdefs.h>
 
-/* totals of resources available on this system */
-unsigned char mp_cpus = 0;
-unsigned char mp_ioapics = 0;
-unsigned char mp_boot_cpu = 0;
-unsigned char mp_domains = 0;
-
-/* pointer to table of cpu descriptors */
-mp_core *cpu_table = NULL;
+/* int_initialise
+   Set up interrupt handling and device management */
+kresult int_initialise(void)
+{
+   irq_initialise();
+   return success;
+}

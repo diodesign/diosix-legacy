@@ -19,13 +19,13 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 
 /* atag_process
-   Process an ATAG list supplied by a bootloader
+   Process an ATAG list supplied by a bootloader into a multiboot structure
    => list = pointer to ATAG list to grok
-   <= 0 for success, or an error code
+   <= phys address of the multiboot structure or 0 for failure
 */
-kresult atag_process(atag_item *item)
+multiboot_info_t *atag_process(atag_item *item)
 {
-   if(!item || (unsigned int)item < KERNEL_SPACE_BASE) return e_bad_params;
+   if(!item || (unsigned int)item < KERNEL_SPACE_BASE) return NULL;
    
    /* run through the list of environment information passed to us by the bootloader */
    while(item->type != atag_none)
@@ -52,5 +52,5 @@ kresult atag_process(atag_item *item)
       item = ATAG_NEXT(item);
    }
    
-   return success;
+   return NULL;
 }

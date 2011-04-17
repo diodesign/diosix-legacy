@@ -802,9 +802,11 @@ kresult proc_initialise(void)
          /* kernel payload binaries start in the executive layer */
          new->layer = LAYER_EXECUTIVE;
          new->flags |= FLAGS_EXECUTIVE;
-         
+      
+#ifdef ARCH_HASIOPORTS
          /* create a blank io port access bitmap for the process */
          lowlevel_ioports_new(new);
+#endif
 
          /* set the entry program counter and get ready to run it */
          new->entry = (unsigned int)payload.entry;

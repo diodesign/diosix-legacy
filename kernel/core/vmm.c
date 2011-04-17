@@ -1154,7 +1154,7 @@ kresult vmm_initialise(multiboot_info_t *mbd)
               pg_stack_size);
    
    /* check to make sure we have enough memory to function */
-   if((phys_pg_count * MEM_PGSIZE) < (KERNEL_CRITICAL_END - KERNEL_CRITICAL_BASE))
+   if((phys_pg_count * MEM_PGSIZE) < (unsigned int)(KERNEL_CRITICAL_END - KERNEL_CRITICAL_BASE))
    {
       BOOT_DEBUG("*** Not enough memory present, must have at least %i bytes available.\n",
                  KERNEL_CRITICAL_END - KERNEL_CRITICAL_BASE);

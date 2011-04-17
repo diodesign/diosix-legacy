@@ -18,14 +18,28 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #ifndef _REGS_H
 #define   _REGS_H
 
+typedef enum
+{
+   reset           = 0,
+   undefined_instr = 1,
+   swi             = 2,
+   prefetch_abort  = 3,
+   data_abort      = 4,
+   /* reserved */
+   irq             = 6,
+   fiq             = 7
+} arm_vector_num;
+
 /* block of registers after an int/excep occurred */
 typedef struct
 {
-   /* pushed by our interrupt code */
-   unsigned int r0, r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13;
+   /* determined by our interrupt code */
+   arm_vector_num vector; /* ARM cpu vector number */
+   unsigned int intnum; /* irq number */
+   unsigned int pc; /* address of faulting/interrupted instruction */
    
-   /* pushed by the processor */
-   unsigned int lr;
+   /* registers stacked by our interrupt code */
+   unsigned int r0, r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14;
 } int_registers_block;
 
 #endif

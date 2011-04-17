@@ -31,6 +31,7 @@ void serial_initialise(void);
 /* i2c eeprom reading */
 unsigned char eeprom_read(unsigned char bus_addr, unsigned int mem_addr);
 
+void lowlevel_thread_switch(thread *now, thread *next, int_registers_block *regs);
 void lowlevel_enable_interrupts(void);
 void lowlevel_disable_interrupts(void);
 void lowlevel_proc_preinit(void);

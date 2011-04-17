@@ -73,6 +73,6 @@ typedef struct
 #define ATAG_NEXT(p) ((atag_item *)((unsigned int)p + (p->size << 2)))
 
 /* prototypes */
-kresult atag_process(atag_item *list);
+multiboot_info_t *atag_process(atag_item *list);
 
 #endif

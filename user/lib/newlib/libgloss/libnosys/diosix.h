@@ -28,6 +28,7 @@ typedef enum
    success              = 0,
    e_failure            = 1, /* generic fault */
    e_not_found          = 2, /* search failed */
+   e_notimplemented     = 3, /* function not supported */
    e_missing_mb_data,
    e_no_phys_pgs,
    e_no_handler,

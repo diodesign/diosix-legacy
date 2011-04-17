@@ -38,14 +38,34 @@ typedef enum
    disabled       /* chip has been disabled at boot */
 } chip_state;
 
+/* describe a cpu run-queue - typedef'd in processes.h */
+struct mp_thread_queue
+{
+   thread *queue_head, *queue_tail;
+   unsigned int priority; /* priority level for this run-queue */
+};
+
 /* describe an mp core */
 typedef struct
 {
    chip_state state;
+   thread *current;  /* must point to the thread being run */
+   rw_gate lock;     /* lock for the cpu metadata */
    
-   thread *current;
+   /* prioritised run queues */
+   mp_thread_queue queues[SCHED_PRIORITY_LEVELS];
+   unsigned int lowest_queue_filled; /* index into queues of the lowest priority
+                                      queue with threads in it */
+   unsigned int queued; /* how much workload this processor has */
 } mp_core;
 
 extern mp_core *cpu_table;
+
+/* prototypes */
+kresult mp_initialise(void); /* if this fails then the machine is probably toast */
+kresult mp_post_initialise(void);
+void mp_interrupt_process(process *proc, unsigned char interrupt);
+void mp_interrupt_thread(thread *target, unsigned char interrupt);
+
 
 #endif

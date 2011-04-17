@@ -18,7 +18,10 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #ifndef _PORTDEFS_H
 #define   _PORTDEFS_H
 
+/* declare stuff shared with the userspace libraries */
 #include "diosix.h"
+#include "async.h"
+#include "roles.h"
 
 /* declare stuff exclusive to the microkernel */
 #include <debug.h>
@@ -26,11 +29,18 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #include <locks.h>
 #include <registers.h>
 #include <processes.h>
+#include <sched.h>
+#include <ipc.h>
+#include <elf.h>
 
+/* the order of these should not be important */
+#include <boot.h>
 #include <memory.h>
 #include <cpu.h>
 #include <lowlevel.h>
 #include <armboot.h>
+#include <interrupts.h>
+#include <syscalls.h>
 
 /* access a 32bit system register */
 #define CHIPSET_REG32(a) (*(volatile unsigned int *)(a))

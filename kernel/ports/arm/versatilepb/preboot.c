@@ -24,36 +24,28 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 /* set this bit in REG_SYS_LOCK to lock all control registers */
 #define SYS_LOCK_BIT     (1 << 16)
 
-/* set up a multiboot environment for the portable kernel */
-void preboot(unsigned int magic, arm_machine_id machine_id, void *atag_list)
+/* preboot
+   Set up a multiboot environment for the portable kernel
+   => magic = must be zero
+      machine_id = id of machine we're being booted on
+      atag_list = pointer to physical address of ATAG list from bootloader
+   <= phys address pointer to multiboot structure for the core kernel, or NULL for failure
+*/
+multiboot_info_t *preboot(unsigned int magic, arm_machine_id machine_id, void *atag_list)
 {
    volatile unsigned int lockval;
+   multiboot_info_t *mb;
    
-   if(DEBUG) debug_initialise();
-   BOOT_DEBUG("[core] %s rev %s" " " __TIME__ " " __DATE__ " (built with GCC " __VERSION__ ")\n", KERNEL_IDENTIFIER, SVN_REV);
-   BOOT_DEBUG("[arm] system identification: %x machine type: %i atag list at %p\n",
-              CHIPSET_REG32(REG_SYS_ID), machine_id, atag_list);
-   
-   /* sanity checks */
-   if(magic)
-   {
-      /* bail out if magic is non-zero */
-      KOOPS_DEBUG("[arm] bootloader magic should be zero, it's actually %x\n", magic);
-      return;
-   }
-   
-   if(machine_id != versatilepb)
-   {
-      /* bail out if trying to boot on a non-supported board - this error message 
-         may not be displayed because the serial hardware isn't where we expect it :( */
-      KOOPS_DEBUG("[arm] this kernel doesn't not support this machine type\n", magic);
-      return;
-   }
-   
+   /* sanity checks - bail out if magic is non-zero or if
+      trying to boot on a non-supported board */
+   if(magic || machine_id != versatilepb) return NULL;
+
    /* process the atag list for the core kernel, which expects multiboot */
-   atag_process(KERNEL_PHYS2LOG(atag_list));
+   mb = atag_process(KERNEL_PHYS2LOG(atag_list));
    
    /* lock the control registers by setting bit 16 */
    lockval = CHIPSET_REG32(REG_SYS_LOCK);
    CHIPSET_REG32(REG_SYS_LOCK) = lockval | SYS_LOCK_BIT;
+   
+   return mb;
 }

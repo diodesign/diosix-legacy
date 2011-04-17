@@ -201,22 +201,33 @@ kresult unlock_gate(rw_gate *gate, unsigned int flags)
 }
 
 /* generic veneers */
+void lowlevel_thread_switch(thread *now, thread *next, int_registers_block *regs)
+{
+   KOOPS_DEBUG("lowlevel_thread_switch(%p, %p, %p): not yet implemented\n",
+               now, next, regs);
+}
+
 void lowlevel_proc_preinit(void)
 {
+   KOOPS_DEBUG("lowlevel_proc_preinit: not yet implemented\n");
 }
 
 void lowlevel_kickstart(void)
 {
+   KOOPS_DEBUG("lowlevel_kickstart: not yet implemented\n");
 }
 
 void lowlevel_stacktrace(void)
 {
+   KOOPS_DEBUG("lowlevel_stacktrace: not yet implemented\n");
 }
 
 void lowlevel_disable_interrupts(void)
 {
+   KOOPS_DEBUG("lowlevel_disable_interrupts: not yet implemented\n");
 }
 
 void lowlevel_enable_interrupts(void)
 {
+   KOOPS_DEBUG("lowlevel_enable_interrupts: not yet implemented\n");
 }

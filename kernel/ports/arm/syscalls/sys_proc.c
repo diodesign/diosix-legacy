@@ -1,0 +1,101 @@
+/* kernel/ports/arm/syscalls/sys_proc.c
+ * ARM-specific software interrupt handling for creating and killing processes
+ * Author : Chris Williams
+ * Date   : Sun,17 Apr 2011.18:24:00
+ 
+Copyright (c) Chris Williams and individual contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
+
+*/
+
+#include <portdefs.h>
+
+/* syscall: exit - terminate execution of the current process */
+void syscall_do_exit(int_registers_block *regs)
+{
+   SYSCALL_DEBUG("[sys:%i] SYSCALL_EXIT called by process %i (%p) (thread %i)\n",
+              CPU_ID, cpu_table[CPU_ID].current->proc->pid, cpu_table[CPU_ID].current->proc,
+              cpu_table[CPU_ID].current->tid);
+
+   /* request to be killed by the system executive */
+   msg_send_signal(proc_role_lookup(DIOSIX_ROLE_SYSTEM_EXECUTIVE),
+                   NULL, SIGXPROCEXIT, cpu_table[CPU_ID].current->proc->pid);
+
+   /* remove from the run queue and mark as dying */
+   sched_remove(cpu_table[CPU_ID].current, dead);
+}
+
+/* syscall: fork - duplicate the currently running process as per:
+   http://www.opengroup.org/onlinepubs/009695399/functions/fork.html
+   <= r0 = -1 for failure, 0 for the child or the new child's PID for the parent */
+void syscall_do_fork(int_registers_block *regs)
+{
+   process *new;
+   thread *source = cpu_table[CPU_ID].current;
+   
+   SYSCALL_DEBUG("[sys:%i] SYSCALL_FORK called by process %i (%p) (thread %i)\n",
+            CPU_ID, source->proc->pid, source->proc, source->tid);
+   
+   new = proc_new(source->proc, source);
+   
+   /* return the right info */
+   if(!new) SYSCALL_RETURN(POSIX_GENERIC_FAILURE); /* POSIX_GENERIC_FAILURE == -1 */
+
+   thread *tnew = thread_find_thread(new, source->tid);
+   
+   /* sort out driver stuff for the thread */
+   if(source->flags & THREAD_FLAG_ISDRIVER)
+      new->flags |= THREAD_FLAG_ISDRIVER;
+   
+   /* XXX don't forget to duplicate the state of the current thread and set its kernel stack */
+   vmm_memcpy(&(tnew->regs), regs, sizeof(int_registers_block));
+   
+   /* zero r0 on the new thread and set the child PID in r0 for the parent */
+   tnew->regs.r0 = 0;
+   regs->r0 = new->pid;
+   
+   /* run the new thread */
+   sched_add(tnew->proc->cpu, tnew);
+}
+         
+/* syscall: kill - terminate the given process. processes can only kill processes
+   in the layers above them or their children. if a process wants
+   to terminate itself, it should ask the executive or its parent via syscall:exit
+   => r0 = PID for the process to kill
+   <= r0 = 0 for success or -1 for a failure
+*/
+void syscall_do_kill(int_registers_block *regs)
+{
+   unsigned int victim = regs->r0;
+   
+   SYSCALL_DEBUG("[sys:%i] SYSCALL_KILL(%i) called by process %i (%p) (thread %i)\n",
+           CPU_ID, regs->r0, cpu_table[CPU_ID].current->proc->pid, cpu_table[CPU_ID].current->proc,
+           cpu_table[CPU_ID].current->tid);         
+   
+   regs->r0 = proc_kill(victim, cpu_table[CPU_ID].current->proc);
+   
+   if(!(regs->r0) && cpu_table[CPU_ID].current->proc != proc_role_lookup(DIOSIX_ROLE_SYSTEM_EXECUTIVE))
+      /* inform the system executive that a process has been killed */
+      msg_send_signal(proc_role_lookup(DIOSIX_ROLE_SYSTEM_EXECUTIVE), NULL, SIGXPROCKILLED, victim);
+}
+
+/* syscall: alarm - send a SIGALRM signal to a process after the given number of
+   scheduling ticks have expired in the system.
+   => r0 = number of scheduling ticks to wait for
+   <= 0 for success, or an error code
+*/
+void syscall_do_alarm(int_registers_block *regs)
+{
+   SYSCALL_DEBUG("[sys:%i] SYSCALL_ALARM(%i) called by process %i (%p) (thread %i)\n",
+                 CPU_ID, regs->r0, cpu_table[CPU_ID].current->proc->pid, cpu_table[CPU_ID].current->proc,
+                 cpu_table[CPU_ID].current->tid);
+   
+   SYSCALL_RETURN(sched_add_snoozer(cpu_table[CPU_ID].current, regs->r0, signal));
+}

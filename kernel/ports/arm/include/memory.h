@@ -45,6 +45,9 @@ extern unsigned int KernelBootStackBase;
 #define KERNEL_CRITICAL_BASE (0x00000000)
 #define KERNEL_CRITICAL_END  KERNEL_PHYSICAL_END_ALIGNED
 
+/* the boot page directory is stored at the 16K mark in phys mem */
+#define KernelPageDirectory  (KERNEL_PHYS2LOG(0x4000))
+
 #define MEM_PGSIZE           (4 * 1024)
 #define MEM_4M_PGSIZE        (4 * 1024 * 1024)
 #define MEM_PGSHIFT          (12)
@@ -220,16 +223,18 @@ extern unsigned int *phys_pg_stack_high_ptr;
 #define PG_GLOBAL     (0)  /* set to map in globally */
 
 #define PG_EXTERNAL   (0)  /* set to bump the page manager on fault, unset to use the vma's setting */
-#define PG_PRIVATE    (0) /* set to indicate this page is private to the process and can be released */
+#define PG_PRIVATE    (0)  /* set to indicate this page is private to the process and can be released */
 
-#define PG_DIR_BASE   (0)    /* physical addr in bits 22-31 */
-#define PG_TBL_BASE   (0)    /* table index in bits 12-21 */
+#define PG_DIR_BASE   (0)  /* physical addr in bits 22-31 */
+#define PG_TBL_BASE   (0)  /* table index in bits 12-21 */
 #define PG_TBL_MASK   (~((4 * 1024) - 1))
 #define PG_INDEX_MASK (1023)  /* 10 bits set */
 
 #define PG_4M_MASK    (~((4 * 1024 * 1024) - 1))
 #define PG_4K_MASK    (~((4 * 1024       ) - 1))
 
+void pg_load_pgdir(void *physaddr);
+unsigned int pg_fault_addr(void);
 void pg_init(void);
 void pg_dump_pagedir(unsigned int *pgdir);
 kresult pg_new_process(process *new, process *current);
@@ -238,7 +243,7 @@ kresult pg_add_4K_mapping(unsigned int **pgdir, unsigned int virtual, unsigned i
 kresult pg_add_4M_mapping(unsigned int **pgdir, unsigned int virtual, unsigned int physical, unsigned int flags);
 kresult pg_fault(int_registers_block *regs);
 kresult pg_preempt_fault(thread *test, unsigned int virtualaddr, unsigned int size, unsigned int flags);
-kresult pg_do_fault(thread *target, unsigned int addr, unsigned int cpuflags);
+kresult pg_do_fault(thread *target, unsigned int faultaddr, arm_vector_num vector);
 void pg_postmortem(int_registers_block *regs);
 kresult pg_user2phys(unsigned int *paddr, unsigned int **pgdir, unsigned int vaddr);
 kresult pg_user2kernel(unsigned int *kaddr, unsigned int uaddr, process *proc);

@@ -14,7 +14,7 @@ VERSION		= -DKERNEL_IDENTIFIER="\"diosix-hyatt i386 SMP pre-Release1.0\"" \
 
 # set the architecture and any architecture flags
 ARCH = i386
-ARCH_FLAGS = -m32 -march=i386
+ARCH_FLAGS = -m32 -march=i386 -DARCH_HASIOPORTS
 
 # ------------------------------------------------------------
 

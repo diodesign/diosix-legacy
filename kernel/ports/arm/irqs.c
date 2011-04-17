@@ -1,7 +1,7 @@
-/* kernel/ports/i386/cpu/irqs.c
- * i386-specific hardware interrupt request handling
+/* kernel/ports/arm/cpu/irqs.c
+ * ARM-specific hardware interrupt request handling
  * Author : Chris Williams
- * Date   : Tues,13 Oct 2009.23:23:00
+ * Date   : Sun,17 Apr 2011.04:05:00
  
 Copyright (c) Chris Williams and individual contributors
 
@@ -25,24 +25,17 @@ irq_driver_entry *irq_drivers[IRQ_MAX_LINES];
 
 /* -------------------- DEVICE INTERRUPT DISPATCH ---------------------- */
 /* irq_handler
- Master interrupt handler -- investigate and delegate
- => r = pointer to stacked registers
+   Master interrupt handler -- investigate and delegate
+   => refs = pointer to stacked registers
  */
 void irq_handler(int_registers_block regs)
 {
-#ifdef PERFORMANCE_DEBUG
-   unsigned long long debug_cycles = x86_read_cyclecount();
-#endif
-
    unsigned int handled = 0;
    irq_driver_entry *driver;
    thread *locker;
    
    IRQ_DEBUG("[irq:%i] processing IRQ %i (registers at %p)\n", CPU_ID, regs.intnum, &regs);
-   
-   /* make sure we only consider the low byte, which contains the irq number */
-   regs.intnum = regs.intnum % IRQ_MAX_LINES;
-   
+
    lock_gate(&irq_lock, LOCK_READ);
    
    /* the interrupt might trigger a reschedule that will change the currently
@@ -132,9 +125,6 @@ irq_handler_exit:
    {
       IRQ_DEBUG("[irq:%i] spurious IRQ %i!\n", CPU_ID, regs.intnum);
    }
-   
-   PERFORMANCE_DEBUG("[irq:%i] hardware interrupt %x took about %i cycles to process\n",
-                     CPU_ID, regs.intnum, (unsigned int)(x86_read_cyclecount() - debug_cycles));
 }
 /* ----------------------------------------------------------------------- */
 

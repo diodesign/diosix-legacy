@@ -143,6 +143,12 @@ NOP
 LDR   sp, =KernelBootStackBase
 BL    preboot
 
+/* if r0 is non-zero then we have the green light to run the
+   core kernel */
+CMP   r0, #0
+LDRNE r1, =KernelMultibootMagic
+BLNE  _main
+
 /* halt if we get to this point */
 B .
 
@@ -242,6 +248,11 @@ KernelBootPgTableSerial:
 
 KernelBootMMUFlags:
 .word 0x800009 /* enable, write buffer, no subpages */
+
+/* ------------------------------------------------------------ */
+
+KernelMultibootMagic:
+.word 0x2badb002 /* see kernel/core/include/multiboot.h */
 
 /* ------------------------------------------------------------ */
 

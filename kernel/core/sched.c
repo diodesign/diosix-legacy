@@ -503,8 +503,8 @@ void sched_tick(int_registers_block *regs)
    }
    unlock_gate(&(cpu->lock), LOCK_READ);
    
-   SCHED_DEBUG("[sched:%i] tick for thread %i of process %i (state %i eip %x)\n",
-               CPU_ID, cpu->current->tid, cpu->current->proc->pid, cpu->current->state, regs->eip);
+   SCHED_DEBUG("[sched:%i] tick for thread %i of process %i (state %i)\n",
+               CPU_ID, cpu->current->tid, cpu->current->proc->pid, cpu->current->state);
    
    lock_gate(&(cpu->current->lock), LOCK_WRITE);
 
