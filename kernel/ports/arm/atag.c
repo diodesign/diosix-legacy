@@ -20,12 +20,31 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 /* atag_process
    Process an ATAG list supplied by a bootloader into a multiboot structure
-   => list = pointer to ATAG list to grok
+   => list = virtual address of ATAG list to grok
    <= phys address of the multiboot structure or 0 for failure
 */
 multiboot_info_t *atag_process(atag_item *item)
 {
+   unsigned int atag_length = 0;
+   atag_item *ptr = item;
+   multiboot_info_t *mb_base;
+   
+   /* sanity check */
    if(!item || (unsigned int)item < KERNEL_SPACE_BASE) return NULL;
+   
+   /* count up length of the tag list, we'll place the multiboot straight after */
+   while(ptr->type != atag_none)
+   {
+      atag_length += ptr->size;
+      ptr = ATAG_NEXT(ptr);
+   }
+   
+   /* convert word count into number of bytes */
+   mb_base = (multiboot_info_t *)((unsigned int)item + (atag_length * sizeof(unsigned int)));
+   
+   /* start constructing the multiboot structure */
+   mb_base->flags = MULTIBOOT_FLAGS_MEMINFO | MULTIBOOT_FLAGS_MEMMAP;
+   
    
    /* run through the list of environment information passed to us by the bootloader */
    while(item->type != atag_none)
@@ -54,5 +73,7 @@ multiboot_info_t *atag_process(atag_item *item)
       item = ATAG_NEXT(item);
    }
    
-   return NULL;
+   return KERNEL_LOG2PHYS(mb_base);
 }
+
+
