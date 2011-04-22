@@ -173,7 +173,7 @@ kresult payload_preinit(multiboot_info_t *mbd)
    mbd_ptr = mbd;
 
    /* bit 3 indicates modules loaded, although we must also check mods_count */
-   if(!((mbd->flags & (1<<3)) && mbd->mods_count))
+   if(!((mbd->flags & MULTIBOOT_FLAGS_MODS) && mbd->mods_count))
    {
       BOOT_DEBUG("[payload:%i] No modules loaded with kernel.\n", CPU_ID);
       return e_payload_missing;

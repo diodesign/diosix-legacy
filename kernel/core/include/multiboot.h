@@ -17,6 +17,18 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #define _MULTIBOOT_H
 
 #define MULTIBOOT_MAGIC (0x2BADB002)
+#define MULTIBOOT_FLAGS_MEMINFO  (1 << 0)
+#define MULTIBOOT_FLAGS_BOOTDEV  (1 << 1)
+#define MULTIBOOT_FLAGS_CMDLINE  (1 << 2)
+#define MULTIBOOT_FLAGS_MODS     (1 << 3)
+#define MULTIBOOT_FLAGS_AOUT     (1 << 4)
+#define MULTIBOOT_FLAGS_ELF      (1 << 5)
+#define MULTIBOOT_FLAGS_MEMMAP   (1 << 6)
+#define MULTIBOOT_FLAGS_DRIVES   (1 << 7)
+#define MULTIBOOT_FLAGS_CONFIG   (1 << 8)
+#define MULTIBOOT_FLAGS_NAME     (1 << 9)
+#define MULTIBOOT_FLAGS_APM      (1 << 10)
+#define MULTIBOOT_FLAGS_VBE      (1 << 11)
 
 typedef struct multiboot_header
 {
