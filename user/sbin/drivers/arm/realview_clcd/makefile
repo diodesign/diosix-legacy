@@ -11,7 +11,7 @@ WRITE = $(Q)echo
 OBJDUMPbin = $(PREFIX)objdump 
 
 # set where the root fs to store the kernel + OS os
-PATHTOROOT = ../../../../../release/root
+PATHTOROOT = ../../../../../release/arm_versatile/root
 
 # defines
 FLAGS		= -O2 -std=c99 -Wall -static -I../../../../../user/lib/newlib/libgloss/libnosys -I../common

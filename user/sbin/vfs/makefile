@@ -11,8 +11,8 @@ WRITE = $(Q)echo
 OBJDUMPbin = $(PREFIX)objdump 
 
 # set where the root fs to store the kernel + OS os
-PATHTOROOT = ../../../release/root
-PATHTOMKFS = ../../../release/makeiso.sh
+PATHTOROOT = ../../../release/i386/root
+PATHTOMKFS = ../../../release/i386/makeiso.sh
 
 # defines
 FLAGS		= -O2 -std=c99 -Wall -static -I../../lib/newlib/libgloss/libnosys
