@@ -22,9 +22,9 @@ ARCH_FLAGS = -mcpu=arm926ej-s -mfloat-abi=soft
 Q=@
 WRITE = $(Q)echo 
 
-# set where the root fs to store the kernel + OS os
-RELEASEDIR  = release
-PATHTOROOT  = $(RELEASEDIR)/initrd
+# set where the root fs to store the kernel + OS
+RELEASEDIR  = release/arm_versatilepb
+PATHTOROOT  = $(RELEASEDIR)/root
 
 .SUFFIXES: .s .c
 
@@ -43,7 +43,7 @@ OBJSDIR  = $(PORTDIR)/objs
 LIBDIOSIXDIR = user/lib/newlib/libgloss/libnosys
 SVNDEF := -D'SVN_REV="$(shell svnversion -n .)"'
 
-MAKEFILE	= makefile-armv5
+MAKEFILE	= makefile-arm_versatilepb
 MAKEDEP		= $(MAKEFILE)
 
 INCDIR		= $(PORTDIR)/include
@@ -187,4 +187,5 @@ kernel:		$(OBJS) $(LDSCRIPT)
 		$(LD) $^ -o $(PORTDIR)/$@ -L $(LD_INCLUDE_LIBGCC) -lgcc
 		$(OBJDUMPbin) --source $(PORTDIR)/$@ >$(PORTDIR)/kernel.lst
 		$(STRIPbin) -s $(PORTDIR)/$@
-		$(OBJCOPYbin) -O binary $(PORTDIR)/$@ $(PORTDIR)/$@
+		$(OBJCOPYbin) -O binary $(PORTDIR)/$@ $(PATHTOROOT)/kernel
+

@@ -42,6 +42,7 @@ multiboot_info_t *preboot(unsigned int magic, arm_machine_id machine_id, void *a
 
    /* process the atag list for the core kernel, which expects multiboot */
    mb = atag_process(KERNEL_PHYS2LOG(atag_list));
+   BOOT_DEBUG("[arm] machine id: %i multiboot: %p\n", machine_id, mb);
    
    /* lock the control registers by setting bit 16 */
    lockval = CHIPSET_REG32(REG_SYS_LOCK);

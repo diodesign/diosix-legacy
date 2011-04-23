@@ -23,7 +23,7 @@ Q=@
 WRITE = $(Q)echo 
 
 # set where the root fs to store the kernel + OS os
-RELEASEDIR  = release
+RELEASEDIR  = release/i386
 MKFSPROGRAM = $(RELEASEDIR)/makeiso.sh
 PATHTOROOT  = $(RELEASEDIR)/root
 
