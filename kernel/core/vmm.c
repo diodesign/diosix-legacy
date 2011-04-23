@@ -1115,7 +1115,7 @@ kresult vmm_initialise(multiboot_info_t *mbd)
               KERNEL_PHYSICAL_END_ALIGNED);
 
    /* check bit six to see if we can access mmap info */
-   if(!(mbd->flags & MULTIBOOT_FLAGS_MEMMAP)))
+   if(!(mbd->flags & MULTIBOOT_FLAGS_MEMMAP))
    {
       VMM_DEBUG("*** missing mem map data from multiboot. (%x)\n", mbd->flags);
       return e_missing_mb_data;
