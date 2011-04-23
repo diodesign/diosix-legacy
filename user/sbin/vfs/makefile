@@ -10,29 +10,32 @@ WRITE = $(Q)echo
 
 OBJDUMPbin = $(PREFIX)objdump 
 
+# set the build output dir
+OBJSDIR = ../../../build/$(ARCH)_$(ARCH_TARGET)/vfs
+
 # set where the root fs to store the kernel + OS os
-PATHTOROOT = ../../../release/i386/root
-PATHTOMKFS = ../../../release/i386/makeiso.sh
+PATHTOROOT = ../../../release/$(ARCH)_$(ARCH_TARGET)/root
+PATHTOMKFS = ../../../release/$(ARCH)_$(ARCH_TARGET)/makeiso.sh
 
 # defines
 FLAGS		= -O2 -std=c99 -Wall -static -I../../lib/newlib/libgloss/libnosys
 CC		= $(PREFIX)gcc $(FLAGS)
 LD		= $(PREFIX)gcc $(FLAGS)
-OBJS	 	= objs/main.o objs/vfstree.o objs/files.o
+OBJS	 	= $(OBJSDIR)/main.o $(OBJSDIR)/vfstree.o $(OBJSDIR)/files.o
 
 # targets
 all: vfs
 
 # dependencies
-objs/main.o:		main.c	makefile
+$(OBJSDIR)/main.o:	main.c	makefile
 			$(WRITE) '==> COMPILE: $<'
 			$(Q)$(CC) -c -o $@ $<
 
-objs/vfstree.o:		vfstree.c	makefile
+$(OBJSDIR)/vfstree.o:	vfstree.c	makefile
 			$(WRITE) '==> COMPILE: $<'
 			$(Q)$(CC) -c -o $@ $<
 
-objs/files.o:		files.c	makefile
+$(OBJSDIR)/files.o:	files.c	makefile
 			$(WRITE) '==> COMPILE: $<'
 			$(Q)$(CC) -c -o $@ $<
 
@@ -40,6 +43,6 @@ objs/files.o:		files.c	makefile
 
 vfs:	$(OBJS)
 	$(WRITE) '==> LINK: vfs'
-	$(Q)$(LD) $^ -o $@
-	$(Q)$(OBJDUMPbin) --source $@ >vfs.lst
-	$(Q)cp vfs $(PATHTOROOT)/sbin/
+	$(Q)$(LD) $^ -o $(OBJSDIR)/$@
+	$(Q)$(OBJDUMPbin) --source $(OBJSDIR)/$@ >$(OBJSDIR)/vfs.lst
+	$(Q)cp $(OBJSDIR)/$@ $(PATHTOROOT)/sbin/

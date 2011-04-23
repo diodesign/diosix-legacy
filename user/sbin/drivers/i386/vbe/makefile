@@ -11,35 +11,38 @@ WRITE = $(Q)echo
 OBJDUMPbin = $(PREFIX)objdump 
 
 # set where the root fs to store the kernel + OS os
-PATHTOROOT = ../../../../../release/i386/root
+PATHTOROOT = ../../../../../release/$(ARCH)_$(ARCH_TARGET)/root
+
+# set the build output dir
+OBJSDIR = ../../../../../build/$(ARCH)_$(ARCH_TARGET)/drivers/vbe
 
 # defines
 FLAGS		= -O2 -std=c99 -Wall -static -I../../../../../user/lib/newlib/libgloss/libnosys -I../common
 CC		= $(PREFIX)gcc $(FLAGS)
 LD		= $(PREFIX)gcc $(FLAGS)
-OBJS	 	= objs/main.o objs/vbe.o objs/lowlevel.o
+OBJS	 	= $(OBJSDIR)/main.o $(OBJSDIR)/vbe.o $(OBJSDIR)/lowlevel.o
 
 # targets
 all: vbe
 
 # dependencies
-objs/main.o:	main.c	makefile vbe.h
-		$(WRITE) '==> COMPILE: $<'
-		$(Q)$(CC) -c -o $@ $<
-
-objs/lowlevel.o:	../common/lowlevel.c	makefile vbe.h
+$(OBJSDIR)/main.o:	main.c	makefile vbe.h
 			$(WRITE) '==> COMPILE: $<'
 			$(Q)$(CC) -c -o $@ $<
 
-objs/vbe.o:	vbe.c	makefile vbe.h
-		$(WRITE) '==> COMPILE: $<'
-		$(Q)$(CC) -c -o $@ $<
+$(OBJSDIR)/lowlevel.o:	../common/lowlevel.c	makefile vbe.h
+			$(WRITE) '==> COMPILE: $<'
+			$(Q)$(CC) -c -o $@ $<
+
+$(OBJSDIR)/vbe.o:	vbe.c	makefile vbe.h
+			$(WRITE) '==> COMPILE: $<'
+			$(Q)$(CC) -c -o $@ $<
 
 # explicit rules
 
 vbe:	$(OBJS)
 	$(WRITE) '==> LINK: vbe'
-	$(Q)$(LD) $^ -o $@
-	$(Q)$(OBJDUMPbin) --source $@ >vbe.lst
-	$(Q)cp vbe $(PATHTOROOT)/sbin/drivers/i386/
+	$(Q)$(LD) $^ -o $(OBJSDIR)/$@
+	$(Q)$(OBJDUMPbin) --source $(OBJSDIR)/$@ >$(OBJSDIR)/vbe.lst
+	$(Q)cp $(OBJSDIR)/$@ $(PATHTOROOT)/sbin/drivers/$(ARCH)/
 

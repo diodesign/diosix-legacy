@@ -11,23 +11,26 @@ WRITE = $(Q)echo
 OBJDUMPbin = $(PREFIX)objdump 
 
 # set where the root fs to store the kernel + OS os
-PATHTOROOT = ../../../../../release/i386/root
+PATHTOROOT = ../../../../../release/$(ARCH)_$(ARCH_TARGET)/root
+
+# set the build output dir
+OBJSDIR = ../../../../../build/$(ARCH)_$(ARCH_TARGET)/drivers/ps2kbd
 
 # defines
 FLAGS		= -O2 -std=c99 -Wall -static -I../../../../../user/lib/newlib/libgloss/libnosys -I../common
 CC		= $(PREFIX)gcc $(FLAGS)
 LD		= $(PREFIX)gcc $(FLAGS)
-OBJS	 	= objs/main.o objs/lowlevel.o
+OBJS	 	= $(OBJSDIR)/main.o $(OBJSDIR)/lowlevel.o
 
 # targets
 all: ps2kbd
 
 # dependencies
-objs/main.o:	main.c	makefile ps2kbd.h
-		$(WRITE) '==> COMPILE: $<'
-		$(Q)$(CC) -c -o $@ $<
+$(OBJSDIR)/main.o:	main.c	makefile ps2kbd.h
+			$(WRITE) '==> COMPILE: $<'
+			$(Q)$(CC) -c -o $@ $<
 
-objs/lowlevel.o:	../common/lowlevel.c	makefile ps2kbd.h
+$(OBJSDIR)/lowlevel.o:	../common/lowlevel.c	makefile ps2kbd.h
 			$(WRITE) '==> COMPILE: $<'
 			$(Q)$(CC) -c -o $@ $<
 
@@ -36,7 +39,7 @@ objs/lowlevel.o:	../common/lowlevel.c	makefile ps2kbd.h
 
 ps2kbd:	$(OBJS)
 	$(WRITE) '==> LINK: ps2kbd'
-	$(Q)$(LD) $^ -o $@
-	$(Q)$(OBJDUMPbin) --source $@ >ps2kbd.lst
-	$(Q)cp ps2kbd $(PATHTOROOT)/sbin/drivers/i386/
+	$(Q)$(LD) $^ -o $(OBJSDIR)/$@
+	$(Q)$(OBJDUMPbin) --source $(OBJSDIR)/$@ >$(OBJSDIR)/ps2kbd.lst
+	$(Q)cp $(OBJSDIR)/$@ $(PATHTOROOT)/sbin/drivers/$(ARCH)/
 

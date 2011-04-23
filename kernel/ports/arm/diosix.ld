@@ -10,7 +10,7 @@ SECTIONS
 
    .startup . :
    {
-      kernel/ports/arm/objs/startup.o(.text)
+      build/arm_versatilepb/kernel/startup.o(.text)
    }
 
    .text : 

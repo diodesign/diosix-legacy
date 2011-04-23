@@ -11,20 +11,23 @@ WRITE = $(Q)echo
 OBJDUMPbin = $(PREFIX)objdump 
 
 # set where the root fs to store the kernel + OS os
-PATHTOROOT = ../../../release/i386/root
-PATHTOMKFS = ../../../release/makeiso.sh
+PATHTOROOT = ../../../release/$(ARCH)_$(ARCH_TARGET)/root
+PATHTOMKFS = ../../../release/$(ARCH)_$(ARCH_TARGET)/makeiso.sh
+
+# set the build output dir
+OBJSDIR = ../../../build/$(ARCH)_$(ARCH_TARGET)/init
 
 # defines
 FLAGS		= -O2 -std=c99 -Wall -static -I../../lib/newlib/libgloss/libnosys
 CC		= $(PREFIX)gcc $(FLAGS)
 LD		= $(PREFIX)gcc $(FLAGS)
-OBJS	 	= objs/init.o
+OBJS	 	= $(OBJSDIR)/init.o
 
 # targets
 all: init
 
 # dependencies
-objs/init.o:		init.c	makefile
+$(OBJSDIR)/init.o:	init.c	makefile
 			$(WRITE) '==> COMPILE: $<'
 			$(Q)$(CC) -c -o $@ $<
 
@@ -32,6 +35,6 @@ objs/init.o:		init.c	makefile
 
 init:	$(OBJS)
 	$(WRITE) '==> LINK: init'
-	$(Q)$(LD) $^ -o $@
-	$(Q)$(OBJDUMPbin) --source $@ >init.lst
-	$(Q)cp init $(PATHTOROOT)/sbin/
+	$(Q)$(LD) $^ -o $(OBJSDIR)/$@
+	$(Q)$(OBJDUMPbin) --source $(OBJSDIR)/$@ >$(OBJSDIR)/init.lst
+	$(Q)cp $(OBJSDIR)/$@ $(PATHTOROOT)/sbin/

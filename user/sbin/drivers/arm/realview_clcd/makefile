@@ -11,35 +11,34 @@ WRITE = $(Q)echo
 OBJDUMPbin = $(PREFIX)objdump 
 
 # set where the root fs to store the kernel + OS os
-PATHTOROOT = ../../../../../release/arm_versatile/root
+PATHTOROOT = ../../../../../release/$(ARCH)_$(ARCH_TARGET)/root
+
+# set the build directory
+OBJSDIR	= ../../../../../build/$(ARCH)_$(ARCH_TARGET)/drivers/realview_clcd
 
 # defines
 FLAGS		= -O2 -std=c99 -Wall -static -I../../../../../user/lib/newlib/libgloss/libnosys -I../common
 CC		= $(PREFIX)gcc $(FLAGS)
 LD		= $(PREFIX)gcc $(FLAGS)
-OBJS	 	= objs/main.o objs/vbe.o objs/lowlevel.o
+OBJS	 	= $(OBJSDIR)/main.o $(OBJSDIR)/clcd.o
 
 # targets
 all: vbe
 
 # dependencies
-objs/main.o:	main.c	makefile vbe.h
-		$(WRITE) '==> COMPILE: $<'
-		$(Q)$(CC) -c -o $@ $<
-
-objs/lowlevel.o:	../common/lowlevel.c	makefile vbe.h
+$(OBJSDIR)/main.o:	main.c	makefile clcd.h
 			$(WRITE) '==> COMPILE: $<'
 			$(Q)$(CC) -c -o $@ $<
 
-objs/vbe.o:	vbe.c	makefile vbe.h
-		$(WRITE) '==> COMPILE: $<'
-		$(Q)$(CC) -c -o $@ $<
+$(OBJSDIR)/clcd.o:	clcd.c	makefile clcd.h
+			$(WRITE) '==> COMPILE: $<'
+			$(Q)$(CC) -c -o $@ $<
 
 # explicit rules
 
-vbe:	$(OBJS)
-	$(WRITE) '==> LINK: vbe'
-	$(Q)$(LD) $^ -o $@
-	$(Q)$(OBJDUMPbin) --source $@ >vbe.lst
-	$(Q)cp vbe $(PATHTOROOT)/sbin/drivers/i386/
+realview_clcd:	$(OBJS)
+	$(WRITE) '==> LINK: realview_clcd'
+	$(Q)$(LD) $^ -o $(OBJSDIR)/$@
+	$(Q)$(OBJDUMPbin) --source $(OBJSDIR)/$@ >$(OBJSDIR)/realview_clcd.lst
+	$(Q)cp $(OBJSDIR)/$@ $(PATHTOROOT)/sbin/drivers/$(ARCH)/
 

@@ -5,25 +5,26 @@
 #
 #
 
-# define the build version
-VERSION		= -DKERNEL_IDENTIFIER="\"diosix-hyatt armv5 pre-Release1.0\"" \
-		  -DKERNEL_RELEASE_MAJOR=0 -DKERNEL_RELEASE_MINOR=1 \
-		  -DKERNEL_API_REVISION=1
-
 # ------------------------------------------------------------
 
 # set the architecture and any architecture flags
 ARCH = arm
+ARCH_TARGET = versatilepb
 ARCH_FLAGS = -mcpu=arm926ej-s -mfloat-abi=soft
 
 # ------------------------------------------------------------
+
+# define the build version
+VERSION		= -DKERNEL_IDENTIFIER="\"diosix-hyatt $(ARCH)_$(ARCH_TARGET) pre-Release1.0\"" \
+-DKERNEL_RELEASE_MAJOR=0 -DKERNEL_RELEASE_MINOR=1 \
+-DKERNEL_API_REVISION=1
 
 # prettify the output
 Q=@
 WRITE = $(Q)echo 
 
 # set where the root fs to store the kernel + OS
-RELEASEDIR  = release/arm_versatilepb
+RELEASEDIR  = release/$(ARCH)_$(ARCH_TARGET)
 PATHTOROOT  = $(RELEASEDIR)/root
 
 .SUFFIXES: .s .c
@@ -39,7 +40,7 @@ READELFbin = $(Q)readelf
 # defines
 PORTDIR  = kernel/ports/$(ARCH)
 COREDIR  = kernel/core
-OBJSDIR  = $(PORTDIR)/objs
+OBJSDIR  = build/$(ARCH)_$(ARCH_TARGET)/kernel
 LIBDIOSIXDIR = user/lib/newlib/libgloss/libnosys
 SVNDEF := -D'SVN_REV="$(shell svnversion -n .)"'
 
@@ -184,8 +185,8 @@ $(OBJSDIR)/msg.o:	$(COREDIR)/msg.c	$(MAKEDEP)
 # link the kernel
 kernel:		$(OBJS) $(LDSCRIPT)
 		$(WRITE) '[+] linking kernel'
-		$(LD) $^ -o $(PORTDIR)/$@ -L $(LD_INCLUDE_LIBGCC) -lgcc
-		$(OBJDUMPbin) --source $(PORTDIR)/$@ >$(PORTDIR)/kernel.lst
-		$(STRIPbin) -s $(PORTDIR)/$@
-		$(OBJCOPYbin) -O binary $(PORTDIR)/$@ $(PATHTOROOT)/kernel
+		$(LD) $^ -o $(OBJSDIR)/$@ -L $(LD_INCLUDE_LIBGCC) -lgcc
+		$(OBJDUMPbin) --source $(OBJSDIR)/$@ >$(OBJSDIR)/kernel.lst
+		$(STRIPbin) -s $(OBJSDIR)/$@
+		$(OBJCOPYbin) -O binary $(OBJSDIR)/$@ $(PATHTOROOT)/kernel
 

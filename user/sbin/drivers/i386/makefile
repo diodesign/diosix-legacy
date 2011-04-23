@@ -1,5 +1,5 @@
 #
-# build drivers for i386 machines
+# build drivers for i386 pc machines
 #
 
 all:	makefile
