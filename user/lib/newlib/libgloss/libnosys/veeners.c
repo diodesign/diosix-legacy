@@ -29,8 +29,11 @@ unsigned int diosix_exit(unsigned int code)
 {
    /* send a message to the sysexec with the return code
       if it is non-zero */
-   
+#if defined (__i386__)
    __asm__ __volatile__("int $0x90" : : "d" (SYSCALL_EXIT));
+#elif defined (__arm__)
+   __asm__ __volatile__("mov r4, %0; swi $0x0" : : "i" (SYSCALL_EXIT));
+#endif
    
    /* execution shouldn't reach here */
    while(1) diosix_thread_yield();
@@ -41,7 +44,11 @@ int diosix_fork(void)
    the new child PID for the parent, or -1 for failure */
 {
    int retval;
-   __asm__ __volatile__("int $0x90" : "=a" (retval) : "d" (SYSCALL_FORK));  
+#if defined (__i386__)
+   __asm__ __volatile__("int $0x90" : "=a" (retval) : "d" (SYSCALL_FORK));
+#elif defined (__arm__)
+   __asm__ __volatile__("mov r4, %1; swi $0x0; mov %0, r0" : "=r" (retval) : "i" (SYSCALL_FORK));
+#endif
    return retval;
 }
 
@@ -50,7 +57,11 @@ unsigned int diosix_kill(unsigned int pid)
    check the documentation on what you can and can't kill */
 {
    unsigned int retval;
-   __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (pid), "d" (SYSCALL_KILL));  
+#if defined (__i386__)
+   __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (pid), "d" (SYSCALL_KILL));
+#elif defined (__arm__)
+   __asm__ __volatile__("mov r4, %2; mov r0, %1; swi $0x0; mov %0, r0" : "=r" (retval) : "r" (pid), "i" (SYSCALL_KILL));
+#endif
    return retval;
 }
 
@@ -58,7 +69,11 @@ unsigned int diosix_alarm(unsigned int ticks)
 /* send a SIGALRM signal to the calling process after the given number of scheduler clock ticks */
 {
    unsigned int retval;
+#if defined (__i386__)
    __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (ticks), "d" (SYSCALL_ALARM));
+#elif defined (__arm__)
+   __asm__ __volatile__("mov r4, %2; mov r0, %1; swi $0x0; mov %0, r0" : "=r" (retval) : "r" (ticks), "i" (SYSCALL_ALARM));
+#endif
    return retval;
 }
 
@@ -67,7 +82,11 @@ unsigned int diosix_alarm(unsigned int ticks)
 void diosix_thread_yield(void)
 /* give up the processor now for another thread */
 {
+#if defined (__i386__)
    __asm__ __volatile__("int $0x90" : : "d" (SYSCALL_THREAD_YIELD));
+#elif defined (__arm__)
+   __asm__ __volatile__("mov r4, %0; swi $0x0" : : "i" (SYSCALL_THREAD_YIELD));
+#endif
 }
 
 unsigned int diosix_thread_exit(unsigned int code)
@@ -77,8 +96,11 @@ unsigned int diosix_thread_exit(unsigned int code)
 {
    /* send a message to the sysexec with the return code
     if it is non-zero */
-   
+#if defined (__i386__)
    __asm__ __volatile__("int $0x90" : : "d" (SYSCALL_THREAD_EXIT));
+#elif defined (__arm__)
+   __asm__ __volatile__("mov r4, %0; swi $0x0" : : "i" (SYSCALL_THREAD_EXIT));
+#endif
    
    /* execution shouldn't reach here */
    while(1) diosix_thread_yield();
@@ -89,7 +111,13 @@ int diosix_thread_fork(void)
    the child or the new thread id (tid) for the parent, or -1 for failure */
 {
    int retval;
+   
+#if defined (__i386__)
    __asm__ __volatile__("int $0x90" : "=a" (retval) : "d" (SYSCALL_THREAD_FORK));
+#elif defined (__arm__)
+   __asm__ __volatile__("mov r4, %1; swi $0x0; mov %0, r0" : "=r" (retval) : "i" (SYSCALL_THREAD_FORK));
+#endif  
+
    return retval;   
 }
 
@@ -98,7 +126,11 @@ unsigned int diosix_thread_kill(unsigned int tid)
    check the documentation on what you can and can't kill */
 {
    unsigned int retval;
+#if defined (__i386__)
    __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (tid), "d" (SYSCALL_THREAD_KILL));
+#elif defined (__arm__)
+   __asm__ __volatile__("mov r4, %2; mov r0, %1; swi $0x0; mov %0, r0" : "=r" (retval) : "r" (tid), "i" (SYSCALL_THREAD_KILL));
+#endif
    return retval;
 }
 
@@ -106,7 +138,11 @@ unsigned int diosix_thread_sleep(unsigned int ticks)
 /* block for the given number of scheduler clock ticks. There are SCHED_FREQUENCY ticks a second */
 {
    unsigned int retval;
+#if defined (__i386__)
    __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (ticks), "d" (SYSCALL_THREAD_SLEEP));
+#elif defined (__arm__)
+   __asm__ __volatile__("mov r4, %2; mov r0, %1; swi $0x0; mov %0, r0" : "=r" (retval) : "r" (ticks), "i" (SYSCALL_THREAD_SLEEP));
+#endif
    return retval;
 }
 
@@ -118,7 +154,11 @@ unsigned int diosix_msg_send(diosix_msg_info *info)
 */
 {
    unsigned int retval;
+#if defined (__i386__)
    __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (info), "d" (SYSCALL_MSG_SEND));
+#elif defined (__arm__)
+   __asm__ __volatile__("mov r4, %2; mov r0, %1; swi $0x0; mov %0, r0" : "=r" (retval) : "r" (info), "i" (SYSCALL_MSG_SEND));
+#endif
    return retval;
 }
 
@@ -128,7 +168,11 @@ unsigned int diosix_msg_receive(diosix_msg_info *info)
 */
 {
    unsigned int retval;
-   __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (info), "d" (SYSCALL_MSG_RECV));  
+#if defined (__i386__)
+   __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (info), "d" (SYSCALL_MSG_RECV));
+#elif defined (__arm__)
+   __asm__ __volatile__("mov r4, %2; mov r0, %1; swi $0x0; mov %0, r0" : "=r" (retval) : "r" (info), "i" (SYSCALL_MSG_RECV));
+#endif
    return retval;
 }
 
@@ -146,7 +190,11 @@ unsigned int diosix_priv_layer_up(unsigned int count)
    unsigned int retval;
    while(count)
    {
+#if defined (__i386__)
       __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (DIOSIX_PRIV_LAYER_UP), "d" (SYSCALL_PRIVS));
+#elif defined (__arm__)
+      __asm__ __volatile__("mov r4, %2; mov r0, %1; swi $0x0; mov %0, r0" : "=r" (retval) : "i" (DIOSIX_PRIV_LAYER_UP), "i" (SYSCALL_PRIVS));
+#endif
       count--;
    }
    return retval;  
@@ -156,7 +204,11 @@ unsigned int diosix_rights_clear(unsigned int bits)
 /* give up previously afforded process rights */
 {
    unsigned int retval;
+#if defined (__i386__)
    __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (DIOSIX_RIGHTS_CLEAR), "b" (bits), "d" (SYSCALL_PRIVS));
+#elif defined (__arm__)
+   __asm__ __volatile__("mov r4, %3; mov r1, %2; mov r0, %1; swi $0x0; mov %0, r0" : "=r" (retval) : "i" (DIOSIX_RIGHTS_CLEAR), "r" (bits), "i" (SYSCALL_PRIVS));
+#endif
    return retval;
 }
 
@@ -164,7 +216,11 @@ unsigned int diosix_set_pg_id(unsigned int pid, unsigned int pgid)
 /* alter the process's process group id */
 {
    unsigned int retval;
+#if defined (__i386__)
    __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (DIOSIX_SETPGID), "b" (pid), "c" (pgid), "d" (SYSCALL_SET_ID));
+#elif defined (__arm__)
+   __asm__ __volatile__("mov r4, %4; mov r2, %3; mov r1, %2; mov r0, %1; swi $0x0; mov %0, r0" : "=r" (retval) : "i" (DIOSIX_SETPGID), "r" (pid), "r" (pgid), "i" (SYSCALL_SET_ID));
+#endif
    return retval;
 }
 
@@ -172,7 +228,11 @@ unsigned int diosix_set_session_id(void)
 /* alter the process's session id */
 {
    unsigned int retval;
+#if defined (__i386__)
    __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (DIOSIX_SETSID), "d" (SYSCALL_SET_ID));
+#elif defined (__arm__)
+   __asm__ __volatile__("mov r4, %2; mov r0, %1; swi $0x0; mov %0, r0" : "=r" (retval) : "i" (DIOSIX_SETSID), "i" (SYSCALL_SET_ID));
+#endif
    return retval;
 }
 
@@ -181,9 +241,17 @@ unsigned int diosix_set_eid(unsigned char flag, unsigned int eid)
 {
    unsigned int retval;
    if(flag == DIOSIX_SET_USER)
+#if defined (__i386__)
       __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (DIOSIX_SETEUID), "b" (eid), "d" (SYSCALL_SET_ID));
+#elif defined (__arm__)
+      __asm__ __volatile__("mov r4, %3; mov r1, %2; mov r0, %1; swi $0x0; mov %0, r0" : "=r" (retval) : "i" (DIOSIX_SETEUID), "r" (eid), "i" (SYSCALL_SET_ID));
+#endif
    else
+#if defined (__i386__)
       __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (DIOSIX_SETEGID), "b" (eid), "d" (SYSCALL_SET_ID));
+#elif defined (__arm__)
+      __asm__ __volatile__("mov r4, %3; mov r1, %2; mov r0, %1; swi $0x0; mov %0, r0" : "=r" (retval) : "i" (DIOSIX_SETEGID), "r" (eid), "i" (SYSCALL_SET_ID));
+#endif
    return retval;
 }
 
@@ -192,9 +260,17 @@ unsigned int diosix_set_reid(unsigned char flag, unsigned int eid, unsigned int 
 {
    unsigned int retval;
    if(flag == DIOSIX_SET_USER)
+#if defined (__i386__)
       __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (DIOSIX_SETREUID), "b" (eid), "c" (rid), "d" (SYSCALL_SET_ID));
+#elif defined (__arm__)
+      __asm__ __volatile__("mov r4, %4; mov r2, %3; mov r1, %2; mov r0, %1; swi $0x0; mov %0, r0" : "=r" (retval) : "i" (DIOSIX_SETREUID), "r" (eid), "r" (rid), "i" (SYSCALL_SET_ID));
+#endif
    else
+#if defined (__i386__)
       __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (DIOSIX_SETREGID), "b" (eid), "c" (rid), "d" (SYSCALL_SET_ID));
+#elif defined (__arm__)
+      __asm__ __volatile__("mov r4, %4; mov r2, %3; mov r1, %2; mov r0, %1; swi $0x0; mov %0, r0" : "=r" (retval) : "i" (DIOSIX_SETREGID), "r" (eid), "r" (rid), "i" (SYSCALL_SET_ID));
+#endif
    return retval;
 }
 
@@ -210,9 +286,17 @@ unsigned int diosix_set_resid(unsigned char flag, unsigned eid, unsigned int rid
    ids.saved     = sid;
    
    if(flag == DIOSIX_SET_USER)
+#if defined (__i386__)
       __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (DIOSIX_SETRESUID), "b" (&ids), "d" (SYSCALL_SET_ID));
+#elif defined (__arm__)
+      __asm__ __volatile__("mov r4, %3; mov r1, %2; mov r0, %1; swi $0x0; mov %0, r0" : "=r" (retval) : "i" (DIOSIX_SETRESUID), "r" (&ids), "i" (SYSCALL_SET_ID));
+#endif
    else
+#if defined (__i386__)
       __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (DIOSIX_SETRESGID), "b" (&ids), "d" (SYSCALL_SET_ID));
+#elif defined (__arm__)
+      __asm__ __volatile__( "mov r4, %3; mov r1, %2; mov r0, %1; swi $0x0; mov %0, r0" : "=r" (retval) : "i" (DIOSIX_SETRESGID), "r" (&ids), "i" (SYSCALL_SET_ID));
+#endif
    return retval;
 }
 
@@ -220,7 +304,11 @@ unsigned int diosix_set_role(unsigned int role)
 /* assign an operating system role to this process */
 {
    unsigned int retval;
+#if defined (__i386__)
    __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (DIOSIX_SET_ROLE), "b" (role), "d" (SYSCALL_SET_ID));
+#elif defined (__arm__)
+   __asm__ __volatile__("mov r4, %3; mov r1, %2; mov r0, %1; swi $0x0; mov %0, r0" : "=r" (retval) : "i" (DIOSIX_SET_ROLE), "r" (role), "i" (SYSCALL_SET_ID));
+#endif
    return retval;
 }
 
@@ -228,7 +316,12 @@ unsigned int diosix_iorights_remove(void)
 /* remove the previously afforded process right to access IO ports entirely */
 {
    unsigned int retval;
+#if defined (__i386__)
    __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (DIOSIX_IORIGHTS_REMOVE), "d" (SYSCALL_PRIVS));
+#elif defined (__arm__)
+   /* ARM doesn't support IO ports */
+   retval = e_notimplemented;
+#endif
    return retval;
 }
 
@@ -236,7 +329,12 @@ unsigned int diosix_iorights_clear(unsigned int index, unsigned int bits)
 /* remove selected IO port rights for the process */
 {
    unsigned int retval;
+#if defined (__i386__)
    __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (DIOSIX_IORIGHTS_CLEAR), "b" (index), "c" (bits), "d" (SYSCALL_PRIVS));
+#elif defined (__arm__)
+   /* ARM doesn't support IO ports */
+   retval = e_notimplemented;
+#endif
    return retval;
 }
 
@@ -244,7 +342,11 @@ unsigned int diosix_signals_unix(unsigned int mask)
 /* bitfield to enable unix signals to be received, a set bit indicates the signal will be accepted */
 {
    unsigned int retval;
+#if defined (__i386__)
    __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (DIOSIX_UNIX_SIGNALS), "b" (mask), "d" (SYSCALL_PRIVS));
+#elif defined (__arm__)
+   __asm__ __volatile__("mov r4, %3; mov r1, %2; mov r0, %1; swi $0x0; mov %0, r0"  : "=r" (retval) : "i" (DIOSIX_UNIX_SIGNALS), "r" (mask), "i" (SYSCALL_PRIVS));
+#endif
    return retval;   
 }
 
@@ -252,24 +354,36 @@ unsigned int diosix_signals_kernel(unsigned int mask)
 /* bitfield to enable kernel-generated signals to be received, a set bit indicates the signal will be accepted */
 {
    unsigned int retval;
+#if defined (__i386__)
    __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (DIOSIX_KERNEL_SIGNALS), "b" (mask), "d" (SYSCALL_PRIVS));
+#elif defined (__arm__)
+   __asm__ __volatile__( "mov r4, %3; mov r1, %2; mov r0, %1; swi $0x0; mov %0, r0" : "=r" (retval) : "i" (DIOSIX_KERNEL_SIGNALS), "r" (mask), "i" (SYSCALL_PRIVS));
+#endif
    return retval;   
 }
 
 /* --------------------------- driver management -------------------- */
 unsigned int diosix_driver_register(void)
-/* remove the previously afforded process right to access IO ports entirely */
+/* remove the previously afforded process right to access hardware entirely */
 {
    unsigned int retval;
+#if defined (__i386__)
    __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (DIOSIX_DRIVER_REGISTER), "d" (SYSCALL_DRIVER));
+#elif defined (__arm__)
+   __asm__ __volatile__("mov r4, %2; mov r0, %1; swi $0x0; mov %0, r0" : "=r" (retval) : "i" (DIOSIX_DRIVER_REGISTER), "i" (SYSCALL_DRIVER));
+#endif
    return retval;
 }
 
 unsigned int diosix_driver_deregister(void)
-/* remove the previously afforded process right to access IO ports entirely */
+/* remove the previously afforded process right to access hardware entirely */
 {
    unsigned int retval;
+#if defined (__i386__)
    __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (DIOSIX_DRIVER_DEREGISTER), "d" (SYSCALL_DRIVER));
+#elif defined (__arm__)
+   __asm__ __volatile__("mov r4, %2; mov r0, %1; swi $0x0; mov %0, r0" : "=r" (retval) : "i" (DIOSIX_DRIVER_DEREGISTER), "i" (SYSCALL_DRIVER));
+#endif
    return retval;
 }
 
@@ -277,7 +391,11 @@ unsigned int diosix_driver_map_phys(diosix_phys_request *block)
 /* map some physical memory into process space, for driver threads with PROC_FLAG_CANMAPPHYS set only */
 {
    unsigned int retval;
+#if defined (__i386__)
    __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (DIOSIX_DRIVER_MAP_PHYS), "b" (block), "d" (SYSCALL_DRIVER));
+#elif defined (__arm__)
+   __asm__ __volatile__("mov r4, %3; mov r1, %2; mov r0, %1; swi $0x0; mov %0, r0" : "=r" (retval) : "i" (DIOSIX_DRIVER_MAP_PHYS), "r" (block), "i" (SYSCALL_DRIVER));
+#endif
    return retval;
 }
 
@@ -285,7 +403,11 @@ unsigned int diosix_driver_unmap_phys(diosix_phys_request *block)
 /* unmap some physical memory into process space, for driver threads with PROC_FLAG_CANMAPPHYS set only */
 {
    unsigned int retval;
+#if defined (__i386__)
    __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (DIOSIX_DRIVER_UNMAP_PHYS), "b" (block), "d" (SYSCALL_DRIVER));
+#elif defined (__arm__)
+   __asm__ __volatile__("mov r4, %3; mov r1, %2; mov r0, %1; swi $0x0; mov %0, r0" : "=r" (retval) : "i" (DIOSIX_DRIVER_UNMAP_PHYS), "r" (block), "i" (SYSCALL_DRIVER));
+#endif
    return retval;
 }
 
@@ -293,7 +415,11 @@ unsigned int diosix_driver_register_irq(unsigned char irq)
 /* tell the kernel to send irq signals to the calling thread */
 {
    unsigned int retval;
+#if defined (__i386__)
    __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (DIOSIX_DRIVER_REGISTER_IRQ), "b" (irq), "d" (SYSCALL_DRIVER));
+#elif defined (__arm__)
+   __asm__ __volatile__("mov r4, %3; mov r1, %2; mov r0, %1; swi $0x0; mov %0, r0" : "=r" (retval) : "i" (DIOSIX_DRIVER_REGISTER_IRQ), "r" (irq), "i" (SYSCALL_DRIVER));
+#endif
    return retval;
 }
 
@@ -301,7 +427,11 @@ unsigned int diosix_driver_deregister_irq(unsigned char irq)
 /* tell the kernel to stop sending irq signals to the calling thread */
 {
    unsigned int retval;
+#if defined (__i386__)
    __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (DIOSIX_DRIVER_DEREGISTER_IRQ), "b" (irq), "d" (SYSCALL_DRIVER));
+#elif defined (__arm__)
+   __asm__ __volatile__("mov r4, %3; mov r1, %2; mov r0, %1; swi $0x0; mov %0, r0" : "=r" (retval) : "i" (DIOSIX_DRIVER_DEREGISTER_IRQ), "r" (irq), "i" (SYSCALL_DRIVER));
+#endif
    return retval;
 }
 
@@ -310,7 +440,11 @@ unsigned int diosix_get_thread_info(diosix_thread_info *block)
 /* get info about this thread */
 {
    unsigned int retval;
+#if defined (__i386__)
    __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (block), "b" (DIOSIX_THREAD_INFO), "d" (SYSCALL_INFO));  
+#elif defined (__arm__)
+   __asm__ __volatile__("mov r4, %3; mov r1, %2; mov r0, %1; swi $0x0; mov %0, r0" : "=r" (retval) : "r" (block), "i" (DIOSIX_THREAD_INFO), "i" (SYSCALL_INFO));
+#endif
    return retval;
 }
 
@@ -318,7 +452,11 @@ unsigned int diosix_get_process_info(diosix_process_info *block)
 /* get info about this thread */
 {
    unsigned int retval;
+#if defined (__i386__)
    __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (block), "b" (DIOSIX_PROCESS_INFO), "d" (SYSCALL_INFO));  
+#elif defined (__arm__)
+   __asm__ __volatile__("mov r4, %3; mov r1, %2; mov r0, %1; swi $0x0; mov %0, r0" : "=r" (retval) : "r" (block), "i" (DIOSIX_PROCESS_INFO), "i" (SYSCALL_INFO));
+#endif
    return retval;
 }
 
@@ -326,7 +464,11 @@ unsigned int diosix_get_kernel_info(diosix_kernel_info *block)
 /* get information about this kernel and the system it's running on */
 {
    unsigned int retval;
+#if defined (__i386__)
    __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (block), "b" (DIOSIX_KERNEL_INFO), "d" (SYSCALL_INFO));  
+#elif defined (__arm__)
+   __asm__ __volatile__("mov r4, %3; mov r1, %2; mov r0, %1; swi $0x0; mov %0, r0"  : "=r" (retval) : "r" (block), "i" (DIOSIX_KERNEL_INFO), "i" (SYSCALL_INFO));
+#endif
    return retval;
 }
 
@@ -335,7 +477,11 @@ unsigned int diosix_memory_create(void *ptr, unsigned int size)
 /* create a new virtual memory area at address ptr of size bytes */
 {
    unsigned int retval;
-   __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (DIOSIX_MEMORY_CREATE), "b" (ptr), "c" (size), "d" (SYSCALL_MEMORY));  
+#if defined (__i386__)
+   __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (DIOSIX_MEMORY_CREATE), "b" (ptr), "c" (size), "d" (SYSCALL_MEMORY));
+#elif defined (__arm__)
+   __asm__ __volatile__("mov r4, %4; mov r2, %3; mov r1, %2; mov r0, %1; swi $0x0; mov %0, r0" : "=r" (retval) : "i" (DIOSIX_MEMORY_CREATE), "r" (ptr), "r" (size), "i" (SYSCALL_MEMORY));
+#endif
    return retval;  
 }
 
@@ -343,7 +489,11 @@ unsigned int diosix_memory_destroy(void *ptr)
 /* destroy a VMA that has the address ptr */
 {
    unsigned int retval;
+#if defined (__i386__)
    __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (DIOSIX_MEMORY_DESTROY), "b" (ptr), "d" (SYSCALL_MEMORY));  
+#elif defined (__arm__)
+   __asm__ __volatile__("mov r4, %3; mov r1, %2; mov r0, %1; swi $0x0; mov %0, r0"  : "=r" (retval) : "i" (DIOSIX_MEMORY_DESTROY), "r" (ptr), "i" (SYSCALL_MEMORY));
+#endif
    return retval; 
 }
 
@@ -351,7 +501,11 @@ unsigned int diosix_memory_resize(void *ptr, signed int change)
 /* increase or decrease by change bytes the size of a VMA given by ptr */
 {
    unsigned int retval;
+#if defined (__i386__)
    __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (DIOSIX_MEMORY_RESIZE), "b" (ptr), "c" (change), "d" (SYSCALL_MEMORY));  
+#elif defined (__arm__)
+   __asm__ __volatile__("mov r4, %4; mov r2, %3; mov r1, %2; mov r0, %1; swi $0x0; mov %0, r0"  : "=r" (retval) : "i" (DIOSIX_MEMORY_RESIZE), "r" (ptr), "r" (change), "i" (SYSCALL_MEMORY));
+#endif
    return retval; 
 }
 
@@ -359,7 +513,11 @@ unsigned int diosix_memory_access(void *ptr, unsigned int bits)
 /* set the VMA_ACCESS_MASK access flags using bits for a VMA given by ptr */
 {
    unsigned int retval;
-   __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (DIOSIX_MEMORY_ACCESS), "b" (ptr), "c" (bits), "d" (SYSCALL_MEMORY));  
+#if defined (__i386__)
+   __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (DIOSIX_MEMORY_ACCESS), "b" (ptr), "c" (bits), "d" (SYSCALL_MEMORY));
+#elif defined (__arm__)
+   __asm__ __volatile__("mov r4, %4; mov r3, %3; mov r1, %2; mov r0, %1; swi $0x0; mov %0, r0"  : "=r" (retval) : "i" (DIOSIX_MEMORY_ACCESS), "r" (ptr), "r" (bits), "i" (SYSCALL_MEMORY));
+#endif
    return retval; 
 }
 
@@ -367,7 +525,11 @@ unsigned int diosix_memory_locate(void **ptr, unsigned int type)
 /* write the address of the VMA identified by the type bits into the ptr pointer */
 {
    unsigned int retval;
+#if defined (__i386__)
    __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (DIOSIX_MEMORY_LOCATE), "b" (ptr), "c" (type), "d" (SYSCALL_MEMORY));  
+#elif defined (__arm__)
+   __asm__ __volatile__("mov r4, %4; mov r2, %3; mov r1, %2; mov r0, %1; swi $0x0; mov %0, r0" : "=r" (retval) : "i" (DIOSIX_MEMORY_LOCATE), "r" (ptr), "r" (type), "i" (SYSCALL_MEMORY));
+#endif
    return retval; 
 }
 
@@ -376,6 +538,10 @@ unsigned int diosix_debug_write(const char *ptr)
 /* write C-string ptr out to the kernel's debug channel (such as serial IO) (root-only) */
 {
    unsigned int retval;
+#if defined (__i386__)
    __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (DIOSIX_DEBUG_WRITE), "b" (ptr), "d" (SYSCALL_USRDEBUG));  
+#elif defined (__arm__)
+   __asm__ __volatile__("mov r4, %3; mov r1, %2; mov r0, %1; swi $0x0; mov %0, r0" : "=r" (retval) : "i" (DIOSIX_DEBUG_WRITE), "r" (ptr), "i" (SYSCALL_USRDEBUG));
+#endif
    return retval;  
 }
