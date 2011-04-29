@@ -23,7 +23,7 @@ LD		= $(PREFIX)gcc $(FLAGS)
 OBJS	 	= $(OBJSDIR)/main.o $(OBJSDIR)/clcd.o
 
 # targets
-all: vbe
+all: realview_clcd
 
 # dependencies
 $(OBJSDIR)/main.o:	main.c	makefile clcd.h

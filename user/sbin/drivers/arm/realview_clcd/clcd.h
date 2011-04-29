@@ -25,7 +25,7 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #define FB_HEIGHT     (600)    /* pixels y max */
 #define FB_TXT_WIDTH  (100)    /* characters x max */
 #define FB_TXT_HEIGHT (75)     /* characters y max */
-#define FB_DEPTH      (VBE_DISPI_BPP_32) /* bits per pixel */
+#define FB_DEPTH      (32)     /* bits per pixel */
 #define FB_MAX_SIZE   (FB_WIDTH * FB_HEIGHT * (FB_DEPTH >> 3))
 #define FB_PHYS_BASE  (0)
 #define FB_LOG_BASE   (0)
@@ -34,6 +34,8 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 #define FB_WORDSPERPIXEL   (FB_DEPTH >> 5) /* 32bits per word */
 #define FB_BYTESPERPIXEL   (FB_DEPTH >> 3) /* 8bits per byte */
+
+#define COLOUR_GREY(a) ((((a) & 0xff) << 16) | (((a) & 0xff) << 8) | ((a) & 0xff))
 
 /* access the graphics hardware */
 void clcd_set_mode(unsigned short width, unsigned short height, unsigned char bpp);

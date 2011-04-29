@@ -15,8 +15,7 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 */
 
-#include "vbe.h"
-#include "lowlevel.h"
+#include "clcd.h"
 
 unsigned short clcd_read(unsigned short index)
 {

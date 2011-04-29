@@ -21,7 +21,7 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #include "roles.h"
 #include "io.h"
 
-#include "vbe.h"
+#include "clcd.h"
 #include "font.h"
 
 #include <stdio.h>
@@ -55,7 +55,7 @@ void initialise_screen(void)
    diosix_phys_request req;
    
    /* program the card to enter the default screen mode */
-   vbe_set_mode(FB_WIDTH, FB_HEIGHT, FB_DEPTH);
+   clcd_set_mode(FB_WIDTH, FB_HEIGHT, FB_DEPTH);
    
    /* map in the video buffer */
    req.paddr = (void *)FB_PHYS_BASE; /* VBE frame buffer */
@@ -144,7 +144,7 @@ void line_break(void)
       }
       
       /* clear the bottom line */
-      plot_rectangle(0, FB_HEIGHT - FONT_HEIGHT, FB_WIDTH, FONT_HEIGHT, VBE_COLOUR_GREY(FB_BACKGROUND));
+      plot_rectangle(0, FB_HEIGHT - FONT_HEIGHT, FB_WIDTH, FONT_HEIGHT, COLOUR_GREY(FB_BACKGROUND));
    }
    else
       txt_y++;
@@ -198,7 +198,7 @@ void backspace(void)
    y = txt_y * FONT_HEIGHT;
    
    /* erase it */
-   plot_rectangle(x, y, FONT_WIDTH, FONT_HEIGHT, VBE_COLOUR_GREY(FB_BACKGROUND));
+   plot_rectangle(x, y, FONT_WIDTH, FONT_HEIGHT, COLOUR_GREY(FB_BACKGROUND));
 }
 
 /* write_character
@@ -213,7 +213,7 @@ void write_character(char c, unsigned int colour)
    x = txt_x * FONT_WIDTH;
    y = txt_y * FONT_HEIGHT;
    
-   plot_character(x, y, c, VBE_COLOUR_GREY(colour));
+   plot_character(x, y, c, COLOUR_GREY(colour));
       
    /* line break automatically at the end of a line */
    txt_x++;
@@ -235,7 +235,7 @@ void write_string(char *str, unsigned int colour)
    
    while(*str)
    {
-      plot_character(x, y, *str, VBE_COLOUR_GREY(colour));
+      plot_character(x, y, *str, COLOUR_GREY(colour));
       
       str++;
       x += FONT_WIDTH;
@@ -256,10 +256,10 @@ void boot_screen(void)
    
    /* fade into white */
    for(i = 0; i < FB_BACKGROUND; i+= 8)
-      plot_rectangle(0, 0, FB_WIDTH, FB_HEIGHT, VBE_COLOUR_GREY(i));
+      plot_rectangle(0, 0, FB_WIDTH, FB_HEIGHT, COLOUR_GREY(i));
    
    /* plot some kind of welcome title bar */
-   plot_rectangle(0, 0, FB_WIDTH, FONT_HEIGHT + 1, VBE_COLOUR_GREY(FB_FOREGROUND));
+   plot_rectangle(0, 0, FB_WIDTH, FONT_HEIGHT + 1, COLOUR_GREY(FB_FOREGROUND));
    write_string("now running diosix-hyatt", FB_BACKGROUND);
 }
 

@@ -182,11 +182,18 @@ $(OBJSDIR)/msg.o:	$(COREDIR)/msg.c	$(MAKEDEP)
 			$(WRITE) '==> COMPILE: $<'
 			$(COMPILE.c)
 
+.EXPORT_ALL_VARIABLES: ;
+
 # link the kernel
 kernel:		$(OBJS) $(LDSCRIPT)
 		$(WRITE) '[+] linking kernel'
 		$(LD) $^ -o $(OBJSDIR)/$@ -L $(LD_INCLUDE_LIBGCC) -lgcc
+		$(WRITE) '[+] generating files for boot'
 		$(OBJDUMPbin) --source $(OBJSDIR)/$@ >$(OBJSDIR)/kernel.lst
+		$(Q)echo 'KSYM' > $(PATHTOROOT)/kernel.sym
+		$(READELFbin) -Ws $(OBJSDIR)/$@ >$(OBJSDIR)/kernel.ksym
+		$(Q)cat $(OBJSDIR)/kernel.ksym | awk '/FUNC/ { print $$2 " " $$3 " " $$8 }' >> $(PATHTOROOT)/kernel.sym
 		$(STRIPbin) -s $(OBJSDIR)/$@
 		$(OBJCOPYbin) -O binary $(OBJSDIR)/$@ $(PATHTOROOT)/kernel
-
+		$(WRITE) '[+] building arch-specific drivers'
+		$(Q)make -C user/sbin/drivers/$(ARCH)
