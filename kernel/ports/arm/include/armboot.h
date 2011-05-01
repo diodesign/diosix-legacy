@@ -72,6 +72,12 @@ typedef struct
 /* get a pointer to the next atag item */
 #define ATAG_NEXT(p) ((atag_item *)((unsigned int)p + (p->size << 2)))
 
+/* header metadata on a diosix initrd of multiboot modules */
+typedef struct
+{
+   unsigned int present;
+} payload_blob_header;
+
 /* prototypes */
 multiboot_info_t *atag_process(atag_item *list);
 

@@ -24,6 +24,7 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #include <fcntl.h>
 
 #include "../../kernel/core/include/multiboot.h"
+#include "../../kernel/ports/arm/include/armboot.h"
 
 /* syntax: mkpayload -o output file1 file2 ... fileN
    Concatenate files 'file1'...'fileN' into a block of multiboot payload modules
@@ -79,10 +80,7 @@ int main(int argc, char **argv)
    unsigned char *copy_buffer = NULL;
    int result = EXIT_SUCCESS;
    
-   struct 
-   {
-      unsigned int present;   /* number of modules present */
-   } payload_header;
+   payload_blob_header payload_header;
    
    /* sanity check the entry params */
    if(argc < (FIRST_INPUT_ARG + 1) || strcmp(argv[1], "-o"))

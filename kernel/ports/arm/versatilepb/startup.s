@@ -86,6 +86,16 @@ STR   r5, [r6]
 MOV   r3, #0xc00
 STR   r5, [r6, r3, LSL #2]
 
+/* an initrd will be loaded at 0x00800000 physical so
+   make sure it's mapped into the kernel's virtual space 
+   at 0xC0800000 */
+LDR   r5, =KernelBootPgTableInitrd
+SUB   r5, r5, r4
+LDR   r5, [r5]
+MOV   r8, #0xc00
+ADD   r8, r8, #0x008         /* get 0xc08 into r8 */
+STR   r5, [r6, r8, LSL #2]
+
 /* map 1M of the system registers at 0x10000000 physical
    into the kernel's space at 0xc0000000 + 0x10000000 */
 MOV   r5, #0x100
@@ -240,6 +250,9 @@ KernelBootStrFIQ:
 */
 KernelBootPgTableEntry:
 .word 0x00010402  /* point at 0x0 phys mem */
+
+KernelBootPgTableInitrd:
+.word 0x00810402  /* point at 0x00800000 phys mem */
 
 /* craft a mapping for the system's chipset registers */
 KernelBootPgTableSysRegs:
