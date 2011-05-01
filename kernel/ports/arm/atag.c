@@ -54,16 +54,22 @@ multiboot_info_t *atag_process(atag_item *item)
          case atag_core:
             if(item->size > 2)
             {
-               BOOT_DEBUG("[atag] flags: %x, %i bytes per page\n",
+               BOOT_DEBUG("[atag] flags: 0x%x, %i bytes per page\n",
                           item->data.core.flags, item->data.core.page_size);
             }
             break;
             
          case atag_mem:
-            BOOT_DEBUG("[atag] RAM area: %x - %x size: %iMB (%i bytes)\n",
+            BOOT_DEBUG("[atag] RAM area: 0x%x - 0x%x size: %iMB (%i bytes)\n",
                        item->data.mem.physaddr,
                        item->data.mem.physaddr + item->data.mem.size - 1,
                        item->data.mem.size >> 20, item->data.mem.size);
+            break;
+            
+         case atag_initrd2:
+            BOOT_DEBUG("[atag] initrd: 0x%x size: %iMB (%i bytes)\n",
+                       item->data.initrd2.physaddr,
+                       item->data.initrd2.size >> 20, item->data.initrd2.size);
             break;
             
          default:

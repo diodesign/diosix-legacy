@@ -145,10 +145,14 @@ BL    preboot
 /* if r0 is non-zero then we have the green light to run the
    core kernel */
 CMP   r0, #0
-LDRNE r1, =KernelMultibootMagic
-BLNE  _main
+BEQ   parked
+
+LDR   r1, =KernelMultibootMagic
+LDR   r1, [r1]
+BL    _main
 
 /* halt if we get to this point */
+parked:
 B .
 
 /* ------------------------------------------------------------ */
