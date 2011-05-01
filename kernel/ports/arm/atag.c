@@ -87,8 +87,8 @@ multiboot_info_t *atag_process(atag_item *item)
    /* convert word count into number of bytes */
    mb_base = (multiboot_info_t *)((unsigned int)item + (atag_length * sizeof(unsigned int)));
    
-   /* start constructing the multiboot structure */
-   mb_base->flags = MULTIBOOT_FLAGS_MEMINFO | MULTIBOOT_FLAGS_MEMMAP | MULTIBOOT_FLAGS_MODS;
+   /* start constructing the multiboot structure by clearing out the flag word */
+   mb_base->flags = 0;
    
    /* run through the list of environment information passed to us by the bootloader */
    while(item->type != atag_none)
@@ -123,7 +123,7 @@ multiboot_info_t *atag_process(atag_item *item)
             mb_base->mods_addr = (unsigned int)item->data.initrd2.physaddr + sizeof(payload_blob_header);
             mb_base->mods_count = atag_fixup_initrd(item->data.initrd2.physaddr, item->data.initrd2.size);
             
-            mb_base->flags |= MULTIBOOT_FLAGS_MEMMAP;
+            mb_base->flags |= MULTIBOOT_FLAGS_MODS;
             break;
             
          default:
@@ -132,10 +132,7 @@ multiboot_info_t *atag_process(atag_item *item)
       
       item = ATAG_NEXT(item);
    }
-   
-   /* calculate total RAM available */
-   mb_base->flags |= MULTIBOOT_FLAGS_MEMINFO;
-   
+
    return KERNEL_LOG2PHYS(mb_base);
 }
 
