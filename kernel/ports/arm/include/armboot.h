@@ -25,7 +25,7 @@ typedef enum
 } arm_machine_id;
 
 /* define the ATAG structures passed to the kernel after boot, full details here:
-   http://www.simtec.co.uk/products/SWLINUX/files/booting_article.htm */
+   http://www.simtec.co.uk/products/SWLINUX/files/booting_article.html */
 
 typedef enum
 {

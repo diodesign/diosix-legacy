@@ -182,6 +182,7 @@ $(OBJSDIR)/msg.o:	$(COREDIR)/msg.c	$(MAKEDEP)
 			$(WRITE) '==> COMPILE: $<'
 			$(COMPILE.c)
 
+# pass all variables down to sub-makes
 .EXPORT_ALL_VARIABLES: ;
 
 # link the kernel
@@ -197,3 +198,6 @@ kernel:		$(OBJS) $(LDSCRIPT)
 		$(OBJCOPYbin) -O binary $(OBJSDIR)/$@ $(PATHTOROOT)/kernel
 		$(WRITE) '[+] building arch-specific drivers'
 		$(Q)make -C user/sbin/drivers/$(ARCH)
+		$(WRITE) '[+] building boot payload'
+		$(Q)$(RELEASEDIR)/mkpayload -o $(RELEASEDIR)/initrd $(PATHTOROOT)/kernel.sym $(PATHTOROOT)/sbin/drivers/arm/realview_clcd
+
