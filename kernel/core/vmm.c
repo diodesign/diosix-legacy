@@ -1185,7 +1185,7 @@ kresult vmm_initialise(multiboot_info_t *mbd)
                CPU_ID, region->base_addr_low, region->length_low, region->type);
 
       /* is this region present? */
-      if(region->type == 1)
+      if(region->type == MULTIBOOT_MEMTYPE_RAM)
       {
          pg_loop = region->base_addr_low;
          while((pg_loop + MEM_PGSIZE) <= max_addr)

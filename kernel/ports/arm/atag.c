@@ -63,9 +63,43 @@ unsigned int atag_fixup_initrd(unsigned int phys_addr, unsigned int size)
    return mods_found;
 }
  
+/* pointer to current free phys RAM addr in multiboot area,
+   which immediately follows ATAG area */
+unsigned char *mb_alloc_ptr = NULL;
+
+/* atag_mb_alloc
+   Allocate a block of physical RAM to store some multiboot data
+   This function will keep allocations contiguous in memory and
+   zero memory areas before returning the pointer
+   => size = number of bytes to allocate
+   <= pointer to start of block in physical memory, or NULL
+      for failure
+*/
+void *atag_mb_alloc(unsigned int size)
+{
+   /* bail out if we try to use this func before mb_alloc_ptr is set */
+   if(!mb_alloc_ptr)
+   {
+      KOOPS_DEBUG("atag_mb_alloc: allocation attempted before mb_alloc_ptr is defined\n");
+      return NULL;
+   }
+   
+   /* can't allocate zero-sized areas */
+   if(!size) return NULL;
+   
+   /* return the current alloc ptr after moving it forward size bytes */
+   void *retval = mb_alloc_ptr;
+   mb_alloc_ptr = (unsigned char *)((unsigned int)mb_alloc_ptr + size);
+   
+   /* zero the memory area */
+   vmm_memset(KERNEL_PHYS2LOG(retval), 0, size);
+   
+   return retval;
+}
+
 /* atag_process
    Process an ATAG list supplied by a bootloader into a multiboot structure
-   => list = virtual address of ATAG list to grok
+   => item = virtual address of ATAG list to grok
    <= phys address of the multiboot structure or 0 for failure
 */
 multiboot_info_t *atag_process(atag_item *item)
@@ -73,6 +107,8 @@ multiboot_info_t *atag_process(atag_item *item)
    unsigned int atag_length = 0;
    atag_item *ptr = item;
    multiboot_info_t *mb_base;
+   unsigned int mem_areas = 0, mem_area_count = 0;
+   mb_memory_map_t *mem_array;
    
    /* sanity check */
    if(!item || (unsigned int)item < KERNEL_SPACE_BASE) return NULL;
@@ -80,15 +116,33 @@ multiboot_info_t *atag_process(atag_item *item)
    /* count up length of the tag list, we'll place the multiboot straight after */
    while(ptr->type != atag_none)
    {
+      /* also count number of memory areas */
+      if(ptr->type == atag_mem) mem_areas++;
+      
       atag_length += ptr->size;
       ptr = ATAG_NEXT(ptr);
    }
    
    /* convert word count into number of bytes */
    mb_base = (multiboot_info_t *)((unsigned int)item + (atag_length * sizeof(unsigned int)));
+   mb_alloc_ptr = KERNEL_LOG2PHYS((unsigned int)mb_base + sizeof(multiboot_info_t));
    
-   /* start constructing the multiboot structure by clearing out the flag word */
-   mb_base->flags = 0;
+   /* start constructing the multiboot structure by zero'ing the structure */
+   vmm_memset(mb_base, 0, sizeof(multiboot_info_t));
+   
+   /* allocate table of memory areas */
+   if(mem_areas)
+   {
+      mb_base->mmap_length = sizeof(mb_memory_map_t) * mem_areas;
+      mb_base->mmap_addr = (unsigned int)atag_mb_alloc(mb_base->mmap_length);
+      mem_array = KERNEL_PHYS2LOG(mb_base->mmap_addr);
+      
+      if(!mb_base->mmap_addr)
+      {
+         KOOPS_DEBUG("atag_process: failed to allocate multiboot memory area array\n");
+         return NULL;
+      }
+   }
    
    /* run through the list of environment information passed to us by the bootloader */
    while(item->type != atag_none)
@@ -100,6 +154,9 @@ multiboot_info_t *atag_process(atag_item *item)
             {
                BOOT_DEBUG("[atag] flags: 0x%x, %i bytes per page\n",
                           item->data.core.flags, item->data.core.page_size);
+               
+               if(item->data.core.page_size != MEM_PGSIZE)
+                  debug_panic("processor page size incompatible with kernel");
             }
             break;
             
@@ -108,6 +165,13 @@ multiboot_info_t *atag_process(atag_item *item)
                        item->data.mem.physaddr,
                        item->data.mem.physaddr + item->data.mem.size - 1,
                        item->data.mem.size >> 20, item->data.mem.size);
+            
+            /* calc length of the data structure in bytes minus the size word */
+            mem_array[mem_area_count].size = sizeof(mb_memory_map_t) - sizeof(unsigned long);
+            mem_array[mem_area_count].base_addr_low = item->data.mem.physaddr;
+            mem_array[mem_area_count].length_low = item->data.mem.size;
+            mem_array[mem_area_count].type = MULTIBOOT_MEMTYPE_RAM;
+            mem_area_count++;
             
             mb_base->flags |= MULTIBOOT_FLAGS_MEMMAP;
             break;

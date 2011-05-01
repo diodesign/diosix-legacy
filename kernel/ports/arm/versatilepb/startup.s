@@ -27,7 +27,32 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
    it from all references */
 .set KernelVirtualBase, 0xc0000000
 
-/* ------------------------------------------------------------ */
+/* ------------------------------------------------------------------------------- 
+    diosix kernel memory map before calling preboot
+   --------------------------------------------------------------------+---------+
+   | phys 0x00000000 - 0x00000fff  processor exception vectors         |         |
+   | virt 0xc0000000 - 0xc0000fff  (zero page)                         |  256M   |
+   +-------------------------------------------------------------------+  SDRAM  |
+   | phys 0x0000c000 - 0x0000ffff  kernel boot page table (16K fixed)  |         |
+   | virt 0xc000c000 - 0xc000ffff                                      |         |
+   +-------------------------------------------------------------------+         |
+   | phys 0x00010000 - 0x001bffff  kernel image (max 1728K)            |         |
+   | virt 0xc0010000 - 0xc01bffff  (includes descending stack)         |         |
+   +-------------------------------------------------------------------+         |
+   | phys 0x001c0000 - 0x001fffff  physical page stack (max 256K)      |         |
+   | virt 0xc01c0000 - 0xc01fffff                                      |         |
+   +-------------------------------------------------------------------+         |
+   | phys 0x00800000 - 0x0fffffff  initrd image (max 248M)             |         |
+   | virt 0xc0800000 - 0xcfffffff                                      |         |
+   +-------------------------------------------------------------------+---------|
+   | phys 0x10000000 - 0x100fffff  chipset registers (1M fixed)        |         |
+   | virt 0xd0000000 - 0xd00fffff  (system controller)                 |  MMIO   |
+   +-------------------------------------------------------------------+         |
+   | phys 0x10100000 - 0x101fffff  chipset registers (1M fixed)        |         |
+   | virt 0xd0100000 - 0xd01fffff  (serial ports)                      |         |
+   +-------------------------------------------------------------------+         |
+   .                                                                   .         .
+   .                                                                   .         . */
 
 _Reset:
 /* the machine has been reset/powered-on, the kernel is loaded
@@ -86,7 +111,17 @@ STR   r5, [r6]
 MOV   r3, #0xc00
 STR   r5, [r6, r3, LSL #2]
 
-/* an initrd will be loaded at 0x00800000 physical so
+/* the kernel's physical page stack will descend from the 2M 
+   mark in phys mem so make sure this 1M-2M region is mapped
+   in at 0xc0100000 virtual */
+LDR   r5, =KernelBootPgTablePgStack
+SUB   r5, r5, r4
+LDR   r5, [r5]
+MOV   r8, #0xc00
+ADD   r8, r8, #0x001         /* get 0xc01 into r8 */
+STR   r5, [r6, r8, LSL #2]
+
+/* an initrd will be loaded at 0x800000 physical so
    make sure it's mapped into the kernel's virtual space 
    at 0xC0800000 */
 LDR   r5, =KernelBootPgTableInitrd
@@ -144,6 +179,14 @@ LDR   r5, [r5]
 MCR   p15, 0, r5, c1, c0, 0
 
 /* there may be pipeline issues so do nothing for a moment */
+NOP
+NOP
+
+/* correct the pc so that it's running in higher-half */
+ADD   pc, pc, r4
+
+/* the above instruction actually does pc = (pc + 8) + r4
+   so place some NOPs to skip over */
 NOP
 NOP
 
@@ -250,6 +293,9 @@ KernelBootStrFIQ:
 */
 KernelBootPgTableEntry:
 .word 0x00010402  /* point at 0x0 phys mem */
+
+KernelBootPgTablePgStack:
+.word 0x00110402  /* point at 0x00100000 phys mem */
 
 KernelBootPgTableInitrd:
 .word 0x00810402  /* point at 0x00800000 phys mem */

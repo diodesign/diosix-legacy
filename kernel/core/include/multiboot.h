@@ -30,6 +30,8 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #define MULTIBOOT_FLAGS_APM      (1 << 10)
 #define MULTIBOOT_FLAGS_VBE      (1 << 11)
 
+#define MULTIBOOT_MEMTYPE_RAM    (1)
+
 typedef struct multiboot_header
 {
   unsigned long magic;
