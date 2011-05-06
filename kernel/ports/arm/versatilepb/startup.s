@@ -159,7 +159,7 @@ MCR   p15, 0, r5, c2, c0, 2
    our boot page table */
 MOV   r5, #1024
 LSL   r5, r5, #4              /* 2^4 * 1024 = 16K */
-ORR   r5, r5, #0xf            /* cachable, sharable */
+ORR   r5, r5, #3              /* cachable, sharable */
 MCR   p15, 0, r5, c2, c0, 0
 
 /* enable domain 0 by setting bit 1 for this domain */
