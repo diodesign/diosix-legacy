@@ -150,12 +150,7 @@ SUB   r5, r5, r4
 LDR   r5, [r5]
 STR   r5, [r6, r7, LSL #2]
 
-/* clear the translation base control address so we
-   only use TTB0 */
-MOV   r5, #0
-MCR   p15, 0, r5, c2, c0, 2
-
-/* set the translation table base 0 (TTB0) to point to
+/* set the translation table base to point to
    our boot page table */
 MOV   r5, #1024
 LSL   r5, r5, #4              /* 2^4 * 1024 = 16K */
@@ -169,9 +164,9 @@ MCR   p15, 0, r5, c3, c0, 0
 /* disable the fast context switch extension system */
 MOV   r5, #0
 MCR   p15, 0, r5, c13, c0, 0
-MCR   p15, 0, r5, c13, c0, 1
 
-/* fingers crossed! flush entire TLB and enable the MMU */
+/* fingers crossed! flush entire TLB and then enable the MMU
+   and caches (plus other flags) in system control reg 1 */
 MCR   p15, 0, r5, c8, c7, 0
 LDR   r5, =KernelBootMMUFlags
 SUB   r5, r5, r4
@@ -279,37 +274,33 @@ KernelBootStrFIQ:
 
 /* identity map the lowest 1M into the kernel's high memory:
    bits  31-20 = 1M section base addr
-         18    = 0
-         17    = nG: 0 for global
-         16    = S: 1 for shared
-         15    = APX: 0 to disable extra protections
-         14-12 = TEX: 0 for strongly ordered, shareable
          11-10 = AP: 1 for privileged access only
          8-5   = Domain: 0 for booting kernel
-         4     = XN: 0 for executable
          3     = C: 0 for strongly ordered, shareable
          2     = B: 0 for strongly ordered, shareable
          1-0   = 2 for 1M section
 */
 KernelBootPgTableEntry:
-.word 0x00010402  /* point at 0x0 phys mem */
+.word 0x00000402  /* point at 0x0 phys mem */
 
 KernelBootPgTablePgStack:
-.word 0x00110402  /* point at 0x00100000 phys mem */
+.word 0x00100402  /* point at 0x00100000 phys mem */
 
 KernelBootPgTableInitrd:
-.word 0x00810402  /* point at 0x00800000 phys mem */
+.word 0x00800402  /* point at 0x00800000 phys mem */
 
 /* craft a mapping for the system's chipset registers */
 KernelBootPgTableSysRegs:
-.word 0x10002402  /* point at 0x10000000 phys mem, non-shared device */
+.word 0x10000402  /* point at 0x10000000 phys mem, non-shared device */
 
 /* craft a mapping for the serial hardware */
 KernelBootPgTableSerial:
-.word 0x10102402  /* point at 0x10100000 phys mem, non-shared device */
+.word 0x10100402  /* point at 0x10100000 phys mem, non-shared device */
 
 KernelBootMMUFlags:
-.word 0x800009 /* enable, write buffer, no subpages */
+/* enable MMU, enable write buffer, check alignment, 32bit mode exceptions,
+   enable data/unified and instruction caches, enable program flow prediction */
+.word 0x187f;
 
 /* ------------------------------------------------------------ */
 

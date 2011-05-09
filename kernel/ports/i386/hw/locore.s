@@ -51,15 +51,15 @@ CHECKSUM    equ -(MAGIC + FLAGS)  ; checksum required
 ; Note that this is not the virtual address where the kernel image itself is
 ; loaded -- just the amount that must be subtracted from a virtual address to
 ; get a physical address.
-KERNEL_VIRTUAL_BASE equ 0xC0000000      ; 3GB high water mark
+KERNEL_VIRTUAL_BASE   equ 0xC0000000      ; 3GB high water mark
 ; Page directory index of kernel's 4MB PTE.
-KERNEL_PAGE_NUMBER  equ (KERNEL_VIRTUAL_BASE >> 22)
+KERNEL_PAGE_NUMBER    equ (KERNEL_VIRTUAL_BASE >> 22)
 ; Page directory index of the per-cpu-LAPIC + per-system-IOAPIC's 4MB PTE
 PIC_BASE              equ 0xFEC00000
-PIC_PAGE_NUMBER     equ (PIC_BASE >> 22)
+PIC_PAGE_NUMBER       equ (PIC_BASE >> 22)
 
 section .data
-align 0x1000
+align 4096
 KernelPageDirectory:
     ; This page directory entry identity-maps the first 3x4MB pages of the 32-bit
     ; physical address space and the 4MB page containing the APIC registers.

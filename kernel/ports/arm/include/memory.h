@@ -214,28 +214,55 @@ extern unsigned int *phys_pg_stack_high_ptr;
 #define PG_FAULT_I    (0)  /* 0 = not instruction fetch, 1 = instr fetch */
 
 /* ARM-specific page flags */
-#define PG_PRESENT    (0)  /* page present in memory */
-#define PG_RW         (0)  /* set for read+write, clear for read only */
-#define PG_PRIVLVL    (0)  /* set for usr, clear for knl */
-#define PG_WRITETHRU  (0)  /* enable write-through caching when set */
-#define PG_CACHEDIS   (0)  /* don't cache when set */
-#define PG_ACCESSED   (0)  /* page has been read from or written to */
-#define PG_DIRTY      (0)  /* page has been written to */
-#define PG_SIZE       (0)  /* set for 4MB page dir entries, 4KB otherwise */
-#define PG_GLOBAL     (0)  /* set to map in globally */
+#define PG_ACCESS_KERNEL   (1) /* kernel r/w access */
+#define PG_ACCESS_USER_RO  (2) /* kernel r/w, user read-only access */
+#define PG_ACCESS_USER_RW  (3) /* all r/w access */
 
-#define PG_EXTERNAL   (0)  /* set to bump the page manager on fault, unset to use the vma's setting */
-#define PG_PRIVATE    (0)  /* set to indicate this page is private to the process and can be released */
+/* set C and B bits to enable cache+buffering of data */
+#define PG_CACHE_PAGE      (1 << 1 | 1 << 0)
 
-#define PG_DIR_BASE   (0)  /* physical addr in bits 22-31 */
-#define PG_TBL_BASE   (0)  /* table index in bits 12-21 */
-#define PG_TBL_MASK   (~((4 * 1024) - 1))
-#define PG_INDEX_MASK (1023)  /* 10 bits set */
+/* extra per-page bits that need to be stored outside of the MMU page tables */
+#define PG_EXTERNAL        (1 << 31)  /* set to bump the page manager on fault, unset to use the vma's setting */
+#define PG_PRIVATE         (1 << 30)  /* set to indicate this page is private to the process and can be released */
+#define PG_EXTRA_SHIFT     (30)       /* extra bits start at bit 30 */
 
-#define PG_4M_MASK    (~((4 * 1024 * 1024) - 1))
-#define PG_4K_MASK    (~((4 * 1024       ) - 1))
+#define PG_1M_ENTRIES      (4096) /* number of 32bit word entries in the page directory */
+#define PG_1M_SHIFT        (20)   /* physical addr in bits 20-31 for 1M page entries */
+#define PG_1M_AP_SHIFT     (10)   /* access bits start at bit 10 in 1M page entries */
+#define PG_1M_CB_SHIFT     (3)    /* cache and buffering bits start at bit 3 in 1M page entries */
+#define PG_1M_MASK         (~((1 * 1024 * 1024) - 1))
 
-void pg_load_pgdir(void *physaddr);
+#define PG_4K_MASK         (~((4 * 1024) - 1))
+#define PG_4K_SHIFT        (12)   /* index into L2 page table starts at bit 12 */
+#define PG_4K_INDEX_MASK   ((1 << 8) - 1)
+#define PG_4K_TABLE_MASK   (~((1 * 1024) - 1))
+#define PG_4K_AP0_SHIFT    (4)    /* access bits start at bit 4 in 4KB page entries */
+#define PG_4K_AP1_SHIFT    (6)    /* access bits start at bit 4 in 4KB page entries */
+#define PG_4K_AP2_SHIFT    (8)    /* access bits start at bit 4 in 4KB page entries */
+#define PG_4K_AP3_SHIFT    (10)   /* access bits start at bit 4 in 4KB page entries */
+#define PG_4K_CB_SHIFT     (2)    /* cache and buffering bits start at bit 2 in 4K page entries */
+
+
+/* set the type of page directory entry */
+#define PG_L1TYPE_MASK     (PG_L1TYPE_1M | PG_L1TYPE_4KTBL) 
+#define PG_L1TYPE_4KTBL    (1 << 0)  /* entry is to a lvl2 page table of 4K pages */ 
+#define PG_L1TYPE_1M       (1 << 1)  /* entry is to a 1M page in phys mem */
+
+#define PG_L2TYPE_MASK     (PG_L2TYPE_4K | PG_L2TYPE_64K)
+#define PG_L2TYPE_64K      (1 << 0)  /* entry points to a 64K physical page frame */
+#define PG_L2TYPE_4K       (1 << 1)  /* entry points to a 4K physical page frame */
+
+/* describe process's paging setup  */
+typedef struct
+{
+   /* the 16K page directory is split over 4 x 4K pages that 
+      are not necessarily contiguous. these are the physical base addresses
+      of the 4 page frames */
+   unsigned int *frames[4];
+   
+   
+} pg_process;
+
 unsigned int pg_fault_addr(void);
 void pg_init(void);
 void pg_dump_pagedir(unsigned int *pgdir);

@@ -15,16 +15,53 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 */
 
+/* the management of the paging system is slightly different to more convential 
+   setups (ie: the i386_pc tree). the ARMv5 level 1 page directory is 16K in 
+   size as it contains 4096 entries, each entry is 32bit wide and represents
+   a 1M section of virtual memory, totalling a 4G address space. This page directory
+   must therefore be contiguous in physical memory and sit on a 16K boundary.
+ 
+   it may not be possible to request a 16K contig block of phys memory from the
+   VMM-managed free page stack so the page code must maintain an array of four
+   pointers to each of the 4K pages that make up the page directory. these are
+   lazily copied into the kernel's master page directory after a context switch.
+   the per-process pg_process structure maintains this array and is created in
+   pg_clone_pgdir().
+ 
+   the kernel core, however, doesn't expect this and passes an unsigned int ** 
+   pointer stashed in the thread's process structure to the paging code. this
+   needs to be recast into a pg_process structure before it's operated on.
+ 
+   next, the level 2 page tables are 1K in size, being 256 entries of 32bit words
+   with each entry repesenting 4K, totalling an address space size of 1M. The
+   lvl 2 page tables must be 1K boundary aligned. These are allocated by grabbing
+   a 4K physical page and splitting it into 4 1K blocks and managing their allocation
+   in the per-process pg_process structure.
+*/
 
 #include <portdefs.h>
 
-/* pg_load_pgdir
-   Tell the CPU to use this new page directory
+/* pg_pgdir_entry_to_vaddr
+   Look up the kernel virtual address of a given entry in a lvl 1 page directory
+   => pgdir = pgdir struct to access
+      entry = entry number to lookup (0-4095)
+   <= virtual address of the entry or 0 for failure
 */
-void pg_load_pgdir(void *physaddr)
+unsigned int *pg_pgdir_entry_to_vaddr(unsigned int **pgdir, unsigned int entry)
 {
-   KOOPS_DEBUG("pg_load_pgdir(%p): not yet implemented\n", physaddr);
-   return;
+   unsigned char index;
+   unsigned int *dir;
+   pg_lvl1_dir *descr = (pg_lvl1_dir *)pgdir;
+   
+   /* sanity checks */
+   if(!descr || entry >= PG_1M_ENTRIES) return NULL;
+   
+   /* bits 11 and 10 select which of the 4K pages to use */
+   index = entry >> 10;
+   dir = KERNEL_PHYS2LOG(descr->frames[index]);
+   
+   /* use a mask to keep the lower 10 bits (0-9) */ 
+   return dir[entry & (1024 - 1)];
 }
 
 unsigned int pg_fault_addr(void)
@@ -340,12 +377,9 @@ unsigned int **pg_clone_pgdir(unsigned int **source)
    unsigned int source_touched = 0;
    unsigned int **new = NULL;
 
-   /* ask the vmm for a physical page */
-   if(vmm_req_phys_pg((void **)&new, 1))
-      return NULL; /* bail out if we can't get a phys page */
-   
-   new = (unsigned int **)KERNEL_PHYS2LOG(new);
-   
+   new = pg_create_pgdir(source);
+   if(!new) return NULL; /* bail out if we can't get a phys page */
+
    /* link the kernelspace mappings */
    for(loop = (KERNEL_SPACE_BASE >> PG_DIR_BASE); loop < 1024; loop++)
       new[loop] = source[loop];
@@ -405,12 +439,12 @@ unsigned int **pg_clone_pgdir(unsigned int **source)
 }
 
 /* pg_new_process
- Called when a new process is being created so port-specific stuff
- can take place. We'll base 
- => new = pointer to process structure
- current = pointer or NULL for initial system processes
- <= 0 for success or an error code
- */
+   Called when a new process is being created so port-specific stuff
+   can take place. We'll base 
+   => new = pointer to process structure
+      current = pointer or NULL for initial system processes
+   <= 0 for success or an error code
+*/
 kresult pg_new_process(process *new, process *current)
 {
    unsigned int **pgdir;
@@ -456,7 +490,7 @@ kresult pg_new_process(process *new, process *current)
    
    PAGE_DEBUG("[page:%i] created new pgdir %p for new process %i\n", 
            CPU_ID, new->pgdir, new->pid);
-   
+
    return success;
 }
 
@@ -469,22 +503,12 @@ kresult pg_new_process(process *new, process *current)
 kresult pg_destroy_process(process *victim)
 {
    unsigned int loop;
-   unsigned int **pgdir;
    
    lock_gate(&(victim->lock), LOCK_WRITE);
-   
-   pgdir = victim->pgdir;
-   
-   /* run through the userspace of the page directory */
-   for(loop = 0; loop < (KERNEL_SPACE_BASE >> PG_DIR_BASE); loop++)
-   {
-      if((unsigned int)(pgdir[loop]) & PG_PRESENT)
-         /* return the page holding the table */
-         vmm_return_phys_pg((unsigned int *)((unsigned int)(pgdir[loop]) & PG_4K_MASK));
-   }
-   
-   /* return the page dir's page */
-   vmm_return_phys_pg(KERNEL_LOG2PHYS(victim->pgdir));
+      
+   /* destroy the structures describing this process and
+      return the page dir's page */
+   pg_destroy_pgdir(victim->pgdir);
    victim->pgdir = NULL;
    
    /* bump the userspace page manager */
@@ -515,21 +539,21 @@ kresult pg_destroy_process(process *victim)
 */
 kresult pg_user2phys(unsigned int *paddr, unsigned int **pgdir, unsigned int virtual)
 {
-   unsigned int pgdir_index = (virtual >> PG_DIR_BASE) & PG_INDEX_MASK;
-   unsigned int pgtable_index = (virtual >> PG_TBL_BASE) & PG_INDEX_MASK;
+   unsigned int pgdir_index = virtual >> PG_1M_SHIFT;
+   unsigned int pgtable_index = (virtual >> PG_4K_SHIFT) & PG_4K_INDEX_MASK;
    unsigned int *pgtbl;
    
    if((!pgdir) || (!paddr)) return e_failure;
    
-   pgtbl = (unsigned int *)((unsigned int)pgdir[pgdir_index] & PG_4K_MASK);
+   pgtbl = (unsigned int *)((unsigned int)pgdir_index[pgdir_index] & PG_4K_TABLE_MASK);
    
    if(pgtbl)
    {
       pgtbl = KERNEL_PHYS2LOG(pgtbl);
 
-      if(pgtbl[pgtable_index] & PG_PRESENT)
+      if((pgtbl[pgtable_index] & PG_L2TYPE_MASK) == PG_L2TYPE_4K)
       {
-         *(paddr) = (pgtbl[pgtable_index] & PG_4K_MASK) + (virtual & ~PG_4K_MASK);
+         *(paddr) = (pgtbl[pgtable_index] & PG_4K_TABLE_MASK) | (virtual & ~PG_4K_TABLE_MASK);
          return success;
       }
    }
@@ -570,53 +594,30 @@ kresult pg_user2kernel(unsigned int *kaddr, unsigned int uaddr, process *proc)
 */
 kresult pg_remove_4K_mapping(unsigned int **pgdir, unsigned int virtual, unsigned int release_flag)
 {
-   unsigned int pgdir_index = (virtual >> PG_DIR_BASE) & PG_INDEX_MASK;
-   unsigned int pgtable_index = (virtual >> PG_TBL_BASE) & PG_INDEX_MASK;
-   unsigned int *pgtbl, physical;
+   unsigned int *pgtable, physical;
+   unsigned int pgdir_index = virtual >> PG_1M_SHIFT;
+   unsigned int pgtbl_index = (virtual >> PG_4K_SHIFT) & PG_4K_INDEX_MASK;
    
-   if(!pgdir || ((unsigned int)pgdir < KERNEL_SPACE_BASE))
-   {
-      KOOPS_DEBUG("[page:%i] OMGWTF bad page directory pointer to pg_remove_4K_mapping!\n"
-                  "              pgdir %p virtual %x\n"
-                  "              pgdir_index %i pgtable_index %i\n",
-                  CPU_ID, pgdir, virtual, pgdir_index, pgtable_index);
-      debug_stacktrace();
-      return e_failure; /* bail out now if we get a bad pointer */
-   }
-   
-   /* if a 4M mapping already exists for this virtual address then bail out */
-   if((unsigned int)(pgdir[pgdir_index]) & PG_SIZE)
-   {
-      KOOPS_DEBUG("[page:%i] OMGWTF tried to remove a 4M page entry in pg_remove_4K_mapping!\n"
-                  "              pgdir %p virtual %x\n"
-                  "              pgdir_index %i pgtable_index %i\n",
-                  CPU_ID, pgdir, virtual, pgdir_index, pgtable_index);
-      debug_stacktrace();
-      return e_failure;
-   }
-   
-   /* get the page table entry */
-   pgtbl = (unsigned int *)KERNEL_PHYS2LOG(pgdir[pgdir_index]);
-   pgtbl = (unsigned int *)((unsigned int)pgtbl & PG_TBL_MASK); /* clean out lower bits */
-   physical = pgtbl[pgtable_index];
-   
-   /* was the page ever present? */
-   if(physical & PG_PRESENT)
-   {
-      /* set page as not present and strip out the physical address */
-      pgtbl[pgtable_index] &= (~PG_TBL_MASK & ~PG_PRESENT); 
+   PAGE_DEBUG("[page:%i] unmapping 4K: %x release flag %x dir index %x\n", 
+              CPU_ID, virtual, release_flag, pgdir_index);
 
-      /* mask off all the low bits in the table entry to get the physical address */
-      physical &= PG_TBL_MASK;
-
-      PAGE_DEBUG("[page:%i] removing 4K page at %x in pd %p, freeing physical frame %x\n",
-                 CPU_ID, virtual, pgdir, physical);
+   /* bail out if we're not dealing with a lvl2 page table entry */
+   if(((unsigned int)pgdir_index[pgdir_index] & PG_L1TYPE_MASK) != PG_L1TYPE_4KTBL)
+      return e_bad_address;
+   
+   /* mark the 4K page entry as not present (zero bottom two bits and physical addr) */
+   pgtable = KERNEL_PHYS2LOG((unsigned int)pgdir_index[pgdir_index] & PG_4K_TABLE_MASK);
+   physical = pgtable[pgtbl_index];
+   pgtable[pgtbl_index] &= (~PG_4K_MASK & ~PG_L2TYPE_MASK);
+   
+   /* determine if a page ever existed for this mapping */
+   if((physical & PG_L2TYPE_MASK) == PG_L2TYPE_4K)
+   {
+      /* strip out the non-physical address bits */
+      physical &= PG_4K_MASK;
       
-      /* only obey the PG_PRIVATE flag if release_flag is set */
-      if(release_flag && (pgtbl[pgtable_index] & PG_PRIVATE))
+      if(release_flag && (pg_read_extrabits(pgdir, virtual) & (PG_PRIVATE >> PG_EXTRA_SHIFT)))
          return vmm_return_phys_pg((void *)physical); /* release the physical frame */
-      else
-         return success;
    }
    
    return success;
@@ -634,93 +635,105 @@ kresult pg_remove_4K_mapping(unsigned int **pgdir, unsigned int virtual, unsigne
 kresult pg_add_4K_mapping(unsigned int **pgdir, unsigned int virtual, unsigned int physical, 
                           unsigned int flags)
 {
-   unsigned int pgdir_index = (virtual >> PG_DIR_BASE) & PG_INDEX_MASK;
-   unsigned int pgtable_index = (virtual >> PG_TBL_BASE) & PG_INDEX_MASK;
-   unsigned int *pgtbl;
-
-   if(!pgdir || ((unsigned int)pgdir < KERNEL_SPACE_BASE))
+   unsigned int *pgtable, ap;
+   unsigned int pgdir_index = virtual >> PG_1M_SHIFT;
+   unsigned int pgtbl_index = (virtual >> PG_4K_SHIFT) & PG_4K_INDEX_MASK;
+   
+   PAGE_DEBUG("[page:%i] mapping 4K: %x -> %x (%x) dir index %x\n", 
+              CPU_ID, virtual, physical, flags, pgdir_index);
+   
+   /* if the level one page directory entry for this virtual address is empty
+      then we need to allocate a level two page table */
+   if(pgdir_index[pgdir_index] == NULL)
    {
-      KOOPS_DEBUG("[page:%i] OMGWTF bad page directory pointer to pg_add_4K_mapping!\n"
-                  "              pgdir %p virtual %x physical %x flags %i\n"
-                  "              pgdir_index %i pgtable_index %i\n",
-                  CPU_ID, pgdir, virtual, physical, flags, pgdir_index, pgtable_index);
-      debug_stacktrace();
-      return e_failure; /* bail out now if we get a bad pointer */
+      /* pg_alloc_pgtable() will also clean the array */
+      unsigned int pgtbl = pg_alloc_pgtable(pgdir);
+      if(!pgtbl) return e_failure;
+      
+      pgdir_index[pgdir_index] = (unsigned int *)(pgtbl | PG_L1TYPE_4KTBL);
    }
    
-   /* if a 4M mapping already exists for this virtual address then bail out */
-   if((unsigned int)(pgdir[pgdir_index]) & PG_SIZE)
-      return success;
-
-   /* find the entry in the page directory for the page table for this 4K page and
-      allocate a page table if it doesn't exist */
-   if(!(pgdir[pgdir_index]))
-   {
-      unsigned int loop;
-      unsigned int *newtable, *cleantable;
-      
-      kresult err = vmm_req_phys_pg((void **)&newtable, 1);
-      if(err) return err; /* failed */
-         
-      PAGE_DEBUG("[page:%i] new page table created: %p\n", CPU_ID, newtable);
-
-      /* PLEASE PLEASE don't forget that all kernel addresses are
-         logical! So you must convert phys to log before accessing
-         the referenced memory */
-      /* zero the new page table */
-      cleantable = (unsigned int *)KERNEL_PHYS2LOG(newtable);
-      for(loop = 0; loop < 1024; loop++)
-         cleantable[loop] = 0;
-      
-      /* write into the page directory entry the new tbl addr and flags */
-      /* force the r/w bit high so that if a particular page is marked read-only
-         the whole directory entry isn't */
-      pgdir[pgdir_index] = (unsigned int *)((unsigned int)newtable | PG_RW | flags);
-   }
+   /* bail out if we're not dealing with a lvl2 page table by now */
+   if(((unsigned int)pgdir_index[pgdir_index] & PG_L1TYPE_MASK) != PG_L1TYPE_4KTBL)
+      return e_bad_address;
    
-   /* align address and clean lower bits */
-   physical = physical & PG_4K_MASK;
+   /* check to see if we've got extra flags to store. these are passed in the
+      high bits of flags but masked out for the actual MMU tables */
+   if(flags & PG_4K_MASK)
+      pg_store_extrabits(pgdir, virtual, flags >> PG_EXTRA_SHIFT);
    
-   PAGE_DEBUG("[page:%i] mapping 4K: %x -> %x (%x) dir index %x table index %x table base %p (%x)\n", 
-           CPU_ID, virtual, physical, flags, pgdir_index, pgtable_index,
-           pgdir[pgdir_index], KERNEL_PHYS2LOG(pgdir[pgdir_index]));
+   /* replicate the access permissions in AP0 into AP1-3 */
+   ap = (flags >> PG_4K_AP0_SHIFT) & PG_ACCESS_USER_RW;
+   flags |= (ap << PG_4K_AP1_SHIFT) | (ap << PG_4K_AP2_SHIFT) | (ap << PG_4K_AP3_SHIFT);
    
-   pgtbl = (unsigned int *)KERNEL_PHYS2LOG(pgdir[pgdir_index]);
-   pgtbl = (unsigned int *)((unsigned int)pgtbl & PG_TBL_MASK); /* clean out lower bits */
+   /* program the 4K page entry for this address into the lvl2 page table */
+   pgtable = KERNEL_PHYS2LOG((unsigned int)pgdir_index[pgdir_index] & PG_4K_TABLE_MASK);
+   pgtable[pgtbl_index] = (physical & PG_4K_MASK) | (flags & ~PG_4K_MASK) | PG_L2TYPE_4K;
    
-   pgtbl[pgtable_index] = physical | flags;
-   
-   return 0;
+   return success;
 }
 
-/* pg_add_4M_mapping
- Add or edit an existing 4M mapping to a page directory
- => pgdir = pointer to page directory to add the 4K mapping to
-    virtual = the full virtual address for the start of the 4K page
-    physical = the full physical address of the page frame
-    flags = flag bits to be ORd with the phys addr
- <= 0 for success, anything else is a fail
- */
-kresult pg_add_4M_mapping(unsigned int **pgdir, unsigned int virtual, unsigned int physical, 
+/* pg_add_1M_mapping
+   Add or edit an existing 1M mapping to a page directory
+   => pgdir = pointer to page directory to add the 1M mapping to
+      virtual = the full virtual address for the start of the 1M page
+      physical = the full physical address of the page frame
+      flags = flag bits to be ORd with the phys addr
+   <= 0 for success, anything else is a fail
+*/
+kresult pg_add_1M_mapping(unsigned int **pgdir, unsigned int virtual, unsigned int physical, 
                           unsigned int flags)
 {   
-   PAGE_DEBUG("[page:%i] mapping 4M: %x -> %x (%x) dir index %x\n", 
-           CPU_ID, virtual, physical, flags, virtual >> PG_DIR_BASE);
+   PAGE_DEBUG("[page:%i] mapping 1M: %x -> %x (%x) dir index %x\n", 
+           CPU_ID, virtual, physical, flags, virtual >> PG_1M_SHIFT);
    
-   virtual = virtual & PG_4M_MASK;
-   physical = physical & PG_4M_MASK;
+   virtual = virtual & PG_1M_MASK;
+   physical = physical & PG_1M_MASK;
    
-   /* create 4MB entry, read+write for kernel-only */
-   if((virtual >> PG_DIR_BASE) < 1024)
+   /* create 1MB entry, read+write for kernel-only
+      ensure we don't overrun the 16K level 1 page directory */
+   if((virtual >> PG_1M_SHIFT) < PG_1M_ENTRIES)
    {
-      unsigned int entry = (unsigned int)(pgdir[(virtual >> PG_DIR_BASE)]);
+      unsigned int entry = (unsigned int)(pgdir[(virtual >> PG_1M_SHIFT)]);
       
-      /* give up if this entry is taken by a 4K mapping entry */
-      if(entry != 0)
-         if((entry & PG_SIZE) == 0)
+      /* give up if this entry is taken by a non-1M mapping entry */
+      if((entry & PG_L1TYPE_MASK) != 0)
+         if((entry & PG_L1TYPE_MASK) != PG_L1TYPE_1M)
             return e_failure;
       
-      pgdir[(virtual >> PG_DIR_BASE)] = (unsigned int *)(physical | PG_SIZE | flags);
+      pgdir[(virtual >> PG_1M_SHIFT)] = (unsigned int *)(physical | flags | PG_L1TYPE_1M);
+      return success;
+   }
+   
+   /* fall through to failure */
+   return e_failure;
+}
+
+/* pg_remove_1M_mapping
+   Delete an existing 1M mapping to a page directory
+   => pgdir = pointer to page directory to add the 1M mapping to
+      virtual = the full virtual address for the start of the 1M page
+   <= 0 for success, anything else is a fail
+*/
+kresult pg_remove_1M_mapping(unsigned int **pgdir, unsigned int virtual)
+{   
+   PAGE_DEBUG("[page:%i] unmapping 1M: %x dir index %x\n", 
+              CPU_ID, virtual, virtual >> PG_DIR_BASE);
+   
+   virtual = virtual & PG_1M_MASK;
+   physical = physical & PG_1M_MASK;
+   
+   /* remove a 1MB entry, ensure we don't overrun the 16K level 1 page directory */
+   if((virtual >> PG_1M_SHIFT) < PG_1M_ENTRIES)
+   {
+      unsigned int entry = (unsigned int)(pgdir[(virtual >> PG_1M_SHIFT)]);
+      
+      /* give up if this entry is taken by a non-1M mapping entry */
+      if((entry & PG_L1TYPE_MASK) != 0)
+         if((entry & PG_L1TYPE_MASK) != PG_L1TYPE_1M)
+            return e_failure;
+      
+      pgdir[(virtual >> PG_1M_SHIFT)] = NULL;
       return success;
    }
    
@@ -730,15 +743,14 @@ kresult pg_add_4M_mapping(unsigned int **pgdir, unsigned int virtual, unsigned i
 
 /* pg_map_phys_to_kernel_space
    Read through a physical page frame stack and add entries to the kernel's
-   virtual space.
+   virtual space, mapping 1M pages in at a time
    => base = base of descending stack
       top = last entry in stack
-      granularity = 0 to add 4KB page entries, 1 to add 4M page entries
 */
-void pg_map_phys_to_kernel_space(unsigned int *base, unsigned int *top, unsigned char granularity)
+void pg_map_phys_to_kernel_space(unsigned int *base, unsigned int *top)
 {
-   unsigned int **pg_dir = (unsigned int **)KernelPageDirectory; /* from start.s */
-   kresult err;
+   /* from kernel/ports/arm/include/memory.h */
+   unsigned int **pg_dir = (unsigned int **)KernelPageDirectory;
 
    /* we must assume the physical page stacks are full - ie: no one has
       popped any stack frames off them. and we have to assume for now that
@@ -746,49 +758,25 @@ void pg_map_phys_to_kernel_space(unsigned int *base, unsigned int *top, unsigned
       frames into the kernel's virtual space. */
    while(base >= top)
    {
-      unsigned int addr, logical_addr;
-      unsigned char this_granularity = granularity;
+      unsigned int addr, virtual_addr;
       
-      if(this_granularity == 1)
-         addr = *base & PG_4M_MASK;
-      else
-         addr = *base & PG_4K_MASK; 
+      addr = *base & PG_1M_MASK;
 
       /* perform the page table scribbling */
-      if(this_granularity == 1)
+      virtual_addr = (unsigned int)KERNEL_PHYS2LOG((unsigned int)addr);
+      
+      PAGE_DEBUG("[page:%i] mapping to kernel 1M, page dir[%i] = %x (%x) (%x)\n",
+              CPU_ID, (virtual_addr >> PG_1M_SHIFT), addr, virtual_addr, pg_dir);
+      
+      /* create 1MB entry, cached and buffered, read+write for kernel-only */
+      pg_add_1M_mapping(pg_dir, virtual_addr, addr,
+                        (PG_CACHE_PAGE << PG_1M_CB_SHIFT) | (PG_ACCESS_KERNEL << PG_1M_AP_SHIFT));
+      
+      /* skip to next 1M boundary */
+      while(base >= top)
       {
-         logical_addr = (unsigned int)KERNEL_PHYS2LOG((unsigned int)addr);
-         
-         PAGE_DEBUG("[page:%i] mapped to kernel 4M, page dir[%i] = %x (%x) (%x)\n",
-                 CPU_ID, (logical_addr >> PG_DIR_BASE), addr, logical_addr, pg_dir);
-         
-         /* create 4MB entry, read+write for kernel-only */
-         pg_add_4M_mapping(pg_dir, logical_addr, addr, PG_PRESENT | PG_RW);
-         
-         /* skip to next 4M boundary aka next */
-         while(base >= top)
-         {
-            base--;
-            if((*base & PG_4M_MASK) != addr) break;
-         }
-      }
-      else
-      {
-
-         PAGE_DEBUG("[page:%i] mapped to kernel 4K, phys %x log %x (%x)\n",
-                 CPU_ID, *base, KERNEL_PHYS2LOG(*base), pg_dir);
-                     
-         /* create a 4KB entry, read+write for kernel-only */
-         err = pg_add_4K_mapping((unsigned int **)pg_dir, (unsigned int)KERNEL_PHYS2LOG(*base),
-                                 *base, PG_PRESENT | PG_RW);
-          if(err)
-          {
-             PAGE_DEBUG("*** failed to map virtual %x to physical %x into kernel! halting.",
-                     (unsigned int)KERNEL_PHYS2LOG(*base), *base);
-             while(1);
-          }
-
          base--;
+         if((*base & PG_1M_MASK) != addr) break;
       }
    }
 }
@@ -808,57 +796,18 @@ void pg_init(void)
    
    unsigned int loop;
    unsigned int **kernel_dir = (unsigned int **)KernelPageDirectory;
-   
+      
    PAGE_DEBUG("[page:%i] initialising.. kernel page dir %x\n", CPU_ID, KernelPageDirectory);
-
-   /* clear out all non-kernelspace entries to start again */
-   for(loop = 0; loop < (KERNEL_SPACE_BASE >> PG_DIR_BASE); loop++)
+   
+   /* clear out all non-kernel space entries to start again - the kernel
+      boot page directory is made up of 4096 x 1M entries */
+   for(loop = 0; loop < (KERNEL_SPACE_BASE >> PG_1M_SHIFT); loop++)
       kernel_dir[loop] = NULL;
    
-   /* the order of this is important: mapping in 4K pages means page tables
-       will have to be found and written in. The physical pages holding these
-       tables are unlikely to be mapped in unless we process the upper
-       memory first, which are mapped in as 4M pages requiring no separate
-       tables */
-   /* map most of memory into 4M pages */
-   pg_map_phys_to_kernel_space(high_base, high_ptr, 1);
-   
-   /* ensure the kernel critical area is mapped in - we use 4M pages to 
-      maximise TLB performance */
-   for(loop = KERNEL_CRITICAL_BASE; loop < (unsigned int)KERNEL_CRITICAL_END; loop += MEM_4M_PGSIZE)
-      pg_add_4M_mapping(kernel_dir, (unsigned int)KERNEL_PHYS2LOG(loop), loop, PG_PRESENT | PG_RW);
-   
-   /* map the rest of the lowest 16M in 4K pages */
-   pg_map_phys_to_kernel_space(low_base, low_ptr, 0);
-   
-   /* notify cpu of change in kernel directory */
-   pg_load_pgdir(KERNEL_LOG2PHYS(KernelPageDirectory));
-   BOOT_DEBUG("[page:%i] vmm initialised\n", CPU_ID);
-}
+   /* ensure all of physical RAM is mapped into the kernel */
+   pg_map_phys_to_kernel_space(high_base, high_ptr)
+   pg_map_phys_to_kernel_space(low_base, low_ptr);
 
-
-/* pg_dump_pagedir
-   For debug purposes, dump a copy of the given page directory */
-void pg_dump_pagedir(unsigned int *pgdir)
-{
-   unsigned int i;
-   
-   if(!pgdir) return;
-   
-   PAGE_DEBUG("[page:%i] contents of pgdir at %p (%x)\n", 
-           CPU_ID, pgdir, KERNEL_LOG2PHYS(pgdir));
-   
-   for(i = 0; i < 1024; i++)
-      if(pgdir[i])
-      {
-         PAGE_DEBUG("       kernel_dir[%i] = %x\n", i, pgdir[i]);
-      }
-}
-
-/* pg_postmortem
- Perform a diagnostic dump if a page fault can't be handled */
-void pg_postmortem(int_registers_block *regs)
-{
-   KOOPS_DEBUG("pg_postmortem: not implemented yet\n");
+   BOOT_DEBUG("[page:%i] paging initialised\n", CPU_ID);
 }
 
