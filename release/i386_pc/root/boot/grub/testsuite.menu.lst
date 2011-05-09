@@ -1,0 +1,14 @@
+# diosix-hyatt testsuite pre-Release1.0 i386 boot agenda
+
+timeout 1
+
+title diosix-hyatt-testsuite
+root (cd)
+kernel /boot/kernel
+
+# kernel symbol table
+module /boot/kernel.sym
+
+# run the kernel API testsuite 
+module /bin/testsuite
+
