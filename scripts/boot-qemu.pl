@@ -49,11 +49,11 @@ if($ARGV[1] ne "")
    $ARGV[3] =~ s/[^0-9MK]//g;      # phys RAM fitted
    
    print "[+] entering standalone run of $arch_name build: $ARGV[2] cpu(s) of $ARGV[1] with $ARGV[3] RAM, Live CD boot";
-   system @arch_generate_cmdline($ARGV[1], $ARGV[2], $ARGV[3], "standalone", "-nographic");
+   system &arch_generate_cmdline($ARGV[1], $ARGV[2], $ARGV[3], "standalone", "-nographic");
    exit 0;
 }
 
-print "[+] entering automated integration testing for $diosix_arch\n";
+print "[+] entering automated integration testing for $arch_name\n";
 
 # iterate through the different combinations specified by the arch target
 foreach $model (@arch_cpu_models)
@@ -86,12 +86,12 @@ exit 0;
 # Start the specified machine in QEMU until the given timeout
 sub boot
 {
-   my $pidfile = @generate_filename_prefix($_[0], $_[1], $_[2], "automated");
+   my $pidfile = &generate_pathname_prefix($_[0], $_[1], $_[2], "automated");
    
    # run the QEMU instance in a separate child process
    if(fork() == 0)
    {
-      system @arch_generate_cmdline($_[0], $_[1], $_[2], "automated", "-nographic");
+      system &arch_generate_cmdline($_[0], $_[1], $_[2], "automated", "-nographic");
       exit 0;
    }
 

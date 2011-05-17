@@ -39,7 +39,7 @@ $arch_name = "arm_versatilepb";
 #  <= returns a string to pass to system()
 sub arch_generate_cmdline
 {
-   my $filename = @generate_pathname_prefix($_[0], $_[1], $_[2], $_[3]);
+   my $filename = &generate_pathname_prefix($_[0], $_[1], $_[2], $_[3]);
    
    return "$arch_qemu_exe -M versatilepb -cpu $_[0] -m $_[2] $_[4] -pidfile $filename.pid -serial file:$filename.log -kernel release/$arch_name/root/kernel -initrd release/$arch_name/initrd >/dev/null 2>/dev/null"
 }

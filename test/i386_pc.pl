@@ -1,7 +1,6 @@
 #!/usr/bin/perl
 
-#
-#
+# ----------------------------------------------------------------------
 # test/i386_pc.pl
 # Define the QEMU boot parameters for testing the i386_pc arch target
 # Author : Chris Williams
@@ -16,8 +15,7 @@
 # THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 # Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
-#
-#
+# ______________________________________________________________________
 
 # define the qemu to use, the kernel arch and how many seconds each run is allowed to execute for
 $arch_qemu_exe = "qemu-system-i386";
@@ -49,7 +47,7 @@ $arch_name = "i386_pc";
 #  <= returns a string to pass to system()
 sub arch_generate_cmdline
 {
-   my $filename = @generate_pathname_prefix($_[0], $_[1], $_[2], $_[3]);
+   my $filename = &generate_pathname_prefix($_[0], $_[1], $_[2], $_[3]);
    
    return "$arch_qemu_exe -M pc -cpu $_[0] -smp $_[1] -m $_[2] $_[4] -pidfile $filename.pid -serial file:$filename.log -boot order=d -cdrom release/$diosix_arch/cd.iso >/dev/null 2>/dev/null"
 }
