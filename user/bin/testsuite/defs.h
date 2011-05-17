@@ -1,7 +1,7 @@
-/* user/bin/testsuite/main.c
- * Testsuite of kernel and OS APIs
+/* user/bin/testsuite/defs.h
+ * Core definitions for the userland testsuite
  * Author : Chris Williams
- * Date   : Mon,9 May 2011.11:06:00
+ * Date   : Mon,9 May 2011.12:25:00
 
 Copyright (c) Chris Williams and individual contributors
 
@@ -15,23 +15,10 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 */
 
-#include "diosix.h"
-#include "functions.h"
-#include "async.h"
-#include "roles.h"
-#include "io.h"
+#ifndef _DEFS_H
+#define  _DEFS_H
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+/* prepended to each output line to be picked up by the testsuite log processor */
+#define LOG "__DTS__"
 
-#include "defs.h"
-
-int main(void)
-{
-   printf(LOG "testsuite running, built: " __TIME__ " " __DATE__ "\n");
-
-   
-   printf(LOG "testsuite complete\n");
-   while(1); /* idle */
-}
+#endif

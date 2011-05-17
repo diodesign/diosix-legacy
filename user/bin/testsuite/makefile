@@ -27,7 +27,7 @@ OBJS	 	= $(OBJSDIR)/main.o
 all: testsuite
 
 # dependencies
-$(OBJSDIR)/main.o:	main.c	makefile
+$(OBJSDIR)/main.o:	main.c	defs.h makefile
 			$(WRITE) '==> COMPILE: $<'
 			$(Q)$(CC) -c -o $@ $<
 
