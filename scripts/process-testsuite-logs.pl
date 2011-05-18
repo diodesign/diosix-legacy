@@ -17,6 +17,8 @@
 # Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 # ______________________________________________________________________
 
+@tests = ( "Usermode execution" );
+my $results;
 
 # syntax: process-testsuite-logs.pl <target name>
 #
@@ -26,44 +28,124 @@
 # clean the args
 $ARGV[0] =~ s/[^A-Za-z0-9_]//g;
 
-if()
-
-print "[+] entering automated integration testing for $diosix_arch\n";
-
-foreach $model (@cpu_models)
+if($ARGV[0] eq "")
 {
-   &print_rule("=");
-   print "[+] CPU MODEL: $model\n";
-   
-   foreach $cores (@cpu_cores)
-   {
-      &print_rule("-");
-      print "[+] NUMBER OF CORES: $cores\n";
-      
-      foreach $mem (@mem_fitted)
-      {
-         my $result;
-         print "$mem ";
+   print STDERR "syntax: process-testsuite-logs.pl <i386_pc | arm_versatilepb>\n";
+   exit 1;
+}
 
-         print "($result) ";
+# find the boot configurations
+require "./test/$ARGV[0].pl" or die $!;
+
+# calc these to help format the table 
+$cpu_model_count = scalar @arch_cpu_models;
+$cores_fitted_count = scalar @arch_cpu_cores;
+$mem_fitted_count = scalar @arch_mem_fitted;
+
+# output the start of the HTML index
+print "<html><head><title>Testsuite boot results for $arch_name</title></head>\n";
+print "<body><h1>Diosix kernel API testsuite results for $arch_name</h1>\n";
+print "<table cellspacing=\"1\" cellpadding=\"10\" bgcolor=\"#ddd\">\n";
+print " <tr bgcolor=\"white\">\n";
+print "  <td colspan=\"2\"><b>Test</b></td>\n";
+
+foreach $model (@arch_cpu_models)
+{
+   print "  <td align=\"center\" colspan=\"".($cores_fitted_count * $mem_fitted_count)."\"><b>$model</b></td>\n";
+   print "  <td width=\"1\">&nbsp;</td>\n"; # vertical separator
+}
+
+print " </tr>\n";
+print " <tr bgcolor=\"white\">\n";
+print "  <td colspan=\"2\">&nbsp;</td>\n";
+
+foreach $model (@arch_cpu_models)
+{
+   foreach $cores (@arch_cpu_cores)
+   {
+      print "  <td align=\"center\" colspan=\"".($mem_fitted_count)."\"><b>$cores cpu(s)</b></td>\n";
+   }
+   
+   print "  <td width=\"1\">&nbsp;</td>\n"; # vertical separator
+}
+
+print " </tr>\n";
+print " <tr bgcolor=\"white\">\n";
+print "  <td colspan=\"2\">&nbsp;</td>\n";
+
+foreach $model (@arch_cpu_models)
+{
+   foreach $cores (@arch_cpu_cores)
+   {
+      foreach $mem (@arch_mem_fitted)
+      {
+         print "  <td><b>$mem</b></td>\n";
+         
+         # this is where we read in the test results...
+         &process_log($model, $cores, $mem);
+      }
+   }
+   
+   print "  <td width=\"1\">&nbsp;</td>\n"; # vertical separator
+}
+
+print " </tr>\n";
+
+my $testid = 0;
+
+# this is where we output the test results...
+foreach $test_name (@tests)
+{
+   print " <tr bgcolor=\"white\">\n";
+   print " <td>($testid)</td>\n";
+   print " <td><b>$test_name</b></td>\n";
+   
+   foreach $model (@arch_cpu_models)
+   {
+      foreach $cores (@arch_cpu_cores)
+      {
+         foreach $mem (@arch_mem_fitted)
+         {
+            my $result = $results[$testid]{$model."_".$cores."_".$mem};
+
+            if($result eq "OK")
+            {
+               print "  <td bgcolor=\"#0f0\">$result</td>\n";
+            }
+            else
+            {
+               print "  <td bgcolor=\"#f00\">$result</td>\n";
+            }
+         }
       }
       
-      print "\n";
+      print "  <td width=\"1\">&nbsp;</td>\n"; # vertical separator
    }
+   
+   print " </tr>\n";
+   $testid++;
 }
+
+print "</table>\n";
+print "</body></html>\n";
 
 exit 0;
 
 
-# prnt_rule(str) - print a line of 70 x str
-sub print_rule
+# process_log(cpu model, number of cores, phys mem fitted)
+# open the log file associated with this boot configuration and process
+# any test results found, storing them into an array of hashes called $results
+sub process_log
 {
-   my $loop;
+   open(my $log, '<', "./test/$arch_name/automated_$_[0]_$_[1]_$_[2].log") or die $!;
    
-   for($loop = 0; $loop < 70; $loop++)
+   while(<$log>)
    {
-      print $_[0];
+      if(/__DTS__test([0-9]*) ([OKFAIL]*)/)
+      {
+         $results[$1]{$_[0]."_".$_[1]."_".$_[2]} = $2;
+      }
    }
    
-   print "\n";
+   close $log;
 }

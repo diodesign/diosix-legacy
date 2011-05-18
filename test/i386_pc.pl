@@ -49,5 +49,5 @@ sub arch_generate_cmdline
 {
    my $filename = &generate_pathname_prefix($_[0], $_[1], $_[2], $_[3]);
    
-   return "$arch_qemu_exe -M pc -cpu $_[0] -smp $_[1] -m $_[2] $_[4] -pidfile $filename.pid -serial file:$filename.log -boot order=d -cdrom release/$diosix_arch/cd.iso >/dev/null 2>/dev/null"
+   return "$arch_qemu_exe -M pc -cpu $_[0] -smp $_[1] -m $_[2] $_[4] -pidfile $filename.pid -serial file:$filename.log -boot order=d -cdrom release/$arch_name/cd.iso >/dev/null 2>/dev/null"
 }

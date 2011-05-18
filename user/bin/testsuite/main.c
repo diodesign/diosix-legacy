@@ -29,9 +29,12 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 int main(void)
 {
-   printf(LOG "testsuite running, built: " __TIME__ " " __DATE__ "\n");
-
+   /* TEST 0: Establish execution
+      Simply prove that userland execution has been reached.
+      => no conditions
+      <= no conditions
+   */
+   printf(LOG "test0 OK # testsuite running, built: " __TIME__ " " __DATE__ "\n");
    
-   printf(LOG "testsuite complete\n");
    while(1); /* idle */
 }

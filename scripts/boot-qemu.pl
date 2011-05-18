@@ -26,7 +26,7 @@
 # then perform a standalone boot of the system using the given configuration within the target
 
 # define how many seconds each run is allowed to execute for
-$qemu_timeout = 5;
+$qemu_timeout = 2;
 
 if($ARGV[0] eq "")
 {
@@ -102,7 +102,7 @@ sub boot
    open my $input, '<', "$pidfile.pid" or die "can't open $file: $!";
    $pid = <$input>;
    close $input;
-   unlink "$boot_output.pid";
+   unlink "$pidfile.pid";
    
    # kill off the QEMU instance
    kill 1, $pid;
