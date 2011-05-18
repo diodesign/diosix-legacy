@@ -210,7 +210,7 @@ kernel: $(OBJS) $(LDSCRIPT)
 	$(LD) $^ -o $(OBJSDIR)/$@
 # produce files to boot the system with the kernel
 	$(WRITE) '[+] generating files for boot'
-	$(OBJDUMPbin) --source $(OBJSDIR)/$@ >$(PORTDIR)/kernel.lst
+	$(OBJDUMPbin) --source $(OBJSDIR)/$@ >$(OBJSDIR)/kernel.lst
 	$(Q)echo 'KSYM' > $(PATHTOROOT)/boot/kernel.sym
 	$(READELFbin) -Ws $(OBJSDIR)/$@ >$(OBJSDIR)/kernel.ksym
 	$(Q)cat $(OBJSDIR)/kernel.ksym | awk '/FUNC/ { print $$2 " " $$3 " " $$8 }' >> $(PATHTOROOT)/boot/kernel.sym
