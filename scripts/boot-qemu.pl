@@ -48,7 +48,7 @@ if($ARGV[1] ne "")
    $ARGV[2] =~ s/[^0-9]//g;        # nr of cpus
    $ARGV[3] =~ s/[^0-9MK]//g;      # phys RAM fitted
    
-   print "[+] entering standalone run of $arch_name build: $ARGV[2] cpu(s) of $ARGV[1] with $ARGV[3] RAM, Live CD boot";
+   print "[+] entering standalone run of $arch_name build: $ARGV[2] cpu(s) of $ARGV[1] with $ARGV[3] RAM, Live CD boot\n";
    system &arch_generate_cmdline($ARGV[1], $ARGV[2], $ARGV[3], "standalone", "-nographic");
    exit 0;
 }
