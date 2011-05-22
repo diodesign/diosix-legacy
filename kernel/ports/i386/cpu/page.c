@@ -633,8 +633,7 @@ kresult pg_add_4K_mapping(unsigned int **pgdir, unsigned int virtual, unsigned i
    }
    
    /* if a 4M mapping already exists for this virtual address then bail out */
-   if((unsigned int)(pgdir[pgdir_index]) & PG_SIZE)
-      return success;
+   if((unsigned int)(pgdir[pgdir_index]) & PG_SIZE) return success;
 
    /* find the entry in the page directory for the page table for this 4K page and
       allocate a page table if it doesn't exist */
@@ -645,7 +644,7 @@ kresult pg_add_4K_mapping(unsigned int **pgdir, unsigned int virtual, unsigned i
       
       kresult err = vmm_req_phys_pg((void **)&newtable, 1);
       if(err) return err; /* failed */
-         
+      
       PAGE_DEBUG("[page:%i] new page table created: %p\n", CPU_ID, newtable);
 
       /* PLEASE PLEASE don't forget that all kernel addresses are
@@ -723,7 +722,7 @@ void pg_map_phys_to_kernel_space(unsigned int *base, unsigned int *top, unsigned
 {
    unsigned int **pg_dir = (unsigned int **)&KernelPageDirectory; /* from start.s */
    kresult err;
-
+   
    /* we must assume the physical page stacks are full - ie: no one has
       popped any stack frames off them. and we have to assume for now that
       the frames are in ascending order. scan through the stacks and map
@@ -736,8 +735,8 @@ void pg_map_phys_to_kernel_space(unsigned int *base, unsigned int *top, unsigned
       if(this_granularity == 1)
          addr = *base & PG_4M_MASK;
       else
-         addr = *base & PG_4K_MASK; 
-
+         addr = *base & PG_4K_MASK;
+      
       /* perform the page table scribbling */
       if(this_granularity == 1)
       {
@@ -800,21 +799,28 @@ void pg_init(void)
       kernel_dir[loop] = NULL;
    
    /* the order of this is important: mapping in 4K pages means page tables
-       will have to be found and written in. The physical pages holding these
-       tables are unlikely to be mapped in unless we process the upper
-       memory first, which are mapped in as 4M pages requiring no separate
-       tables */
+      will have to be found and written in. The physical pages holding these
+      tables are unlikely to be mapped in unless we process the upper
+      memory first, which are mapped in as 4M pages requiring no separate
+      tables */
    /* map most of memory into 4M pages */
    pg_map_phys_to_kernel_space(high_base, high_ptr, 1);
-   
+      
    /* ensure the kernel critical area is mapped in - we use 4M pages to 
       maximise TLB performance */
    for(loop = KERNEL_CRITICAL_BASE; loop < KERNEL_CRITICAL_END; loop += MEM_4M_PGSIZE)
       pg_add_4M_mapping(kernel_dir, (unsigned int)KERNEL_PHYS2LOG(loop), loop, PG_PRESENT | PG_RW);
    
+   /* if the system has no high pages then it will be impossible to access
+      the pages needed to hold the page tables for 4K pages - they haven't
+      been mapped in yet to kernel space. Therefore, ensure the 4M region
+      covering the page stacks is accessible */
+   pg_add_4M_mapping(kernel_dir, (unsigned int)KERNEL_PHYS2LOG(MEM_PHYS_STACK_BASE),
+                     MEM_PHYS_STACK_BASE, PG_PRESENT | PG_RW);
+   
    /* map the rest of the lowest 16M in 4K pages */
    pg_map_phys_to_kernel_space(low_base, low_ptr, 0);
-   
+      
    /* notify cpu of change in kernel directory */
    x86_load_cr3(KERNEL_LOG2PHYS(&KernelPageDirectory));
    BOOT_DEBUG("[page:%i] vmm initialised\n", CPU_ID);
@@ -901,7 +907,7 @@ void pg_postmortem(int_registers_block *regs)
       KOOPS_DEBUG("NoExecute ");
    }
    KOOPS_DEBUG("\n");
-   
+      
    if(running)
    {
       proc = running->proc;

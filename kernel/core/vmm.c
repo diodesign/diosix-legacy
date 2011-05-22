@@ -936,10 +936,11 @@ get_page_success:
    phys_pg_reqed++; /* update accounting totals */
    /* we don't clean the page at this stage - it has
       to be mapped in first */
-   
+
    /* would be nice to clean this page */
-   vmm_memset(KERNEL_PHYS2LOG(*addr), 0, MEM_PGSIZE);
-   
+   // vmm_memset(KERNEL_PHYS2LOG(*addr), 0, MEM_PGSIZE);      
+   vmm_memset(KERNEL_PHYS2LOG(*addr), 0, 0);
+
    unlock_gate(&(vmm_lock), LOCK_WRITE);
    return success;
 }
@@ -1169,7 +1170,7 @@ kresult vmm_initialise(multiboot_info_t *mbd)
       that we can make sure the pages holding the stacks don't end up on
       the list of available physical page frames */
    pg_stack_top = MEM_PGALIGN(pg_stack_top);
-
+   
    /* run through the memory areas found by the bootloader and build up
       physical page stacks */
    region = (mb_memory_map_t *)mbd->mmap_addr;
@@ -1183,7 +1184,7 @@ kresult vmm_initialise(multiboot_info_t *mbd)
 
       VMM_DEBUG("[vmm:%i] mem region: start %x length %i type %x\n",
                CPU_ID, region->base_addr_low, region->length_low, region->type);
-
+      
       /* is this region present? */
       if(region->type == MULTIBOOT_MEMTYPE_RAM)
       {
@@ -1215,7 +1216,7 @@ kresult vmm_initialise(multiboot_info_t *mbd)
                pg_loop += MEM_PGSIZE;
                continue;
             }
-
+            
             /* decide which stack to place the page frame in */
             if(pg_loop < MEM_DMA_REGION_MARK)
             {
@@ -1257,7 +1258,7 @@ kresult vmm_initialise(multiboot_info_t *mbd)
    phys_pg_stack_high_ptr++; /* adjust ptr to top word */
    phys_pg_stack_low_limit = phys_pg_stack_low_ptr;
    phys_pg_stack_high_limit = phys_pg_stack_high_ptr;
-      
+
    /* now we've got a grip on physical memory, map it all into our virtual
       space using pagination */
    pg_init(); /* non-portable code */
@@ -1295,7 +1296,7 @@ void vmm_memset(void *addr, unsigned char value, unsigned int count)
 {
    unsigned char *ptr = (unsigned char *)addr;
    unsigned int i;
-   
+      
    for(i = 0; i < count; i++)
       ptr[i] = value;
 }
