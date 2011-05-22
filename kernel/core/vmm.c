@@ -937,9 +937,8 @@ get_page_success:
    /* we don't clean the page at this stage - it has
       to be mapped in first */
 
-   /* would be nice to clean this page */
-   // vmm_memset(KERNEL_PHYS2LOG(*addr), 0, MEM_PGSIZE);      
-   vmm_memset(KERNEL_PHYS2LOG(*addr), 0, 0);
+   /* clean this page */
+   vmm_memset(KERNEL_PHYS2LOG(*addr), 0, MEM_PGSIZE);      
 
    unlock_gate(&(vmm_lock), LOCK_WRITE);
    return success;
