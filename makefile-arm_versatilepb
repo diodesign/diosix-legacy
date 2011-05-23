@@ -44,7 +44,7 @@ OBJSDIR  = build/$(ARCH)_$(ARCH_TARGET)/kernel
 LIBDIOSIXDIR = user/lib/newlib/libgloss/libnosys
 SVNDEF := -D'SVN_REV="$(shell svnversion -n .)"'
 
-MAKEFILE	= makefile-arm_versatilepb
+MAKEFILE	= makefile-$(ARCH)_$(ARCH_TARGET)
 MAKEDEP		= $(MAKEFILE)
 
 INCDIR		= $(PORTDIR)/include

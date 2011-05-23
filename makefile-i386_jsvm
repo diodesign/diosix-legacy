@@ -1,5 +1,5 @@
 #
-# diosix hyatt - PC i386 port
+# diosix hyatt - i386 port to Bellard.org's JavaScript PC Emulator (VM)
 #
 # makefile for the kernel and libdiosix
 #
@@ -9,7 +9,7 @@
 
 # set the architecture and any architecture flags
 ARCH = i386
-ARCH_TARGET = pc
+ARCH_TARGET = jsvm
 ARCH_FLAGS = -m32 -march=i386 -DARCH_HASIOPORTS
 
 # ------------------------------------------------------------
@@ -23,9 +23,8 @@ VERSION		= -DKERNEL_IDENTIFIER="\"diosix-hyatt $(ARCH)_$(ARCH_TARGET) SMP pre-Re
 Q=@
 WRITE = $(Q)echo 
 
-# set where the root fs to store the kernel + OS os
+# set where the root fs to store the kernel + OS
 RELEASEDIR  = release/$(ARCH)_$(ARCH_TARGET)
-MKFSPROGRAM = $(RELEASEDIR)/makeiso.sh
 PATHTOROOT  = $(RELEASEDIR)/root
 
 .SUFFIXES: .s .c
@@ -48,7 +47,7 @@ MAKEFILE	= makefile-$(ARCH)_$(ARCH_TARGET)
 MAKEDEP		= $(MAKEFILE) $(PORTDIR)/include/portdefs.h $(COREDIR)/include/processes.h $(COREDIR)/include/boot.h $(PORTDIR)/include/cpu.h $(PORTDIR)/include/buses.h $(COREDIR)/include/debug.h $(COREDIR)/include/elf.h $(PORTDIR)/include/interrupts.h $(COREDIR)/include/ipc.h $(COREDIR)/include/locks.h $(PORTDIR)/include/lowlevel.h $(PORTDIR)/include/memory.h $(COREDIR)/include/multiboot.h $(COREDIR)/include/sched.h $(COREDIR)/include/sglib.h $(PORTDIR)/include/syscalls.h $(PORTDIR)/include/registers.h $(LIBDIOSIXDIR)/diosix.h $(LIBDIOSIXDIR)/async.h
 
 INCDIR		= $(PORTDIR)/include
-LDSCRIPT	= $(PORTDIR)/diosix.ld
+LDSCRIPT	= $(PORTDIR)/$(ARCH_TARGET).ld
 
 NASM		= $(NASMbin) -f elf -i$(INCDIR)/
 FLAGS		= -g -std=c99 -Wall -nostdlib -nostartfiles \
@@ -59,7 +58,7 @@ FLAGS		= -g -std=c99 -Wall -nostdlib -nostartfiles \
 # DEBUGFLAGS	= -DDEBUG -DMSG_DEBUG -DBUS_DEBUG -DPROC_DEBUG -DSCHED_DEBUG -DTHREAD_DEBUG -DVMM_DEBUG -DXPT_DEBUG -DINT_DEBUG -DIRQ_DEBUG -DMP_DEBUG -DPAGE_DEBUG -DKSYM_DEBUG -DIOAPIC_DEBUG -DLAPIC_DEBUG -DLOCK_DEBUG -DLOLVL_DEBUG -DPIC_DEBUG -DSYSCALL_DEBUG -DPERFORMANCE_DEBUG -DLOCK_TIME_CHECK
 
 # basic debugging
-DEBUGFLAGS	= -DDEBUG -DLOCK_TIME_CHECK -DMP_DEBUG -DINT_DEBUG -DIRQ_DEBUG
+DEBUGFLAGS	= -DDEBUG
 
 CC		= $(CCbin) $(SVNDEF) $(FLAGS) -I$(INCDIR) -I$(COREDIR)/include -I$(LIBDIOSIXDIR) $(DEBUGFLAGS) $(VERSION)
 LD		= $(CCbin) $(FLAGS) -Xlinker --script=$(LDSCRIPT) -Xlinker
@@ -211,19 +210,11 @@ kernel: $(OBJS) $(LDSCRIPT)
 # produce files to boot the system with the kernel
 	$(WRITE) '[+] generating files for boot'
 	$(OBJDUMPbin) --source $(OBJSDIR)/$@ >$(OBJSDIR)/kernel.lst
-	$(Q)echo 'KSYM' > $(PATHTOROOT)/boot/kernel.sym
+	$(Q)echo 'KSYM' > $(PATHTOROOT)/kernel.sym
 	$(READELFbin) -Ws $(OBJSDIR)/$@ >$(OBJSDIR)/kernel.ksym
-	$(Q)cat $(OBJSDIR)/kernel.ksym | awk '/FUNC/ { print $$2 " " $$3 " " $$8 }' >> $(PATHTOROOT)/boot/kernel.sym
+	$(Q)cat $(OBJSDIR)/kernel.ksym | awk '/FUNC/ { print $$2 " " $$3 " " $$8 }' >> $(PATHTOROOT)/kernel.sym
 	$(STRIPbin) -s $(OBJSDIR)/$@
-	$(Q)cp $(OBJSDIR)/$@ $(PATHTOROOT)/boot/kernel
+	$(Q)cp $(OBJSDIR)/$@ $(PATHTOROOT)/kernel
 # build the FS
-	$(WRITE) '[+] building arch-specific drivers'
-	$(Q)make -C user/sbin/drivers/$(ARCH)
-	$(WRITE) '[+] building system executive (/sbin/init)'
-	$(Q)make -C user/sbin/init
-	$(WRITE) '[+] building virtual filesystem manager (/sbin/vfs)'
-	$(Q)make -C user/sbin/vfs
-	$(WRITE) '[+] building testsuite (/bin/testsuite)'
-	$(Q)make -C user/bin/testsuite
-	$(WRITE) '[+] building filesystem'
-	$(Q)$(MKFSPROGRAM)
+	$(WRITE) '[+] building boot payload'
+	$(Q)$(RELEASEDIR)/mkpayload -o $(RELEASEDIR)/initrd $(PATHTOROOT)/kernel.sym
