@@ -66,7 +66,7 @@ LD		= $(CCbin) $(FLAGS) -Xlinker --script=$(LDSCRIPT) -Xlinker
 
 # the order of code in the kernel binary is quite important...
 # try to keep often-used functions together for cache performance
-OBJS	 = $(OBJSDIR)/locore.o \
+OBJS	 = $(OBJSDIR)/linuxglue.o $(OBJSDIR)/locore.o \
 	   $(OBJSDIR)/lowlevel.o $(OBJSDIR)/exceptions.o $(OBJSDIR)/irqs.o $(OBJSDIR)/msg.o $(OBJSDIR)/sched.o \
 	   $(OBJSDIR)/sys_driver.o $(OBJSDIR)/sys_info.o $(OBJSDIR)/sys_memory.o $(OBJSDIR)/sys_msg.o $(OBJSDIR)/sys_privs.o \
 	   $(OBJSDIR)/sys_proc.o $(OBJSDIR)/sys_thread.o $(OBJSDIR)/sys_debug.o \
@@ -141,6 +141,10 @@ $(OBJSDIR)/lowlevel.o:	$(PORTDIR)/hw/lowlevel.c	$(MAKEDEP)
 $(OBJSDIR)/locore.o:	$(PORTDIR)/hw/locore.s		$(MAKEDEP)
 			$(WRITE) '==> ASSEMBLE: $<'
 			$(COMPILE.s)
+
+$(OBJSDIR)/linuxglue.o:	$(PORTDIR)/hw/linuxglue.s		$(MAKEDEP)
+				$(WRITE) '==> ASSEMBLE: $<'
+				$(COMPILE.s)
 
 $(OBJSDIR)/buses.o:	$(PORTDIR)/buses.c		$(MAKEDEP)
 			$(WRITE) '==> COMPILE: $<'

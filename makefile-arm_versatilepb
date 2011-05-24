@@ -104,10 +104,6 @@ $(OBJSDIR)/arm9pg.o:	$(PORTDIR)/arm9pg.c	$(MAKEDEP)
 			$(WRITE) '==> COMPILE: $<'
 			$(COMPILE.c)
 
-$(OBJSDIR)/atag.o:	$(PORTDIR)/atag.c	$(MAKEDEP)
-			$(WRITE) '==> COMPILE: $<'
-			$(COMPILE.c)
-
 $(OBJSDIR)/arm9int.o:	$(PORTDIR)/arm9int.c	$(MAKEDEP)
 			$(WRITE) '==> COMPILE: $<'
 			$(COMPILE.c)
@@ -150,6 +146,10 @@ $(OBJSDIR)/sys_thread.o:	$(PORTDIR)/syscalls/sys_thread.c	$(MAKEDEP)
 
 
 # explicit rules for portable code
+$(OBJSDIR)/atag.o:	$(COREDIR)/atag.c	$(MAKEDEP)
+			$(WRITE) '==> COMPILE: $<'
+			$(COMPILE.c)
+
 $(OBJSDIR)/debug.o:	$(COREDIR)/debug.c	$(MAKEDEP)
 			$(WRITE) '==> COMPILE: $<'
 			$(COMPILE.c)

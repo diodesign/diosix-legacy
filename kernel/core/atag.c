@@ -1,5 +1,5 @@
-/* kernel/ports/arm/atag.c
- * ARM-specific ATAG bootloader support
+/* kernel/core/atag.c
+ * ATAG bootloader data structure support
  * Author : Chris Williams
  * Date   : Sun,12 Mar 2011.03:39.00
 

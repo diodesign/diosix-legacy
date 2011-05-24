@@ -1,6 +1,6 @@
 /* from OsFaqWiki - Higher Half Bare Bones linker script */
 
-ENTRY(_loader)
+ENTRY(_loaderglue)
 OUTPUT_FORMAT(elf32-i386)
 virt = 0xC0400000;
 phys = 0x00400000;
