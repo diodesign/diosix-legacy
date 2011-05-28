@@ -189,11 +189,6 @@ MultiBootHeader:
 ; bootlaoder's GDT loaded by this point
 
 _loader:
-mov al, 65
-mov dx, 0x3f8
-out dx, al
-jmp _loader
-
 ; NOTE: Until paging is set up, the code must be position-independent
 ; and use physical addresses, not virtual ones.
 protectedmode:
