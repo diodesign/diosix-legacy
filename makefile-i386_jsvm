@@ -10,7 +10,9 @@
 # set the architecture and any architecture flags
 ARCH = i386
 ARCH_TARGET = jsvm
-ARCH_FLAGS = -m32 -march=i386 -DARCH_HASIOPORTS -DARCH_NOMULTIBOOT
+ARCH_FLAGS = -m32 -march=i386 -DARCH_HASIOPORTS -DARCH_NOMULTIBOOT -DARCH_NO4MPAGES
+
+# ARCH_NOMULTIBOOT and ARCH_NO4MPAGES must also be passed to nasm separately
 
 # ------------------------------------------------------------
 
@@ -50,7 +52,7 @@ MAKEDEP		= $(MAKEFILE) $(PORTDIR)/include/portdefs.h $(COREDIR)/include/processe
 INCDIR		= $(PORTDIR)/include
 LDSCRIPT	= $(PORTDIR)/$(ARCH_TARGET).ld
 
-NASM		= $(NASMbin) -f elf -i$(INCDIR)/ -dARCH_NOMULTIBOOT
+NASM		= $(NASMbin) -f elf -i$(INCDIR)/ -dARCH_NOMULTIBOOT -dARCH_NO4MPAGES
 FLAGS		= -g -std=c99 -Wall -nostdlib -nostartfiles \
 		  -nostdinc -fno-builtin -nodefaultlibs \
 		  -fomit-frame-pointer $(ARCH_FLAGS)

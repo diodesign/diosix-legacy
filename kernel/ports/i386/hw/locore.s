@@ -68,32 +68,79 @@ STACKSIZE   equ 0x2000
 section .data
 align 4096
 KernelPageDirectory:
-    ; This page directory entry identity-maps the first 3x4MB pages of the 32-bit
-    ; physical address space and the 4MB page containing the APIC registers.
-    
-    ; All bits are clear except the following:
-    ; bit 7: PS The kernel page is 4MB.
-    ; bit 1: RW The kernel page is read/write.
-    ; bit 0: P  The kernel page is present.
-    
-    ; NOTE: It's not generally a good idea to have the first 4M of physical
-    ; space tied up in one CPU page for caching reasons. So redo this in 4K
-    ; blocks as soon as possible.
-    
-    dd 0x00000083
-    dd 0x00400083
-    dd 0x00800083
-    times (KERNEL_PAGE_NUMBER - 3) dd 0 ; Pages before kernel space.
+%ifdef ARCH_NO4MPAGES
+   ; use this structure on processors that only support 4K pages...
+   ; This page directory entry identity-maps the first 12MB of the 32-bit
+   ; physical address space into the kernel's virtual address space by
+   ; using three page tables that each map in 4M of memory.
+   ; All control bits clear except:
+   ; bit 1: RW The kernel page is read/write.
+   ; bit 0: P  The kernel page is present.
+
+   dd KernelPageTable0 - KERNEL_VIRTUAL_BASE + 3
+   dd KernelPageTable1 - KERNEL_VIRTUAL_BASE + 3
+   dd KernelPageTable2 - KERNEL_VIRTUAL_BASE + 3
+   times (KERNEL_PAGE_NUMBER - 3) dd 0 ; Pages before kernel space.
 KernelPageDirectoryVirtStart:
-    ; This page directory entry defines the first 3x4MB pages in kernel space.
-    dd 0x00000083
-    dd 0x00400083
-    dd 0x00800083
-    times (PIC_PAGE_NUMBER - KERNEL_PAGE_NUMBER - 3) dd 0  ; Pages after the kernel image to the PIC area
-    ; This page directory entry defines a 4MB page containing the memory-mapped APIC architecture.
-    ; NB: cache disable and write-through bits (4 & 3 respectively) are set
-    dd 0xFEC0009B
-    times (1024 - PIC_PAGE_NUMBER - 1) dd 0                ; Pages to the end of address space
+   dd KernelPageTable0 - KERNEL_VIRTUAL_BASE + 3
+   dd KernelPageTable1 - KERNEL_VIRTUAL_BASE + 3
+   dd KernelPageTable2 - KERNEL_VIRTUAL_BASE + 3
+   times (1024 - KERNEL_PAGE_NUMBER - 3) dd 0  ; Pages to end of address space
+
+; build a set of page tables mapping in the first 12M of physical memory
+; 4K at a time, with the P and RW bits set, usermode bit clear
+align 4096
+KernelPageTable0:
+dd 0x01001001
+%assign i 0
+%rep 1024
+   dd i+3
+%assign i i+4096
+%endrep
+
+align 4096
+KernelPageTable1:
+%rep 1024
+   dd i+3
+%assign i i+4096
+%endrep
+
+align 4096
+KernelPageTable2:
+%rep 1024
+   dd i+3
+%assign i i+4096
+%endrep
+
+%else
+   ; use this structure on processors that support 4M pages...
+   ; This page directory entry identity-maps the first 3x4MB pages of the 32-bit
+   ; physical address space and the 4MB page containing the APIC registers.
+    
+   ; All bits are clear except the following:
+   ; bit 7: PS The kernel page is 4MB.
+   ; bit 1: RW The kernel page is read/write.
+   ; bit 0: P  The kernel page is present.
+    
+   ; NOTE: It's not generally a good idea to have the first 4M of physical
+   ; space tied up in one CPU page for caching reasons. So redo this in 4K
+   ; blocks as soon as possible.
+    
+   dd 0x00000083
+   dd 0x00400083
+   dd 0x00800083
+   times (KERNEL_PAGE_NUMBER - 3) dd 0 ; Pages before kernel space.
+KernelPageDirectoryVirtStart:
+   ; This page directory entry defines the first 3x4MB pages in kernel space.
+   dd 0x00000083
+   dd 0x00400083
+   dd 0x00800083
+   times (PIC_PAGE_NUMBER - KERNEL_PAGE_NUMBER - 3) dd 0  ; Pages after the kernel image to the PIC area
+   ; This page directory entry defines a 4MB page containing the memory-mapped APIC architecture.
+   ; NB: cache disable and write-through bits (4 & 3 respectively) are set
+   dd 0xFEC0009B
+   times (1024 - PIC_PAGE_NUMBER - 1) dd 0                ; Pages to the end of address space
+%endif
 
    ; the diosix GDT
 align 16
@@ -187,7 +234,7 @@ MultiBootHeader:
 ; the default is multiboot loader, define ARCH_NOMULTIBOOT if kernel is to
 ; be loaded by a Linux loader. we should be in protected mode with the
 ; bootlaoder's GDT loaded by this point
-
+bits 32
 _loader:
 ; NOTE: Until paging is set up, the code must be position-independent
 ; and use physical addresses, not virtual ones.
@@ -545,7 +592,7 @@ hexloop:
     and eax, 0xf
     cmp eax, 9
     jle isanumber
-    add eax, 0x41          ; character code for 'A'
+    add eax, 0x41 - 10     ; character code for 'A'
     jmp hexoutput
 isanumber:
     add eax, 0x30          ; character code for '0'
