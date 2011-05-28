@@ -40,11 +40,14 @@ extern exception_handler                ; common exception handler
 extern irq_handler                      ; common irq handler
 
 ; setting up the Multiboot header - see GRUB docs for details
-MODULEALIGN equ  1<<0         ; align loaded modules on page boundaries
-MEMINFO     equ  1<<1         ; provide memory map
+MODULEALIGN equ  1<<0                   ; align loaded modules on page boundaries
+MEMINFO     equ  1<<1                   ; provide memory map
 FLAGS       equ  MODULEALIGN | MEMINFO  ; this is the Multiboot 'flag' field
-MAGIC       equ  0x1BADB002   ; 'magic number' lets bootloader find the header
-CHECKSUM    equ -(MAGIC + FLAGS)  ; checksum required
+MAGIC       equ  0x1BADB002             ; 'magic number' lets bootloader find the header
+CHECKSUM    equ -(MAGIC + FLAGS)        ; checksum required
+
+ATAGBASE    equ 0x500                   ; generate ATAG list at this phys addr
+LOADERMAGIC equ 0x2BADB002              ; magic number used by the loader (see mutliboot.h)
 
 ; This is the virtual base address of kernel space. It must be used to
 ; convert virtual addresses into physical addresses until paging is enabled.
@@ -52,11 +55,15 @@ CHECKSUM    equ -(MAGIC + FLAGS)  ; checksum required
 ; loaded -- just the amount that must be subtracted from a virtual address to
 ; get a physical address.
 KERNEL_VIRTUAL_BASE   equ 0xC0000000      ; 3GB high water mark
+KERNEL_PHYSICAL_BASE  equ 0x00400000      ; 4M mark
 ; Page directory index of kernel's 4MB PTE.
 KERNEL_PAGE_NUMBER    equ (KERNEL_VIRTUAL_BASE >> 22)
 ; Page directory index of the per-cpu-LAPIC + per-system-IOAPIC's 4MB PTE
 PIC_BASE              equ 0xFEC00000
 PIC_PAGE_NUMBER       equ (PIC_BASE >> 22)
+
+; reserve initial kernel stack space - 8K should be adequate for the bootstrap cpu
+STACKSIZE   equ 0x2000
 
 section .data
 align 4096
@@ -164,60 +171,103 @@ APStack:
 section .text
 align 4
 MultiBootHeader:
+%ifndef ARCH_NOMULTIBOOT
     dd MAGIC
     dd FLAGS
     dd CHECKSUM
-
-; reserve initial kernel stack space - 8K should be adequate for the bootstrap cpu
-STACKSIZE   equ 0x2000
+%endif
 
 ; ------------------- Bootstrap processor entry point -----------------------
+; if loaded by a multiboot loader:
+;    => eax = multiboot magic number, ebx = phys addr of multiboot data
+;
+; if loaded by a Linux loader:
+;    => eax = amount of RAM fitted in bytes, ebx = initrd phys addr
+; 
+; the default is multiboot loader, define ARCH_NOMULTIBOOT if kernel is to
+; be loaded by a Linux loader. we should be in protected mode with the
+; bootlaoder's GDT loaded by this point
+
 _loader:
-    ; NOTE: Until paging is set up, the code must be position-independent
-    ; and use physical addresses, not virtual ones.
-    mov ecx, (KernelPageDirectory - KERNEL_VIRTUAL_BASE)
-    mov cr3, ecx          ; Load page dDirectory base register.
+mov al, 65
+mov dx, 0x3f8
+out dx, al
+jmp _loader
+
+; NOTE: Until paging is set up, the code must be position-independent
+; and use physical addresses, not virtual ones.
+protectedmode:
+   mov ecx, (KernelPageDirectory - KERNEL_VIRTUAL_BASE)
+   mov cr3, ecx          ; Load page directory base register.
     
-    mov ecx, cr4
-    or ecx, 0x00000010    ; Set PSE bit in CR4 to enable 4MB pages.
-    mov cr4, ecx
+   mov ecx, cr4
+   or ecx, 0x00000010    ; Set PSE bit in CR4 to enable 4MB pages.
+   mov cr4, ecx
+   
+   mov ecx, cr0
+   or ecx, 0x80000000    ; Set PG bit in CR0 to enable paging.
+   mov cr0, ecx
 
-    mov ecx, cr0
-    or ecx, 0x80000000    ; Set PG bit in CR0 to enable paging.
-    mov cr0, ecx
-
-    ; Start fetching instructions in kernel space.
-    lea ecx, [StartInHigherHalf]
-    jmp ecx  ; NOTE: Must be absolute jump!
+   ; Start fetching instructions in kernel space.
+   lea ecx, [StartInHigherHalf]
+   jmp ecx  ; NOTE: Must be absolute jump!
 
 StartInHigherHalf:
-    ; stop using bootloader GDT, and load our GDT. this should be all the GDT
-    ; we need from now on, descriptors for usr and knl modes.
-    lgdt [gdt_ptr]
-    
-    mov ax, KERNEL_DATA_SEL
-    mov ds, ax
-    mov es, ax
-    mov ss, ax
-    mov fs, ax
-    mov gs, ax
-    jmp KERNEL_CODE_SEL:FixupStack
+   ; stop using bootloader GDT, and load our GDT. this should be all the GDT
+   ; we need from now on, descriptors for usr and knl modes.
+   lgdt [gdt_ptr]
+
+   mov dx, KERNEL_DATA_SEL
+   mov ds, dx
+   mov es, dx
+   mov ss, dx
+   mov fs, dx
+   mov gs, dx
+   jmp KERNEL_CODE_SEL:FixupStack
 
 FixupStack:
-    ; NOTE: From now on, paging should be enabled. The first 12MB of physical
-    ; address space is mapped starting at KERNEL_VIRTUAL_BASE. Everything is
-    ; linked to this address, so no more position-independent code or funny
-    ; business with virtual-to-physical address translation should be
-    ; necessary. We now have a higher-half kernel.
-    mov esp, stack+STACKSIZE           ; set up the stack
-    push eax                           ; pass Multiboot magic number
+   ; NOTE: From now on, paging should be enabled. The first 12MB of physical
+   ; address space is mapped starting at KERNEL_VIRTUAL_BASE. Everything is
+   ; linked to this address, so no more position-independent code or funny
+   ; business with virtual-to-physical address translation should be
+   ; necessary. We now have a higher-half kernel.
+   mov esp, stack+STACKSIZE           ; set up the stack
 
-    ; pass Multiboot info structure -- WARNING: This is a physical address
-    ; and may not be in the first 12MB!
-    push ebx
+%ifdef ARCH_NOMULTIBOOT
+   extern atag_build_list
+   extern atag_process
 
-    call  _main                  ; call kernel proper
-    jmp   $                      ; halt machine should kernel return
+   ; if we have no multiboot structure then it's easier to craft a simple
+   ; ATAG list and then use a core routine to convert this into multiboot.
+   ; call atag_build_list(RAM fitted in bytes, initrd location)
+   ; and then pass the list to the multiboot structure generator
+   push eax
+   push ebx
+   push ATAGBASE
+   add eax, KERNEL_VIRTUAL_BASE       ; convert the base addr into a virtual one
+   call atag_build_list
+   sub esp, 12
+   hlt
+
+   mov eax, ATAGBASE
+   add eax, KERNEL_VIRTUAL_BASE       ; convert the base addr into a virtual one
+   call atag_process
+   sub esp, 4
+
+   ; save the multiboot structure pointer into ebx, put the right magic into
+   ; eax and we're now in a good known state to enter the micorkernel proper
+   mov ebx, eax
+   mov eax, LOADERMAGIC
+%endif
+
+   push eax                           ; pass Multiboot magic number
+
+   ; pass Multiboot info structure -- WARNING: This is a physical address
+   ; and may not be in the first 12MB!
+   push ebx
+
+   call  _main                  ; call kernel proper
+   jmp   $                      ; halt machine should kernel return
 ; ---------------------- Elvis has left the building --------------------------
 
 ; ------------------- Application processor entry point -----------------------
@@ -226,56 +276,56 @@ FixupStack:
 align 4
 bits 16
 x86_start_ap:
-    ; NOTE: we're running in god-awful real mode too, so we need to break
-    ; out of that asap. we've copied the basic kernel gdtpr, gdt and page
-    ; directory into the pages above the trampoline code too (at 0x81000,
-    ; 0x82000 and 0x83000 respectively)
-    cli                    ; ensure interrupts are off
-    mov eax, 0x81000
-    lgdt [eax]              ; load the low-memory GDT ptr
+   ; NOTE: we're running in god-awful real mode too, so we need to break
+   ; out of that asap. we've copied the basic kernel gdtpr, gdt and page
+   ; directory into the pages above the trampoline code too (at 0x81000,
+   ; 0x82000 and 0x83000 respectively)
+   cli                    ; ensure interrupts are off
+   mov eax, 0x81000
+   lgdt [eax]             ; load the low-memory GDT ptr
 
-    mov eax, cr0
-    or eax, 0x1
-    mov cr0, eax           ; enable protected mode and jmp into 32bit mode
+   mov eax, cr0
+   or eax, 0x1
+   mov cr0, eax           ; enable protected mode and jmp into 32bit mode
 
-    jmp dword KERNEL_CODE_SEL:((APEnterPMode - x86_start_ap) + 0x80000)
+   jmp dword KERNEL_CODE_SEL:((APEnterPMode - x86_start_ap) + 0x80000)
         
 bits 32
 APEnterPMode:
-    mov ecx, 0x83000        ; pointer to the base of the page directory
-    mov [ecx], dword 0x83 ; ensure the lowest 4MB is identity mapped in
-    mov cr3, ecx          ; load page directory base register.
+   mov ecx, 0x83000       ; pointer to the base of the page directory
+   mov [ecx], dword 0x83  ; ensure the lowest 4MB is identity mapped in
+   mov cr3, ecx           ; load page directory base register.
     
-    mov ecx, cr4
-    or ecx, 0x00000010  ; Set PSE bit in CR4 to enable 4MB pages.
-    mov cr4, ecx
+   mov ecx, cr4
+   or ecx, 0x00000010     ; Set PSE bit in CR4 to enable 4MB pages.
+   mov cr4, ecx
 
-    mov ecx, cr0
-    or ecx, 0x80000000  ; Set PG bit in CR0 to enable paging.
-    mov cr0, ecx
+   mov ecx, cr0
+   or ecx, 0x80000000     ; Set PG bit in CR0 to enable paging.
+   mov cr0, ecx
 
-    ; Start fetching instructions in higher kernel space.
-    lea ecx, [APMoveToHigherHalf]
-    jmp ecx  ; NOTE: Must be absolute jump!
+   ; Start fetching instructions in higher kernel space.
+   lea ecx, [APMoveToHigherHalf]
+   jmp ecx  ; NOTE: Must be absolute jump!
 
 APMoveToHigherHalf:
-    ; switch to the GDT table in the higher-half of the memory map
-    mov eax, gdt_ptr
-    lgdt [eax]
+   ; switch to the GDT table in the higher-half of the memory map
+   mov eax, gdt_ptr
+   lgdt [eax]
     
-    ; get the right segment selectors
-    mov ax, KERNEL_DATA_SEL
-    mov ds, ax
-    mov es, ax
-    mov ss, ax
-    mov fs, ax
-    mov gs, ax
-    jmp KERNEL_CODE_SEL:APFixupStack
+   ; get the right segment selectors
+   mov ax, KERNEL_DATA_SEL
+   mov ds, ax
+   mov es, ax
+   mov ss, ax
+   mov fs, ax
+   mov gs, ax
+   jmp KERNEL_CODE_SEL:APFixupStack
     
 APFixupStack:
-    mov esp, [APStack]   ; set up the stack
-    call  _mp_catch_ap  ; bounce into the kernel
-    jmp   $             ; halt should this processor return
+   mov esp, [APStack]   ; set up the stack
+   call  _mp_catch_ap  ; bounce into the kernel
+   jmp   $             ; halt should this processor return
 
 [global x86_start_ap_end]
 x86_start_ap_end:
@@ -490,6 +540,29 @@ x86_test_and_set:
     xchg [edx], eax   ; swap eax with what is stored in [edx]
     ret               ; return the old value that's in eax 
 
+; ---------------- filthy dump of hex in ecx to COM1 and halt -----------------
+x86_dump_hex_and_halt:
+    mov ebx, 8
+    mov dx, 0x3f8
+hexloop:
+    mov eax, ecx
+    shr eax, 28
+    and eax, 0xf
+    cmp eax, 9
+    jle isanumber
+    add eax, 0x41          ; character code for 'A'
+    jmp hexoutput
+isanumber:
+    add eax, 0x30          ; character code for '0'
+hexoutput:
+    out dx, al
+    shl ecx, 4
+    sub ebx, 1
+    cmp ebx, 0
+    jne hexloop
+    hlt
+    jmp $
+    
 ; ------------------------- stack space ---------------------------------------
 section .bss
 align 32

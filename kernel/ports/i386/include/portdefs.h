@@ -31,6 +31,7 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #include <processes.h>
 
 /* the order of these should not be important */
+#include <atag.h>
 #include <boot.h>
 #include <sched.h>
 #include <buses.h>

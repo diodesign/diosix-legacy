@@ -19,10 +19,11 @@
 
 $arch_name = "i386_jsvm";
 
-system "cp release/$arch_name/kernel test/$arch_name/vmlinux26.bin";
-system "cp release/$arch_name/initrd test/$arch_name/root.bin";
-system "cp release/$arch_name/linuxstart.bin test/$arch_name/linuxstart.bin";
+system "cp release/$arch_name/linuxstart/linuxstart.bin test/$arch_name/";
+system "cp release/$arch_name/root/kernel test/$arch_name/kernel.bin";
+system "cp release/$arch_name/initrd test/$arch_name/initrd.bin";
+system "chmod a+r test/$arch_name/*";
 
-echo "[+] done\n";
+print "[+] done\n";
 
 exit 0;

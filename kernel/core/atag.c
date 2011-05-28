@@ -200,4 +200,13 @@ multiboot_info_t *atag_process(atag_item *item)
    return KERNEL_LOG2PHYS(mb_base);
 }
 
-
+/* atag_build_list
+   Create an ATAG list from the details supplied describing a boot environment
+   => ram_fitted = amount of physical RAM fitted in bytes, starting from phys addr 0
+      initrd_addr = physical address of the initrd payload
+      base = virtual base address of where to store the ATAG list
+*/
+void atag_build_list(unsigned int ram_fitted, unsigned int initrd_addr, atag_item *base)
+{
+   KOOPS_DEBUG("Hello, world! ram = %i initd = %x base = %x\n", ram_fitted, initrd_addr, base);
+}

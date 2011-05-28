@@ -24,7 +24,7 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #include <fcntl.h>
 
 #include "../../kernel/core/include/multiboot.h"
-#include "../../kernel/ports/arm/include/armboot.h"
+#include "../../kernel/core/include/atag.h"
 
 /* syntax: mkpayload -o output file1 file2 ... fileN
    Concatenate files 'file1'...'fileN' into a block of multiboot payload modules
