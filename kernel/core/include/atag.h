@@ -36,6 +36,16 @@ typedef enum
    atag_cmdline	= 0x54410009
 } atag_type;
 
+#define ATAG_CORE_SIZE        (5)
+#define ATAG_MEM_SIZE         (4)
+#define ATAG_VIDEOTEXT_SIZE	(5)
+#define ATAG_RAMDISK_SIZE		(5)
+#define ATAG_INITRD2_SIZE		(4)
+#define ATAG_SERIAL_SIZE		(4)
+#define ATAG_REVISION_SIZE		(3)
+#define ATAG_VIDEOLFB_SIZE		(8)
+#define ATAG_CMDLINE_SIZE(a)  (2 + ((a) + 3) >> 2)
+
 typedef struct
 {
    unsigned int size;

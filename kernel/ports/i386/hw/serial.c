@@ -35,6 +35,8 @@ void serial_writebyte(unsigned char c)
       data can be written */
    while((x86_inportb(SERIAL_HW + 5) & 0x20) == 0) __asm__ __volatile("pause");
    x86_outportb(SERIAL_HW + 0, c);
+   
+   if(c == '\n') serial_writebyte('\r');
 }
 
 /* serial_initialise

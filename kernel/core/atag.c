@@ -208,5 +208,27 @@ multiboot_info_t *atag_process(atag_item *item)
 */
 void atag_build_list(unsigned int ram_fitted, unsigned int initrd_addr, atag_item *base)
 {
-   KOOPS_DEBUG("Hello, world! ram = %i initd = %x base = %x\n", ram_fitted, initrd_addr, base);
+   BOOT_DEBUG("atag_build_list: ram = %x initrd = %x atag base = %x\n",
+              ram_fitted, initrd_addr, base);
+   
+   /* store the header information */
+   base->type = atag_core;
+   base->size = ATAG_CORE_SIZE;
+   base->data.core.flags = 0;
+   base->data.core.page_size = MEM_PGSIZE;
+   base->data.core.root_device = 0;
+   
+   /* store data about the RAM fitted */
+   base = ATAG_NEXT(base);
+   base->type = atag_mem;
+   base->size = ATAG_MEM_SIZE;
+   base->data.mem.size = ram_fitted;
+   base->data.mem.physaddr = 0;
+   
+   /* describe the initrd */
+   base = ATAG_NEXT(base);
+   base->type = atag_initrd2;
+   base->size = ATAG_INITRD2_SIZE;
+   base->data.initrd2.physaddr = initrd_addr;
+   base->data.initrd2.size = 0;
 }

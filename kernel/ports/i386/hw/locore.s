@@ -289,7 +289,6 @@ FixupStack:
    add eax, KERNEL_VIRTUAL_BASE       ; convert the base addr into a virtual one
    call atag_build_list
    sub esp, 12
-   hlt
 
    mov eax, ATAGBASE
    add eax, KERNEL_VIRTUAL_BASE       ; convert the base addr into a virtual one
