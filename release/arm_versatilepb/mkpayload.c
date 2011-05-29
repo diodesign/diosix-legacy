@@ -47,7 +47,11 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
    +----------------------------------------+
    | must be 0x00000000                     | 32bits wide
    +----------------------------------------+
-   | module comment string, null-terminated | 0 or more bytes
+ 
+   ...followed by the payload data...
+ 
+   +----------------------------------------+
+   | module strings, null-terminated        | 1 or more bytes
    +----------------------------------------+
    | module file data                       | 1 or more bytes
    +----------------------------------------+
@@ -74,9 +78,11 @@ int main(int argc, char **argv)
    unsigned int mod_loop;
    int output_fh;
    int *input_fh = NULL;
-   mb_module_t **modules = NULL;
+   unsigned int *string_sizes = NULL;
+   unsigned int *module_sizes = NULL;
+   mb_module_t *modules = NULL;
    struct stat st;
-   unsigned int offset;
+   unsigned int strings_base = 0, modules_base = 0;
    unsigned char *copy_buffer = NULL;
    int result = EXIT_SUCCESS;
    
@@ -108,33 +114,36 @@ int main(int argc, char **argv)
       return EXIT_FAILURE;
    }
    
-   /* allocate enough slots in the module table and input filehandle table
+   /* allocate enough slots in the module table, input filehandle table and size tables
       for all the requested files, although we'll skip over missing files later on */
-   modules = malloc(sizeof(mb_module_t *) * ARG_TO_INDEX(argc));
+   modules = malloc(sizeof(mb_module_t) * ARG_TO_INDEX(argc));
    input_fh = malloc(sizeof(int) * ARG_TO_INDEX(argc));
+   string_sizes = malloc(sizeof(unsigned int) * ARG_TO_INDEX(argc));
+   module_sizes = malloc(sizeof(unsigned int) * ARG_TO_INDEX(argc));
 
-   if(!modules || !input_fh)
+   if(!modules || !input_fh || !string_sizes || !module_sizes)
    {
       printf("[-] could not allocate heap for internal structures -- bailing out\n");
       
       /* clean up */
       if(modules) free(modules);
       if(input_fh) free(input_fh);
+      if(string_sizes) free(string_sizes);
+      if(module_sizes) free(module_sizes);
       close(output_fh);
       free(copy_buffer);
       return EXIT_FAILURE;
    }
    
-   /* zero the module table, a NULL entry means no module present */
-   bzero(modules, sizeof(mb_module_t *) * ARG_TO_INDEX(argc));
+   /* zero the module and size tables, a NULL entry means no module present */
+   bzero(modules, sizeof(mb_module_t) * ARG_TO_INDEX(argc));
+   bzero(string_sizes, sizeof(unsigned int) * ARG_TO_INDEX(argc));
+   bzero(module_sizes, sizeof(unsigned int) * ARG_TO_INDEX(argc));   
    
    /* fill the filehandle table with -1 entries to indicate no file open */
    for(mod_loop = 0; mod_loop < ARG_TO_INDEX(argc); mod_loop++)
       input_fh[mod_loop] = -1;
-   
-   /* skip the offset counter past the initial header */
-   offset = sizeof(payload_header);
-   
+      
    payload_header.present = 0;
    
    /* run through the given files to check they exist and build up
@@ -147,32 +156,24 @@ int main(int argc, char **argv)
       if(input_fh[ARG_TO_INDEX(mod_loop)] != -1 &&
          fstat(input_fh[ARG_TO_INDEX(mod_loop)], &st) == 0)
       {
-         modules[ARG_TO_INDEX(mod_loop)] = malloc(sizeof(mb_module_t));
-         if(modules[ARG_TO_INDEX(mod_loop)])
-         {
-            mb_module_t *module = modules[ARG_TO_INDEX(mod_loop)];
-            
-            /* string immediately follows this header */
-            module->string = offset + sizeof(mb_module_t);
-            
-            /* module data starts after the filename string, including the string's prepended '/' and NULL terminator */
-            module->mod_start = module->string + strlen(argv[mod_loop]) + (2 * sizeof(char));
-            module->mod_end = module->mod_start + st.st_size;
-            module->reserved = 0;
-            
-            /* adjust the offset to point after the module data */
-            offset = module->mod_end;
-            
-            payload_header.present++; /* keep track of the number of modules to write out */
-         }
-         else
-            printf("[-] could not allocate %i bytes for module '%s' metadata -- skipping\n",
-                   sizeof(mb_module_t), argv[mod_loop]);
+         /* string size includes prepended '/' and null terminator */
+         string_sizes[ARG_TO_INDEX(mod_loop)] = strlen(argv[mod_loop]) + (2 * sizeof(char));
+         module_sizes[ARG_TO_INDEX(mod_loop)] = st.st_size;
+         
+         /* keep a note of how long the string section is so that the modules can
+            follow straight after */
+         modules_base += string_sizes[ARG_TO_INDEX(mod_loop)];
+         
+         payload_header.present++; /* keep track of the number of modules to write out */
       }
       else
          printf("[-] could not open module '%s' for reading -- skipping\n", argv[mod_loop]);
    }
    
+   /* calculate final base addresses for the string and module data sections */
+   strings_base = sizeof(payload_blob_header) + sizeof(mb_module_t) * payload_header.present;
+   modules_base += strings_base;
+
    /* we've got all our pieces in place, time to write out to the output file, starting with
       the header */
    if(write(output_fh, &payload_header, sizeof(payload_header)) == -1)
@@ -181,14 +182,21 @@ int main(int argc, char **argv)
       result = EXIT_FAILURE;
       goto clean_up;
    }
-      
-   /* now run through the modules, writing them out to disc if present */
+     
+   /* write out the module headers as a table */
    for(mod_loop = FIRST_INPUT_ARG; mod_loop < argc; mod_loop++)
-   {      
-      if(modules[ARG_TO_INDEX(mod_loop)])
+   {
+      mb_module_t *module = &modules[ARG_TO_INDEX(mod_loop)];
+      
+      /* if the size is zero then skip over the module */
+      if(module_sizes[ARG_TO_INDEX(mod_loop)])
       {
-         mb_module_t *module = modules[ARG_TO_INDEX(mod_loop)];
-         int bytes_read = 0;
+         module->mod_start = modules_base;
+         module->mod_end = modules_base + module_sizes[ARG_TO_INDEX(mod_loop)];
+         modules_base = module->mod_end;
+
+         module->string = strings_base;
+         strings_base += string_sizes[ARG_TO_INDEX(mod_loop)];
          
          /* write out the fields for the module */
          if(write(output_fh, module, sizeof(mb_module_t)) == -1)
@@ -197,8 +205,16 @@ int main(int argc, char **argv)
             result = EXIT_FAILURE;
             goto clean_up;
          }
-         
-         /* write out the filename string inc null term */
+      }
+   }
+   
+   /* write out the string data, including leading '/' and null terminator,
+      concatenating them into one block */
+   for(mod_loop = FIRST_INPUT_ARG; mod_loop < argc; mod_loop++)
+   {      
+      /* if the size is zero then skip over the module */
+      if(module_sizes[ARG_TO_INDEX(mod_loop)])
+      {
          if(write(output_fh, "/", sizeof(char)) == -1 ||
             write(output_fh, argv[mod_loop], strlen(argv[mod_loop]) + sizeof(char)) == -1)
          {
@@ -206,8 +222,17 @@ int main(int argc, char **argv)
             result = EXIT_FAILURE;
             goto clean_up;
          }
+      }
+   }
+   
+   /* copy data from input files into output file */
+   for(mod_loop = FIRST_INPUT_ARG; mod_loop < argc; mod_loop++)
+   {      
+      /* if the size is zero then skip over the module */
+      if(module_sizes[ARG_TO_INDEX(mod_loop)])
+      {
+         unsigned int bytes_read;
          
-         /* copy data from input files into output file */
          do
          {            
             bytes_read = read(input_fh[ARG_TO_INDEX(mod_loop)], copy_buffer, COPY_BUFFER_SIZE);
@@ -220,16 +245,14 @@ int main(int argc, char **argv)
             printf("[-] failed to read file '%s' -- bailing out\n", argv[mod_loop]); 
             result = EXIT_FAILURE;
             goto clean_up;
-         }
+         }  
       }
    }
       
 clean_up:
    /* close any files we have open, free any memory */
    for(mod_loop = 0; mod_loop < ARG_TO_INDEX(argc); mod_loop++)
-   {
-      if(modules[mod_loop]) free(modules[mod_loop]);
-      
+   {      
       if(input_fh[mod_loop] != -1)
          if(close(input_fh[mod_loop]) != 0)
             printf("[-] cleaning up for module %i failed!\n", mod_loop);
@@ -240,6 +263,8 @@ clean_up:
    free(modules);
    free(input_fh);
    free(copy_buffer);
+   free(module_sizes);
+   free(string_sizes);
    
    return result; /* set to EXIT_SUCCESS unless a failure happened */
 }

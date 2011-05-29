@@ -49,7 +49,7 @@ void exception_handler(int_registers_block regs)
              "        intnum %x errcode %x eip %x cs %x eflags %x useresp %x ss %x\n",
             CPU_ID, regs.ds, regs.edi, regs.esi, regs.ebp, regs.esp, regs.ebx, regs.edx, regs.ecx, regs.eax,
             regs.intnum & 0xff, regs.errcode, regs.eip, regs.cs, regs.eflags, regs.useresp, regs.ss);
-   
+
    regs.intnum &= 0xff; /* just interested in the low byte */
    
    switch(regs.intnum)

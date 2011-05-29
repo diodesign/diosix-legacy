@@ -223,5 +223,9 @@ kernel: $(OBJS) $(LDSCRIPT)
 	$(STRIPbin) -s $(OBJSDIR)/$@
 	$(OBJCOPYbin) -O binary --strip-all $(OBJSDIR)/$@ $(PATHTOROOT)/kernel
 # build the FS
+	$(WRITE) '[+] building arch-specific drivers'
+	$(Q)make -C user/sbin/drivers/$(ARCH)
+	$(WRITE) '[+] building system executive (/sbin/init)'
+	$(Q)make -C user/sbin/init
 	$(WRITE) '[+] building boot payload'
-	$(Q)$(RELEASEDIR)/mkpayload -o $(RELEASEDIR)/initrd $(PATHTOROOT)/kernel.sym
+	$(Q)$(RELEASEDIR)/mkpayload -o $(RELEASEDIR)/initrd $(PATHTOROOT)/kernel.sym $(PATHTOROOT)/sbin/init $(PATHTOROOT)/sbin/drivers/$(ARCH)/serial

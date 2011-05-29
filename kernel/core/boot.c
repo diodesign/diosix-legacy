@@ -48,16 +48,16 @@ void _main(multiboot_info_t *mbd, unsigned int magic)
 
    /* initialise the memory manager or halt if it fails */
    if(vmm_initialise(mbd)) goto goforhalt;
-   
+
    /* initialise the interrupt and hardware driver subsystem */
    if(int_initialise()) goto goforhalt;
-   
+
    /* bring up the remaining processor(s) cores */
    if(mp_post_initialise()) goto goforhalt;
-   
+
    /* initialise process and thread management, prepare first process */
    if(proc_initialise()) goto goforhalt;
-   
+
    /* ---- multiboot + SMP data is no longer required by this point ------- */
 
    /* hocus pocus, mumbo jumbo, black magic */

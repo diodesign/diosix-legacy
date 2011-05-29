@@ -1261,7 +1261,7 @@ kresult vmm_initialise(multiboot_info_t *mbd)
    /* now we've got a grip on physical memory, map it all into our virtual
       space using pagination */
    pg_init(); /* non-portable code */
-   
+
    return 0;
 }
 

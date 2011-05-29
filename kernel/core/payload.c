@@ -86,7 +86,7 @@ payload_type payload_parsemodule(mb_module_t *module, payload_descr *payload)
    unsigned char *magic = (unsigned char *)KERNEL_PHYS2LOG(module->mod_start);
    Elf32_Ehdr *fheader;
    Elf32_Phdr *pheader;
-
+   
    /* is this a symbol table for debugging? */
    if(magic[0] == 'K' &&
       magic[1] == 'S' &&

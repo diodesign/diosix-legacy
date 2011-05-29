@@ -26,11 +26,10 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
       size = size of the payload blob in bytes
    <= returns the number of modules present
 */
-unsigned int atag_fixup_initrd(unsigned int phys_addr, unsigned int size)
+unsigned int atag_fixup_initrd(unsigned int phys_addr)
 {
    mb_module_t *module;
-   unsigned int mods_found = 0;
-   unsigned int mods_end = (unsigned int)KERNEL_PHYS2LOG(phys_addr + size);
+   unsigned int mod_loop;
    unsigned int virt_addr = (unsigned int)KERNEL_PHYS2LOG(phys_addr);
 
    payload_blob_header *hdr = (payload_blob_header *)virt_addr;
@@ -39,30 +38,19 @@ unsigned int atag_fixup_initrd(unsigned int phys_addr, unsigned int size)
    if(hdr->present == 0) return 0;
       
    /* move addr beyond the header metadata */
-   virt_addr += sizeof(payload_blob_header);
+   module = (mb_module_t *)(virt_addr + sizeof(payload_blob_header));
 
-   do
-   {
-      /* get pointer to this module */
-      module = (mb_module_t *)virt_addr;
-         
+   for(mod_loop = 0; mod_loop < hdr->present; mod_loop++)
+   {      
       /* use the initial phys addr as a base for the offsets */
-      module->mod_start += phys_addr;
-      module->mod_end   += phys_addr;
-      module->string    += phys_addr;
-            
-      /* move to the end of the module */
-      virt_addr = (unsigned int)KERNEL_PHYS2LOG(module->mod_end);
-      mods_found++;
+      module[mod_loop].mod_start += phys_addr;
+      module[mod_loop].mod_end   += phys_addr;
+      module[mod_loop].string    += phys_addr;
    }
-   while(virt_addr < mods_end && mods_found < hdr->present);
-      
-   BOOT_DEBUG("[atag] initrd said to contain %i module(s), %i found\n",
-              hdr->present, mods_found);
    
-   return mods_found;
+   return hdr->present;
 }
- 
+
 /* pointer to current free phys RAM addr in multiboot area,
    which immediately follows ATAG area */
 unsigned char *mb_alloc_ptr = NULL;
@@ -185,8 +173,8 @@ multiboot_info_t *atag_process(atag_item *item)
                the header data we prepended to the modules but does expect the pointers to
                be valid, hence the fixup proc call */
             mb_base->mods_addr = (unsigned int)item->data.initrd2.physaddr + sizeof(payload_blob_header);
-            mb_base->mods_count = atag_fixup_initrd(item->data.initrd2.physaddr, item->data.initrd2.size);
-            
+            mb_base->mods_count = atag_fixup_initrd(item->data.initrd2.physaddr);
+
             mb_base->flags |= MULTIBOOT_FLAGS_MODS;
             break;
             
@@ -207,8 +195,8 @@ multiboot_info_t *atag_process(atag_item *item)
       base = virtual base address of where to store the ATAG list
 */
 void atag_build_list(unsigned int ram_fitted, unsigned int initrd_size, atag_item *base)
-{
-   /* XXX can't understand why ram_fitted is not correct, fix it - we know it's 16M */
+{   
+   /* XXX can't understand why ram_fitted is not correct, fix it - we know it's at least 16M */
    if(ram_fitted < (16 * 1024 * 1024)) ram_fitted = 16 * 1024 * 1024;
    
    /* store the header information */
