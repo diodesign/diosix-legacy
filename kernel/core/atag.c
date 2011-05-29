@@ -208,10 +208,7 @@ multiboot_info_t *atag_process(atag_item *item)
 */
 void atag_build_list(unsigned int ram_fitted, unsigned int initrd_size, atag_item *base)
 {
-   BOOT_DEBUG("atag_build_list: ram %x bytes, initrd %x bytes, atag base %x\n",
-            ram_fitted, initrd_size, base);
-
-   /* XXX can't understand by ram_fitted is not correct, fix it */
+   /* XXX can't understand why ram_fitted is not correct, fix it - we know it's 16M */
    if(ram_fitted < (16 * 1024 * 1024)) ram_fitted = 16 * 1024 * 1024;
    
    /* store the header information */
