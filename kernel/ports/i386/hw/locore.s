@@ -70,9 +70,9 @@ align 4096
 KernelPageDirectory:
 %ifdef ARCH_NO4MPAGES
    ; use this structure on processors that only support 4K pages...
-   ; This page directory entry identity-maps the first 12MB of the 32-bit
+   ; This page directory entry identity-maps the first 16MB of the 32-bit
    ; physical address space into the kernel's virtual address space by
-   ; using three page tables that each map in 4M of memory.
+   ; using four page tables that each map in 4M of memory.
    ; All control bits clear except:
    ; bit 1: RW The kernel page is read/write.
    ; bit 0: P  The kernel page is present.
@@ -80,12 +80,14 @@ KernelPageDirectory:
    dd KernelPageTable0 - KERNEL_VIRTUAL_BASE + 3
    dd KernelPageTable1 - KERNEL_VIRTUAL_BASE + 3
    dd KernelPageTable2 - KERNEL_VIRTUAL_BASE + 3
-   times (KERNEL_PAGE_NUMBER - 3) dd 0 ; Pages before kernel space.
+   dd KernelPageTable3 - KERNEL_VIRTUAL_BASE + 3 
+   times (KERNEL_PAGE_NUMBER - 4) dd 0 ; Pages before kernel space.
 KernelPageDirectoryVirtStart:
    dd KernelPageTable0 - KERNEL_VIRTUAL_BASE + 3
    dd KernelPageTable1 - KERNEL_VIRTUAL_BASE + 3
    dd KernelPageTable2 - KERNEL_VIRTUAL_BASE + 3
-   times (1024 - KERNEL_PAGE_NUMBER - 3) dd 0  ; Pages to end of address space
+   dd KernelPageTable3 - KERNEL_VIRTUAL_BASE + 3
+   times (1024 - KERNEL_PAGE_NUMBER - 4) dd 0  ; Pages to end of address space
 
 ; build a set of page tables mapping in the first 12M of physical memory
 ; 4K at a time, with the P and RW bits set, usermode bit clear
@@ -110,6 +112,14 @@ KernelPageTable2:
    dd i+3
 %assign i i+4096
 %endrep
+
+align 4096
+KernelPageTable3:
+%rep 1024
+dd i+3
+%assign i i+4096
+%endrep
+
 
 %else
    ; use this structure on processors that support 4M pages...

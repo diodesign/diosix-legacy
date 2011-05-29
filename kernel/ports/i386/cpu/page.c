@@ -798,6 +798,13 @@ void pg_init(void)
    for(loop = 0; loop < (KERNEL_SPACE_BASE >> PG_DIR_BASE); loop++)
       kernel_dir[loop] = NULL;
    
+#ifdef ARCH_NO4MPAGES
+   /* if this define is set then we need to map in the entirely of
+       physical RAM using 4K pages. The page stacks are stored below
+       the 16M mark using static page tables so this /should/ be safe
+       because the pahe stacks are mapped in */
+   pg_map_phys_to_kernel_space(high_base, high_ptr, 0);
+#else
    /* the order of this is important: mapping in 4K pages means page tables
       will have to be found and written in. The physical pages holding these
       tables are unlikely to be mapped in unless we process the upper
@@ -805,11 +812,12 @@ void pg_init(void)
       tables */
    /* map most of memory into 4M pages */
    pg_map_phys_to_kernel_space(high_base, high_ptr, 1);
-      
+
+
    /* ensure the kernel critical area is mapped in - we use 4M pages to 
       maximise TLB performance */
    for(loop = KERNEL_CRITICAL_BASE; loop < KERNEL_CRITICAL_END; loop += MEM_4M_PGSIZE)
-      pg_add_4M_mapping(kernel_dir, (unsigned int)KERNEL_PHYS2LOG(loop), loop, PG_PRESENT | PG_RW);
+      pg_add_4M_mapping(kernel_dir, (unsigned int)KERNEL_PHYS2LOG(loop), loop, PG_PRESENT | PG_RW)
    
    /* if the system has no high pages then it will be impossible to access
       the pages needed to hold the page tables for 4K pages - they haven't
@@ -817,10 +825,11 @@ void pg_init(void)
       covering the page stacks is accessible */
    pg_add_4M_mapping(kernel_dir, (unsigned int)KERNEL_PHYS2LOG(MEM_PHYS_STACK_BASE),
                      MEM_PHYS_STACK_BASE, PG_PRESENT | PG_RW);
+#endif
    
    /* map the rest of the lowest 16M in 4K pages */
    pg_map_phys_to_kernel_space(low_base, low_ptr, 0);
-      
+
    /* notify cpu of change in kernel directory */
    x86_load_cr3(KERNEL_LOG2PHYS(&KernelPageDirectory));
    BOOT_DEBUG("[page:%i] vmm initialised\n", CPU_ID);
