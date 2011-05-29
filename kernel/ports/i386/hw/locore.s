@@ -91,7 +91,6 @@ KernelPageDirectoryVirtStart:
 ; 4K at a time, with the P and RW bits set, usermode bit clear
 align 4096
 KernelPageTable0:
-dd 0x01001001
 %assign i 0
 %rep 1024
    dd i+3
@@ -229,7 +228,7 @@ MultiBootHeader:
 ;    => eax = multiboot magic number, ebx = phys addr of multiboot data
 ;
 ; if loaded by a Linux loader:
-;    => eax = amount of RAM fitted in bytes, ebx = initrd phys addr
+;    => eax = amount of RAM fitted in bytes, ebx = initrd size
 ; 
 ; the default is multiboot loader, define ARCH_NOMULTIBOOT if kernel is to
 ; be loaded by a Linux loader. we should be in protected mode with the
@@ -283,15 +282,14 @@ FixupStack:
    ; ATAG list and then use a core routine to convert this into multiboot.
    ; call atag_build_list(RAM fitted in bytes, initrd location)
    ; and then pass the list to the multiboot structure generator
-   push eax
+   mov ecx, ATAGBASE + KERNEL_VIRTUAL_BASE
+   push ecx
    push ebx
-   push ATAGBASE
-   add eax, KERNEL_VIRTUAL_BASE       ; convert the base addr into a virtual one
+   push eax
    call atag_build_list
    sub esp, 12
 
-   mov eax, ATAGBASE
-   add eax, KERNEL_VIRTUAL_BASE       ; convert the base addr into a virtual one
+   push ATAGBASE + KERNEL_VIRTUAL_BASE
    call atag_process
    sub esp, 4
 
@@ -581,29 +579,63 @@ x86_test_and_set:
     xchg [edx], eax   ; swap eax with what is stored in [edx]
     ret               ; return the old value that's in eax 
 
-; ---------------- filthy dump of hex in ecx to COM1 and halt -----------------
+; ---------------- filthy dump of hex to COM1 -----------------
 x86_dump_hex_and_halt:
-    mov ebx, 8
-    mov dx, 0x3f8
-hexloop:
-    mov eax, ecx
-    shr eax, 28
-    and eax, 0xf
-    cmp eax, 9
-    jle isanumber
-    add eax, 0x41 - 10     ; character code for 'A'
-    jmp hexoutput
-isanumber:
-    add eax, 0x30          ; character code for '0'
-hexoutput:
-    out dx, al
-    shl ecx, 4
-    sub ebx, 1
-    cmp ebx, 0
-    jne hexloop
-    hlt
-    jmp $
-    
+; => ecx = value to write - will halt after writing
+   mov ebx, 8
+   mov dx, 0x3f8
+x86_dump_hex_and_halt_hexloop:
+   mov eax, ecx
+   shr eax, 28
+   and eax, 0xf
+   cmp eax, 9
+   jle x86_dump_hex_and_halt_isanumber
+   add eax, 0x41 - 10     ; character code for 'A'
+   jmp x86_dump_hex_and_halt_hexoutput
+x86_dump_hex_and_halt_isanumber:
+   add eax, 0x30          ; character code for '0'
+x86_dump_hex_and_halt_hexoutput:
+   out dx, al
+   shl ecx, 4
+   sub ebx, 1
+   cmp ebx, 0
+   jne x86_dump_hex_and_halt_hexloop
+   hlt
+   jmp $
+
+x86_print_hex:
+; => ecx = value to write plus a trailing space
+   push eax
+   push ebx
+   push edx
+
+   mov ebx, 8
+   mov dx, 0x3f8
+x86_print_hex_hexloop:
+   mov eax, ecx
+   shr eax, 28
+   and eax, 0xf
+   cmp eax, 9
+   jle x86_print_hex_isanumber
+   add eax, 0x41 - 10     ; character code for 'A'
+   jmp x86_print_hex_hexoutput
+x86_print_hex_isanumber:
+   add eax, 0x30          ; character code for '0'
+x86_print_hex_hexoutput:
+   out dx, al
+   shl ecx, 4
+   sub ebx, 1
+   cmp ebx, 0
+   jne x86_print_hex_hexloop
+
+   mov al, 32             ; character code for ' '
+   out dx, al             ; print trailing space
+
+   pop edx
+   pop ebx
+   pop eax
+   ret
+
 ; ------------------------- stack space ---------------------------------------
 section .bss
 align 32

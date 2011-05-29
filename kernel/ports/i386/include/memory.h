@@ -43,6 +43,9 @@ extern unsigned int KernelBootStackBase, APStack;
 #define KERNEL_LOG2PHYS(a)   ((void *)((unsigned int)(a) - KERNEL_SPACE_BASE))
 #define KERNEL_PHYS2LOG(a)   ((void *)((unsigned int)(a) + KERNEL_SPACE_BASE))
 
+/* the ideal location of the initrd image in physical memory */
+#define INITRD_LOAD_ADDR      (0x00100000)
+
 /* the kernel is loaded at the 4M mark and the physical page stack
    descends from the 12M mark. these are critical kernel areas */
 #define KERNEL_CRITICAL_BASE KERNEL_PHYSICAL_BASE

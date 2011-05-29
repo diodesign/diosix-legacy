@@ -203,13 +203,16 @@ multiboot_info_t *atag_process(atag_item *item)
 /* atag_build_list
    Create an ATAG list from the details supplied describing a boot environment
    => ram_fitted = amount of physical RAM fitted in bytes, starting from phys addr 0
-      initrd_addr = physical address of the initrd payload
+      initrd_size = size of the initrd payload in bytes
       base = virtual base address of where to store the ATAG list
 */
-void atag_build_list(unsigned int ram_fitted, unsigned int initrd_addr, atag_item *base)
+void atag_build_list(unsigned int ram_fitted, unsigned int initrd_size, atag_item *base)
 {
-   BOOT_DEBUG("atag_build_list: ram = %x initrd = %x atag base = %x\n",
-              ram_fitted, initrd_addr, base);
+   BOOT_DEBUG("atag_build_list: ram %x bytes, initrd %x bytes, atag base %x\n",
+            ram_fitted, initrd_size, base);
+
+   /* XXX can't understand by ram_fitted is not correct, fix it */
+   if(ram_fitted < (16 * 1024 * 1024)) ram_fitted = 16 * 1024 * 1024;
    
    /* store the header information */
    base->type = atag_core;
@@ -229,6 +232,6 @@ void atag_build_list(unsigned int ram_fitted, unsigned int initrd_addr, atag_ite
    base = ATAG_NEXT(base);
    base->type = atag_initrd2;
    base->size = ATAG_INITRD2_SIZE;
-   base->data.initrd2.physaddr = initrd_addr;
-   base->data.initrd2.size = 0;
+   base->data.initrd2.physaddr = INITRD_LOAD_ADDR;
+   base->data.initrd2.size = initrd_size;
 }
