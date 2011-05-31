@@ -445,6 +445,8 @@ unsigned int diosix_driver_iorequest(diosix_ioport_request *req)
    /* not supported in the ARM architecture */
    return e_notimplemented;
 #endif
+   
+   return retval;
 }
 
 /* --------------- get information out of the kernel ---------------- */
