@@ -29,12 +29,12 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
    Write a byte out out to the serial port
    => c = character to output
 */
-void serial_write_char(unsigned char c)
+void serial_write_char(char c)
 {
    /* loop waiting for bit 5 of the line status register to set, indicating
     data can be written */
-   while((read_port_byte(SERIAL_HW + 5) & 0x20) == 0) diosix_thread_yield();
-   write_port_byte(SERIAL_HW + 0, c);
+   while((kernel_ioread_byte(SERIAL_HW + 5) & 0x20) == 0);
+   kernel_iowrite_byte(SERIAL_HW + 0, c);
    
    if(c == '\n') serial_write_char('\r');
 }
@@ -43,33 +43,30 @@ void serial_write_char(unsigned char c)
    Wait until a character enters the serial port
    <= byte read
 */
-unsigned char serial_read_char(void)
+char serial_read_char(void)
 {
    /* loop waiting for bit 1 of the line status register is set, indicating
       data is ready to be read */
-   while((read_port_byte(SERIAL_HW + 5) & 1) == 0) diosix_thread_yield();
-   return read_port_byte(SERIAL_HW + 0);
+   while((kernel_ioread_byte(SERIAL_HW + 5) & 1) == 0);
+   return kernel_ioread_byte(SERIAL_HW + 0);
 }
 
 /* serial_write_string
    Output the given string of characters to the serial port
    => str = null-terminated string to output
 */
-void serial_write_string(unsigned char *str)
+void serial_write_string(char *str)
 {
    while(*str) serial_write_char(*str++);
 }
 
 int main(void)
-{
+{      
    /* move into driver layer (1) and get access to IO ports */
    diosix_priv_layer_up(1);
    if(diosix_driver_register()) diosix_exit(1); /* or exit on failure */
 
-   serial_write_string("welcome to diosix...\n");
+   serial_write_string("welcome to diosix... go ahead and type something:\n");
    
-   while(1)
-   {
-      serial_write_char(serial_read_char());
-   }
+   while(1) serial_write_char(serial_read_char());
 }

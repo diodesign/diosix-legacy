@@ -197,6 +197,22 @@ typedef struct
 #define DIOSIX_DRIVER_UNMAP_PHYS     (3)
 #define DIOSIX_DRIVER_REGISTER_IRQ   (4)
 #define DIOSIX_DRIVER_DEREGISTER_IRQ (5)
+#define DIOSIX_DRIVER_IOREQUEST      (6)
+
+/* define an IO request via a hardware IO port, if available */
+typedef enum
+{
+   ioport_read, ioport_write
+} diosix_ioport_request_type;
+
+typedef struct
+{
+   diosix_ioport_request_type type;
+   char size; /* number of bytes to write: 1, 2 or 4 */
+   unsigned short port;
+   unsigned int data_out;
+   unsigned int data_in;
+} diosix_ioport_request;
 
 /* reason codes for memory management */
 #define DIOSIX_MEMORY_CREATE         (0)

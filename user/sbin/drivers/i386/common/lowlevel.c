@@ -15,6 +15,31 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 */
 
+#include "diosix.h"
+#include "functions.h"
+#include "io.h"
+
+/* read a byte from an IO port via the kernel */
+unsigned char kernel_ioread_byte(unsigned short port)
+{
+   diosix_ioport_request req;
+   req.type = ioport_read;
+   req.size = sizeof(char);
+   req.port = port;
+   diosix_driver_iorequest(&req);
+   return req.data_in;
+}
+
+/* write a byte to an IO port via the kernel */
+void kernel_iowrite_byte(unsigned short port, unsigned char val)
+{
+   diosix_ioport_request req;
+   req.type = ioport_write;
+   req.size = sizeof(char);
+   req.port = port;
+   req.data_out = (unsigned int)val & 0xff;
+   diosix_driver_iorequest(&req);
+}
 
 unsigned char read_port_byte(unsigned short port)
 {

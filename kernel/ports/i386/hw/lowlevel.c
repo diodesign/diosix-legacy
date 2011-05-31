@@ -460,6 +460,36 @@ kresult x86_ioports_disable(thread *t)
    return success;
 }
 
+/* x86_ioports_check
+   Check if a process has access to an IO port
+   => p = process to check
+      port = port number to check for
+   <= 0 for access allow, or an error code
+*/
+kresult x86_ioports_check(process *p, unsigned short port)
+{
+   /* calculate an index into the ioport table */
+   unsigned int index = port >> 5;
+   unsigned int offset = port - (index << 5);
+   kresult result;
+   
+   /* sanity check */
+   if(!p || !(p->ioport_bitmap) || index > X86_IOPORT_MAXWORDS)
+      return e_failure;
+   
+   lock_gate(&(p->lock), LOCK_WRITE);
+   
+   /* a set bit in the io port table means no access */
+   if(p->ioport_bitmap[index] & (1 << offset))
+      result = e_no_rights;
+   else
+      result = success;
+   
+   unlock_gate(&(p->lock), LOCK_WRITE);
+   return result;
+
+}
+
 // ------------------- performance monitoring support ----------------------
 /* x86_read_cyclecount
    <= returns the CPU's current cycle counter value
@@ -791,7 +821,7 @@ void x86_kickstart(thread *torun)
       to keep the C-front end of the kick-started program from accessing stack that's not there */
    usresp = torun->stackbase - (4 * (sizeof(unsigned int)));
    /* see: http://asm.sourceforge.net/articles/startup.html for minimal stack layout */
-   
+
    /* x86 voodoo to switch to user mode and enable interrupts (eflags OR 0x200 in the code) */
    /* segment number 0x23 = 0x20 | 0x3 = user data seg 0x20 with ring3 bits set
                      0x2B = 0x28 | 0x3 = user code seg 0x28 with ring3 bits set */
@@ -823,22 +853,22 @@ void x86_kickstart(thread *torun)
 /* typical x86 PC values for the two basic PIC chips */
 #define PIC1               (0x20)   /* IO base address for master PIC */
 #define PIC2               (0xA0)   /* IO base address for slave PIC */
-#define PIC1_COMMAND         (PIC1)
-#define PIC1_DATA            (PIC1+1)
-#define PIC2_COMMAND         (PIC2)
-#define PIC2_DATA            (PIC2+1)
+#define PIC1_COMMAND       (PIC1)
+#define PIC1_DATA          (PIC1+1)
+#define PIC2_COMMAND       (PIC2)
+#define PIC2_DATA          (PIC2+1)
 
-#define ICW1_ICW4            (0x01)   /* ICW4 (not) needed */
-#define ICW1_SINGLE         (0x02)   /* Single (cascade) mode */
-#define ICW1_INTERVAL4      (0x04)   /* Call address interval 4 (8) */
+#define ICW1_ICW4          (0x01)   /* ICW4 (not) needed */
+#define ICW1_SINGLE        (0x02)   /* Single (cascade) mode */
+#define ICW1_INTERVAL4     (0x04)   /* Call address interval 4 (8) */
 #define ICW1_LEVEL         (0x08)   /* Level triggered (edge) mode */
-#define ICW1_INIT            (0x10)   /* Initialization - required! */
+#define ICW1_INIT          (0x10)   /* Initialization - required! */
    
-#define ICW4_8086            (0x01)   /* 8086/88 (MCS-80/85) mode */
-#define ICW4_AUTO            (0x02)   /* Auto (normal) EOI */
-#define ICW4_BUF_SLAVE      (0x08)   /* Buffered mode/slave */
-#define ICW4_BUF_MASTER      (0x0C)   /* Buffered mode/master */
-#define ICW4_SFNM            (0x10)   /* Special fully nested (not) */
+#define ICW4_8086          (0x01)   /* 8086/88 (MCS-80/85) mode */
+#define ICW4_AUTO          (0x02)   /* Auto (normal) EOI */
+#define ICW4_BUF_SLAVE     (0x08)   /* Buffered mode/slave */
+#define ICW4_BUF_MASTER    (0x0C)   /* Buffered mode/master */
+#define ICW4_SFNM          (0x10)   /* Special fully nested (not) */
 
 /* x86_pic_remap
    Reinitialise the two motherboard PIC chips to reprogram basic

@@ -29,6 +29,8 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
                => ebx = IRQ number to register
             DIOSIX_DRIVER_DEREGISTER_IRQ: stop routing IRQ signals to the caller
                => ebx = IRQ number to deregister
+            DIOSIX_DRIVER_IOREQUEST: access an IO port, privileged drivers only
+               => ebx = pointer to IO port request block
    <= eax = 0 for success or an error code
 */
 void syscall_do_driver(int_registers_block *regs)
@@ -172,6 +174,63 @@ void syscall_do_driver(int_registers_block *regs)
             
             /* let the IRQ code take care of it including outputting debug */
             err = irq_deregister_driver(irq, IRQ_DRIVER_PROCESS, current->proc, NULL);
+            SYSCALL_RETURN(err);
+         }
+         
+      case DIOSIX_DRIVER_IOREQUEST:
+         if(current->flags & THREAD_FLAG_ISDRIVER)
+         {
+            kresult err;
+            diosix_ioport_request *req = (diosix_ioport_request *)regs->ebx;
+            
+            /* sanity checks */
+            if(!req) SYSCALL_RETURN(e_bad_params);
+            if((unsigned int)req + MEM_CLIP(req, sizeof(diosix_ioport_request)) >= KERNEL_SPACE_BASE)
+               SYSCALL_RETURN(e_bad_params);
+            
+            /* check the thread has the correct IO port access */
+            err = x86_ioports_check(current->proc, req->port);
+            if(err) SYSCALL_RETURN(err);
+            
+            /* decode the request action */
+            switch(req->type)
+            {
+               case ioport_read:
+               {
+                  switch(req->size)
+                  {
+                     case 1:
+                        req->data_in = x86_inportb(req->port);
+                        break;
+                        
+                     /* bad read width */
+                     default:
+                        SYSCALL_RETURN(e_bad_params);
+                  }
+               }
+               break;
+                  
+               case ioport_write:
+               {
+                  switch(req->size)
+                  {
+                     case 1:
+                        x86_outportb(req->port, req->data_out);
+                        break;
+                        
+                     /* bad write width */
+                     default:
+                        SYSCALL_RETURN(e_bad_params);
+                  }
+               }
+               break;
+               
+               /* bad access type */
+               default:
+                  SYSCALL_RETURN(e_bad_params);
+            }
+            
+            /* will be success */
             SYSCALL_RETURN(err);
          }
    }

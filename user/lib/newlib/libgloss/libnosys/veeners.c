@@ -364,7 +364,7 @@ unsigned int diosix_signals_kernel(unsigned int mask)
 
 /* --------------------------- driver management -------------------- */
 unsigned int diosix_driver_register(void)
-/* remove the previously afforded process right to access hardware entirely */
+/* request access to hardware from suerspace */
 {
    unsigned int retval;
 #if defined (__i386__)
@@ -433,6 +433,18 @@ unsigned int diosix_driver_deregister_irq(unsigned char irq)
    __asm__ __volatile__("mov r4, %3; mov r1, %2; mov r0, %1; swi $0x0; mov %0, r0" : "=r" (retval) : "i" (DIOSIX_DRIVER_DEREGISTER_IRQ), "r" (irq), "i" (SYSCALL_DRIVER));
 #endif
    return retval;
+}
+
+unsigned int diosix_driver_iorequest(diosix_ioport_request *req)
+/* ask the kernel to perform an IO port access */
+{
+   unsigned int retval;
+#if defined (__i386__)
+   __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (DIOSIX_DRIVER_IOREQUEST), "b" (req), "d" (SYSCALL_DRIVER));
+#elif defined (__arm__)
+   /* not supported in the ARM architecture */
+   return e_notimplemented;
+#endif
 }
 
 /* --------------- get information out of the kernel ---------------- */

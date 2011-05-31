@@ -26,6 +26,13 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #include "../../kernel/core/include/multiboot.h"
 #include "../../kernel/core/include/atag.h"
 
+/* from memory.h */
+#define MEM_PGSIZE           (4 * 1024)
+#define MEM_PGSHIFT          (12)
+#define MEM_PGMASK           ((1 << MEM_PGSHIFT) - 1)
+/* MEM_PG_ROUND_UP - round up to the nearest page-aligned address */
+#define MEM_PG_ROUND_UP(a)   ( ((unsigned int)(a) + MEM_PGSIZE) & ~(MEM_PGMASK) )
+
 /* syntax: mkpayload -o output file1 file2 ... fileN
    Concatenate files 'file1'...'fileN' into a block of multiboot payload modules
    stored in the binary file 'output'. The output file should be easily loadable by
@@ -53,11 +60,14 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
    +----------------------------------------+
    | module strings, null-terminated        | 1 or more bytes
    +----------------------------------------+
+   | padding to 4K boundary                 |
+   +----------------------------------------+
    | module file data                       | 1 or more bytes
    +----------------------------------------+
  
    * Offsets are measured from the start of the file 
    * Module files must exist and must be at least 1 byte long
+   * Each module must be padded out to start on a 4K boundary, aligning them to pages
    * Comment field is always the given filename of the module with a prepended / character 
  
    To compile:
@@ -73,6 +83,30 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 #define COPY_BUFFER_SIZE      (1 * 1024 * 1024)
 
+/* --------------------------------------------------------------------------- *
+
+/* write_padding
+   Write 'count' number of zero bytes to the filehandle 'fh'
+   <= 0 for success, 1 for failure
+*/
+int write_padding(int fh, unsigned int count)
+{
+   unsigned char *zdata = malloc(count);
+   if(!zdata) return 1;
+   bzero(zdata, count);
+   
+   if(write(fh, zdata, count) == count)
+   {
+      free(zdata);
+      return 0;
+   }
+   
+   free(zdata);
+   return 1;
+}
+
+/* --------------------------------------------------------------------------- */
+
 int main(int argc, char **argv)
 {
    unsigned int mod_loop;
@@ -82,7 +116,7 @@ int main(int argc, char **argv)
    unsigned int *module_sizes = NULL;
    mb_module_t *modules = NULL;
    struct stat st;
-   unsigned int strings_base = 0, modules_base = 0;
+   unsigned int strings_base = 0, modules_base = 0, modules_base_aligned = 0;
    unsigned char *copy_buffer = NULL;
    int result = EXIT_SUCCESS;
    
@@ -173,6 +207,7 @@ int main(int argc, char **argv)
    /* calculate final base addresses for the string and module data sections */
    strings_base = sizeof(payload_blob_header) + sizeof(mb_module_t) * payload_header.present;
    modules_base += strings_base;
+   modules_base_aligned = MEM_PG_ROUND_UP(modules_base);
 
    /* we've got all our pieces in place, time to write out to the output file, starting with
       the header */
@@ -191,9 +226,9 @@ int main(int argc, char **argv)
       /* if the size is zero then skip over the module */
       if(module_sizes[ARG_TO_INDEX(mod_loop)])
       {
-         module->mod_start = modules_base;
-         module->mod_end = modules_base + module_sizes[ARG_TO_INDEX(mod_loop)];
-         modules_base = module->mod_end;
+         module->mod_start = modules_base_aligned;
+         module->mod_end = modules_base_aligned + module_sizes[ARG_TO_INDEX(mod_loop)];
+         modules_base_aligned = MEM_PG_ROUND_UP(module->mod_end);
 
          module->string = strings_base;
          strings_base += string_sizes[ARG_TO_INDEX(mod_loop)];
@@ -225,6 +260,14 @@ int main(int argc, char **argv)
       }
    }
    
+   /* pad the module data to next 4K boundary */
+   if(write_padding(output_fh, MEM_PG_ROUND_UP(modules_base) - modules_base))
+   {
+      printf("[-] failed to write module padding -- bailing out\n", argv[mod_loop]); 
+      result = EXIT_FAILURE;
+      goto clean_up;
+   }
+   
    /* copy data from input files into output file */
    for(mod_loop = FIRST_INPUT_ARG; mod_loop < argc; mod_loop++)
    {      
@@ -232,7 +275,7 @@ int main(int argc, char **argv)
       if(module_sizes[ARG_TO_INDEX(mod_loop)])
       {
          unsigned int bytes_read;
-         
+                  
          do
          {            
             bytes_read = read(input_fh[ARG_TO_INDEX(mod_loop)], copy_buffer, COPY_BUFFER_SIZE);
@@ -245,7 +288,17 @@ int main(int argc, char **argv)
             printf("[-] failed to read file '%s' -- bailing out\n", argv[mod_loop]); 
             result = EXIT_FAILURE;
             goto clean_up;
-         }  
+         }
+         
+         /* pad the module data to next 4K boundary */
+         if(write_padding(output_fh,
+                          MEM_PG_ROUND_UP(module_sizes[ARG_TO_INDEX(mod_loop)]) - 
+                          module_sizes[ARG_TO_INDEX(mod_loop)]))
+         {
+            printf("[-] failed to write module padding -- bailing out\n", argv[mod_loop]); 
+            result = EXIT_FAILURE;
+            goto clean_up;
+         }
       }
    }
       

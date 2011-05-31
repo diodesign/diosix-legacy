@@ -46,6 +46,7 @@ kresult x86_ioports_clone(process *target, process *source);
 kresult x86_ioports_new(process *p);
 kresult x86_ioports_enable(thread *t);
 kresult x86_ioports_disable(thread *t);
+kresult x86_ioports_check(process *p, unsigned short port);
 void x86_cmos_write(unsigned char addr, unsigned char value);
 void x86_pic_remap(unsigned int offset1, unsigned int offset2);
 void x86_pic_reset(unsigned char pic);
