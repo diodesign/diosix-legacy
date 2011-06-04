@@ -51,7 +51,7 @@ void _main(multiboot_info_t *mbd, unsigned int magic)
 
    /* initialise the interrupt and hardware driver subsystem */
    if(int_initialise()) goto goforhalt;
-
+   
    /* bring up the remaining processor(s) cores */
    if(mp_post_initialise()) goto goforhalt;
 

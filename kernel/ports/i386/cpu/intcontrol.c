@@ -101,23 +101,21 @@ kresult int_initialise(void)
 {
    /* initialise the basic PIC chipset */
    pic_initialise();
-   
+
    /* on a uniproc machine? */
-   if(mp_cpus == 1)
+   if(!mp_is_smp)
    {      
       /* set up a 100Hz ticker for the scheduler  */
       INT_DEBUG("[int:%i] uniproc: set up timer (%iHz)...\n", CPU_ID, SCHED_FREQUENCY);
       x86_timer_init(SCHED_FREQUENCY);
       irq_register_driver(PIC_8254_IRQ, IRQ_DRIVER_FUNCTION | IRQ_DRIVER_LAST, 0, &int_common_timer);
-      
-      return success;
    }
 
    /* initialise the smp system's IOAPIC */
    if(mp_ioapics) ioapic_initialise(0);
-      
-   /* initialise the boot cpu's local APIC */
-   lapic_initialise(INT_IAMBSP);
+
+   /* initialise the boot cpu's local APIC if we're on a multiprocessor machine */
+   if(mp_is_smp) lapic_initialise(INT_IAMBSP);
    
    return success;
 }

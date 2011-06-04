@@ -106,7 +106,7 @@ kresult ioapic_register_chip(unsigned int id, unsigned int physaddr)
 {
    /* TODO: not implemented */
    
-   return e_failure;
+   return success;
 }
 
 /* int_initialise_ioapic

@@ -25,6 +25,7 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 extern unsigned char mp_cpus;
 extern unsigned char mp_ioapics;
 extern unsigned char mp_boot_cpu;
+extern unsigned char mp_is_smp;
 
 #define MP_MAGIC_SIG     (0x5f504d5f)   /* _MP_ */
 #define MP_RSDT_SIG      (0x52534454)   /* RSDT */
@@ -179,6 +180,9 @@ struct __attribute__((packed)) tss_descr
     unsigned short trap;
     unsigned short iomap_base;
 };
+
+/* low level cpu register defines */
+#define X86_EFLAGS_INTERRUPT_ENABLE  (1 << 9) /* set to enable interrupts */
 
 /* low level gdt entry definition */
 typedef struct

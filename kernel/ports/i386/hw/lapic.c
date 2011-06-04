@@ -43,11 +43,16 @@ kresult lapic_irq_default(unsigned char intnum, int_registers_block *regs)
    lAPIC timer for the scheduler */
 kresult lapic_preflight_timer(unsigned char intnum, int_registers_block *regs)
 {
-   /* sample the lAPIC's current timer value */
-   lapic_preflight_timer_lap[lapic_preflight_timer_pass] = (*LAPIC_TIMERNOW) / APIC_TIMER_PASSES;
+   /* sample the lAPIC's current timer value and store it while the index variable 
+      is valid for the array */
    if(lapic_preflight_timer_pass < APIC_TIMER_PASSES)
-      lapic_preflight_timer_pass++;
-
+      lapic_preflight_timer_lap[lapic_preflight_timer_pass++] = (*LAPIC_TIMERNOW) / APIC_TIMER_PASSES;
+   
+   /* if the index variable hits the APIC_TIMER_PASSES limit then disable further interrupts
+      to give the boot thread a chance to detect this test loop's end condition */
+   if(lapic_preflight_timer_pass >= APIC_TIMER_PASSES)
+      regs->eflags = regs->eflags & ~X86_EFLAGS_INTERRUPT_ENABLE;
+   
    /* reload to max value */
    lapic_write(LAPIC_TIMERINIT, 0xffffffff);
 
@@ -207,23 +212,23 @@ void lapic_initialise(unsigned char flags)
       /* calculate average CPU bus speed and, thus, the local APIC's timer period */
       LAPIC_DEBUG("[lapic:%i] measuring APIC timer in pre-flight checks...\n", CPU_ID);
       
-      /* attach the preflight timer handler to the correct IRQ line */
-      irq_register_driver(PIC_8254_IRQ, IRQ_DRIVER_FUNCTION, 0, &lapic_preflight_timer);
-
+      /* attach the preflight timer handler to IRQ line. */
+      irq_register_driver(IRQ_APIC_LINT0, IRQ_DRIVER_FUNCTION, 0, &lapic_preflight_timer);
+      
       /* set the old-world timer to fire every at the rate expcted by the scheduler
        and see how far the CPU's APIC counts down in those periods */
       lapic_write(LAPIC_TIMERDIV, LAPIC_DIV_128); /* divide down the bus clock by 128 */
       lapic_write(LAPIC_TIMERINIT, 0xffffffff);
       x86_timer_init(SCHED_FREQUENCY);
       x86_enable_interrupts();
-      
+
       /* loop until all done - don't optimise it out */
       while(lapic_preflight_timer_pass < APIC_TIMER_PASSES) __asm__ __volatile__("pause");
 
-      /* tear down this preflight check */
+      /* tear down this preflight check and ensure the timer is disabled */
       x86_disable_interrupts();
       x86_timer_init(0);
-      irq_deregister_driver(PIC_8254_IRQ, IRQ_DRIVER_FUNCTION, 0, &lapic_preflight_timer);
+      irq_deregister_driver(IRQ_APIC_LINT0, IRQ_DRIVER_FUNCTION, 0, &lapic_preflight_timer);
       
       /* calculate the average init value for the apic timer - each value has
          already been divided by APIC_TIMER_PASSES */

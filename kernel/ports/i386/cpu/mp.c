@@ -22,6 +22,7 @@ unsigned char mp_cpus = 0;
 unsigned char mp_ioapics = 0;
 unsigned char mp_boot_cpu = 0;
 unsigned char mp_domains = 0;
+unsigned char mp_is_smp = 0; /* set to 1 on an SMP system */
 
 /* pointer to table of cpu descriptors */
 mp_core *cpu_table = NULL;
@@ -369,7 +370,7 @@ kresult mp_initialise(void)
    }
 
    /* we're in multiprocessor territory now */
-   
+   mp_is_smp = 1;
    BOOT_DEBUG("[mp] multiprocessor machine detected\n");
    
    /* start pulling apart system info */
