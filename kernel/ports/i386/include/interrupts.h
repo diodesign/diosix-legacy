@@ -104,7 +104,10 @@ void exceptions_initialise(void);
 void irq_initialise(void);
 void ioapic_initialise(unsigned char id);
 void lapic_initialise(unsigned char flags);
+
 void pic_initialise(void);
+void pic_remap(unsigned int offset1, unsigned int offset2);
+void pic_reset(unsigned char pic);
 
 void lapic_write(volatile unsigned int *addr, unsigned int value);
 void lapic_end_interrupt(void);
@@ -152,6 +155,7 @@ kresult irq_deregister_driver(unsigned int irq_num, unsigned int type, process *
 #define INT_IAMAP          (0)
 
 /* the 8254 PIT timer kernel IRQ wired via a PIC chip on a uniproc machine */
-#define PIC_8254_IRQ       (PIC_MASTER_VECTOR_BASE + 0)
+#define PIC_8254_IRQ_FIXED (0)
+#define PIC_8254_IRQ       (PIC_MASTER_VECTOR_BASE + PIC_8254_IRQ_FIXED)
 
 #endif

@@ -30,11 +30,108 @@ kresult pic_irq_default(unsigned char intnum, int_registers_block *regs)
 {
    /* clear the int from the chip */
    if(intnum >= PIC_SLAVE_VECTOR_BASE)
-      x86_pic_reset(2); /* reset the slave if necessary */
-   x86_pic_reset(1); /* as well as the master */
+      pic_reset(2); /* reset the slave if necessary */
+   pic_reset(1); /* as well as the master */
    
    PIC_DEBUG("[pic:%i] default irq handler called: int %i\n", CPU_ID, intnum);
    return success;
+}
+
+/* pic_remap
+   Reinitialise the two motherboard PIC chips to reprogram basic
+   interrupt routing to the kernel using an offset.
+   => offset1 = vector offset for master PIC
+                vectors on the master become offset1 to offset1 + 7
+   => offset2 = same for slave PIC: offset2 to offset2 + 7
+*/
+void pic_remap(unsigned int offset1, unsigned int offset2)
+{
+   unsigned char a1, a2;
+   
+   /* save the masks */
+   a1 = x86_inportb(PIC1_DATA);
+   a2 = x86_inportb(PIC2_DATA);
+   
+   /* reinitialise the chipset */
+   x86_outportb(PIC1_COMMAND, ICW1_INIT + ICW1_ICW4);
+   x86_outportb(PIC2_COMMAND, ICW1_INIT + ICW1_ICW4);
+   /* send the new offsets */
+   x86_outportb(PIC1_DATA, offset1);
+   x86_outportb(PIC2_DATA, offset2);
+   /* complete the reinitialisation sequence */
+   x86_outportb(PIC1_DATA, 4);
+   x86_outportb(PIC2_DATA, 2);
+   x86_outportb(PIC1_DATA, ICW4_8086);
+   x86_outportb(PIC2_DATA, ICW4_8086);
+   
+   /* restore saved masks */
+   x86_outportb(PIC1_DATA, a1);
+   x86_outportb(PIC2_DATA, a2);
+}
+
+/* pic_reset
+   Send an end-of-interrupt/reset signal to a PIC
+   => pic = 1 for master
+            2 for slave
+*/
+void pic_reset(unsigned char pic)
+{
+   if(pic == 1)
+      x86_outportb(PIC1_COMMAND, 0x20);
+   else
+      x86_outportb(PIC2_COMMAND, 0x20);
+}
+
+/* pic_mask_disable
+   Mask out the given IRQ line to disable the PIC from processing it
+*/
+void pic_mask_disable(unsigned char irq)
+{
+   unsigned short port;
+   unsigned char value;
+   
+   /* bail out if irq is bonkers, there's only 0-15 PIC IRQs */
+   if(irq > 0x0f) return;
+   
+   /* select the right PIC, master or slave */
+   if(irq < 8)
+      port = PIC1_DATA;
+   else
+   {
+      port = PIC2_DATA;
+      irq -= 8;
+   }
+
+   /* read in the current mask value, set the bit to disable 
+      and update the mask register */
+   value = x86_inportb(port) | (1 << irq);
+   x86_outportb(port, value);        
+}
+
+/* pic_mask_enable
+   Mask in the given IRQ line to enable the PIC to process it
+*/
+void pic_mask_enable(unsigned char irq)
+{
+   unsigned short port;
+   unsigned char value;
+   
+   /* bail out if irq is bonkers, there's only 0-15 PIC IRQs */
+   if(irq > 0x0f) return;
+   
+   /* select the right PIC, master or slave */
+   if(irq < 8)
+      port = PIC1_DATA;
+   else
+   {
+      port = PIC2_DATA;
+      irq -= 8;
+   }
+   
+   /* read the current mask value, clear the bit to enable the
+      IRQ and updatet he mask register */
+   value = x86_inportb(port) & ~(1 << irq);
+   x86_outportb(port, value);        
 }
 
 /* initialise the common entries in the int table for uni and multiproc systems */
@@ -47,7 +144,7 @@ void pic_initialise(void)
    /* reprogram the basic PICs so that any old-world interrupts
     get sent to the 16 vectors above the cpu exceptions.
     Run the PIC vectors from 32 (0x20) to 47 (0x2F) */
-   x86_pic_remap(PIC_MASTER_VECTOR_BASE, PIC_SLAVE_VECTOR_BASE);
+   pic_remap(PIC_MASTER_VECTOR_BASE, PIC_SLAVE_VECTOR_BASE);
    
    /* ..and direct the old-world hardware interrupts at the right vectors */
    int_set_gate(PIC_MASTER_VECTOR_BASE + 0, (unsigned int)irq0,  0x18, 0x8E, 0);

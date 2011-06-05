@@ -517,8 +517,12 @@ void x86_cmos_write(unsigned char addr, unsigned char value)
 }
 
 // ------------------------ multitasking support ---------------------------
+
 /* x86_timer_init
-   Program the onboard timer to fire freq-times-a-second, or 0 to disable */
+   Program the onboard timer to fire freq-times-a-second, or 0 to disable
+   Note: this will also alter the PIC mask to enable/disable its PIT's IRQ line
+   as required.
+*/
 void x86_timer_init(unsigned char freq)
 {
    unsigned char lo, hi;
@@ -530,7 +534,12 @@ void x86_timer_init(unsigned char freq)
          terminal count mode. the chip will wait for a
          value to be loaded into the data register, 
          which it won't be */
-      x86_outportb(0x43, 1 << 4);
+      x86_outportb(X86_PIT_COMMAND, 1 << 4);
+      
+      /* mask out the interrupt line connecting the PIT 
+         to the PIC */
+      pic_mask_disable(PIC_8254_IRQ_FIXED);
+      
       return;
    }
    
@@ -540,15 +549,18 @@ void x86_timer_init(unsigned char freq)
    
    /* Send byte to command port - generate a square wave pulse
       interrupt at a set rate (mode 3) on channel 0 (wired to IRQ0) */
-   x86_outportb(0x43, 0x36);
+   x86_outportb(X86_PIT_COMMAND, 0x36);
    
    /* divisor has to be sent byte-wise, lo then hi */
    lo = (unsigned char)(div & 0xff);
    hi = (unsigned char)((div >> 8) & 0xff);
    
    /* send the frequency divisor to channel 0 data port */
-   x86_outportb(0x40, lo);
-   x86_outportb(0x40, hi);
+   x86_outportb(X86_PIT_CHANNEL0, lo);
+   x86_outportb(X86_PIT_CHANNEL0, hi);
+
+   /* ensure the PIT's IRQ line to the PIC is not masked out */
+   pic_mask_enable(PIC_8254_IRQ_FIXED);
    
    LOLVL_DEBUG("[x86:%i] programmed PIT to fire interrupt %i times a second\n",
                CPU_ID, freq);
@@ -847,72 +859,6 @@ void x86_kickstart(thread *torun)
    /* execution shouldn't really return to here */
    KOOPS_DEBUG("[x86:%i] x86_kickstart: thread %p (tid %i pid %i) failed to kickstart\n",
                CPU_ID, torun, torun->tid, torun->proc->pid);
-}
-
-// ----------------------- interrupt management ----------------------------
-/* typical x86 PC values for the two basic PIC chips */
-#define PIC1               (0x20)   /* IO base address for master PIC */
-#define PIC2               (0xA0)   /* IO base address for slave PIC */
-#define PIC1_COMMAND       (PIC1)
-#define PIC1_DATA          (PIC1+1)
-#define PIC2_COMMAND       (PIC2)
-#define PIC2_DATA          (PIC2+1)
-
-#define ICW1_ICW4          (0x01)   /* ICW4 (not) needed */
-#define ICW1_SINGLE        (0x02)   /* Single (cascade) mode */
-#define ICW1_INTERVAL4     (0x04)   /* Call address interval 4 (8) */
-#define ICW1_LEVEL         (0x08)   /* Level triggered (edge) mode */
-#define ICW1_INIT          (0x10)   /* Initialization - required! */
-   
-#define ICW4_8086          (0x01)   /* 8086/88 (MCS-80/85) mode */
-#define ICW4_AUTO          (0x02)   /* Auto (normal) EOI */
-#define ICW4_BUF_SLAVE     (0x08)   /* Buffered mode/slave */
-#define ICW4_BUF_MASTER    (0x0C)   /* Buffered mode/master */
-#define ICW4_SFNM          (0x10)   /* Special fully nested (not) */
-
-/* x86_pic_remap
-   Reinitialise the two motherboard PIC chips to reprogram basic
-   interrupt routing to the kernel using an offset.
-   => offset1 = vector offset for master PIC
-                vectors on the master become offset1 to offset1 + 7
-   => offset2 = same for slave PIC: offset2 to offset2 + 7
-*/
-void x86_pic_remap(unsigned int offset1, unsigned int offset2)
-{
-   unsigned char a1, a2;
-   
-   /* save the masks */
-   a1 = x86_inportb(PIC1_DATA);
-   a2 = x86_inportb(PIC2_DATA);
-   
-   /* reinitialise the chipset */
-   x86_outportb(PIC1_COMMAND, ICW1_INIT+ICW1_ICW4);
-   x86_outportb(PIC2_COMMAND, ICW1_INIT+ICW1_ICW4);
-   /* send the new offsets */
-   x86_outportb(PIC1_DATA, offset1);
-   x86_outportb(PIC2_DATA, offset2);
-   /* complete the reinitialisation sequence */
-   x86_outportb(PIC1_DATA, 4);
-   x86_outportb(PIC2_DATA, 2);
-   x86_outportb(PIC1_DATA, ICW4_8086);
-   x86_outportb(PIC2_DATA, ICW4_8086);
-   
-   /* restore saved masks */
-   x86_outportb(PIC1_DATA, a1);
-   x86_outportb(PIC2_DATA, a2);
-}
-
-/* x86_pic_reset
-   Send an end-of-interrupt/reset signal to a PIC
-   => pic = 1 for master
-            2 for slave
-*/
-void x86_pic_reset(unsigned char pic)
-{
-   if(pic == 1)
-      x86_outportb(PIC1_COMMAND, 0x20);
-   else
-      x86_outportb(PIC2_COMMAND, 0x20);
 }
 
 /* x86_enable_interrupts and x86_disable_interrupts
