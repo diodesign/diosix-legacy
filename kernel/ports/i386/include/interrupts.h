@@ -94,6 +94,9 @@ struct irq_driver_entry
    irq_driver_entry *proc_previous, *proc_next;
 };
 
+/* export the irq lock to the thread switching code */
+extern rw_gate irq_lock;
+
 /* interrupt-related functions */
 kresult int_initialise(void);
 void int_initialise_common(void);

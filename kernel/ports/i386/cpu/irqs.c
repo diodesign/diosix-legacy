@@ -44,23 +44,10 @@ void irq_handler(int_registers_block regs)
    regs.intnum = regs.intnum % IRQ_MAX_LINES;
    
    lock_gate(&irq_lock, LOCK_READ);
-   
-   /* the interrupt might trigger a reschedule that will change the currently
-      running thread - but it'll still be holding onto irq_lock. so be prepared
-      to change the ownership of the lock if the thread is switched out. if
-      cpu_table isn't allocated yet then we have no threads running and the lock
-      is owned by the processor, so set locker to zero to prevent further changes. */
-   if(cpu_table)
-   {
-      locker = LOCK_GET_OWNER(&irq_lock);
-      if(locker != cpu_table[CPU_ID].current) locker = NULL; /* this isn't my locker... */
-   }
-   else
-      locker = NULL;
 
    /* find the registered drivers */
    driver = irq_drivers[regs.intnum];
-
+   
    while(driver)
    {
       switch(driver->flags & IRQ_DRIVER_TYPEMASK)
@@ -79,15 +66,25 @@ void irq_handler(int_registers_block regs)
             {
                if(driver->flags & IRQ_DRIVER_LAST)
                {
-                  /* call the last kernel function */
+                  /* get ready to call the last kernel function assigned to this IRQ line */
                   kresult (*driver_func)(unsigned char intnum, int_registers_block *regs) = driver->func;
                   
+                  /* we may not return from the kernel function as this thread might get scheduled away
+                     and restarted at the point the IRQ came in - so give up the IRQ lock. This is
+                     likely to happen if the IRQ is a timer interrupt, for example */
+                  unlock_gate(&irq_lock, LOCK_READ);
+                  
                   (driver_func)(regs.intnum, &regs);
+                  
+                  /* if we're still here then reacquire the lock to carry on reading the structure,
+                     which should still be valid because no kernel IRQ function will alter 
+                     the driver structure */
+                  lock_gate(&irq_lock, LOCK_READ);
                   handled = 1;
                }
                else
                {
-                  /* call the kernel function */
+                  /* call a kernel IRQ handler function - this MUST not reschedule the thread */
                   (driver->func)(regs.intnum, &regs);
                   handled = 1;
                }
@@ -115,10 +112,6 @@ void irq_handler(int_registers_block regs)
    }
 
 irq_handler_exit:
-   /* hand the lock over to the new thread if the current one was rescheduled away */
-   if(locker && locker != cpu_table[CPU_ID].current)
-      LOCK_SET_OWNER(&irq_lock, cpu_table[CPU_ID].current);
-
    unlock_gate(&irq_lock, LOCK_READ);
    
 #ifdef IRQ_DEBUG

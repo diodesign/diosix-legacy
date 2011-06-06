@@ -884,10 +884,10 @@ void lowlevel_thread_switch(thread *now, thread *next, int_registers_block *regs
    if(now->lock.owner)
    {
       thread *o = (thread *)(now->lock.owner);
-      LOLVL_DEBUG("[x86:%i] switching from thread %p (tid %i pid %i) with lock %p still engaged!\n",
+      KOOPS_DEBUG("[x86:%i] switching from thread %p (tid %i pid %i) with lock %p still engaged!\n",
               CPU_ID, now, now->tid, now->proc->pid, &(now->lock));
-      LOLVL_DEBUG("        lock owner is %p (tid %i pid %i)\n", o, o->tid, o->proc->pid);
-      LOLVL_DEBUG(" *** halting.\n");
+      KOOPS_DEBUG("        lock owner is %p (tid %i pid %i)\n", o, o->tid, o->proc->pid);
+      KOOPS_DEBUG(" *** halting.\n");
       while(1);
    }
    unlock_spin(&(now->lock.spinlock));
@@ -896,15 +896,24 @@ void lowlevel_thread_switch(thread *now, thread *next, int_registers_block *regs
    if(now->proc->lock.owner)
    {
       thread *o = (thread *)(now->proc->lock.owner);
-      LOLVL_DEBUG("[x86:%i] switching from process %p (pid %i) with lock %p still engaged!\n",
+      KOOPS_DEBUG("[x86:%i] switching from process %p (pid %i) with lock %p still engaged!\n",
               CPU_ID, now->proc, now->proc->pid, &(now->proc->lock));
-      LOLVL_DEBUG("        lock owner is %p (tid %i pid %i)\n", o, o->tid, o->proc->pid);
-      LOLVL_DEBUG(" *** halting.\n");
+      KOOPS_DEBUG("        lock owner is %p (tid %i pid %i)\n", o, o->tid, o->proc->pid);
+      KOOPS_DEBUG(" *** halting.\n");
       while(1);
    }
    unlock_spin(&(now->proc->lock.spinlock));
-#endif
    
+   /* make sure the IRQ lock isn't going to be held across thread switches */
+   lock_spin(&(irq_lock.spinlock));
+   if(irq_lock.owner == (unsigned int)now && (unsigned int)now != (unsigned int)next)
+   {
+      KOOPS_DEBUG("[x86:%i] OMGWTF! lowlevel_thread_switch: thread %i of process %i (%x -> %x) holds IRQ lock!\n",
+                  CPU_ID, now->tid, now->proc->pid, now, next);
+   }
+   unlock_spin(&(irq_lock.spinlock));
+#endif
+
    /* if the thread is already in usermode then switch to it */
    if(next->flags & THREAD_FLAG_INUSERMODE)
    {
