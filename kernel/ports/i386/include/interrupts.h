@@ -108,6 +108,8 @@ void lapic_initialise(unsigned char flags);
 void pic_initialise(void);
 void pic_remap(unsigned int offset1, unsigned int offset2);
 void pic_reset(unsigned char pic);
+void pic_mask_disable(unsigned char irq);
+void pic_mask_enable(unsigned char irq);
 
 void lapic_write(volatile unsigned int *addr, unsigned int value);
 void lapic_end_interrupt(void);

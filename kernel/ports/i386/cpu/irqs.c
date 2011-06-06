@@ -55,7 +55,8 @@ void irq_handler(int_registers_block regs)
       locker = LOCK_GET_OWNER(&irq_lock);
       if(locker != cpu_table[CPU_ID].current) locker = NULL; /* this isn't my locker... */
    }
-   else locker = NULL;
+   else
+      locker = NULL;
 
    /* find the registered drivers */
    driver = irq_drivers[regs.intnum];
@@ -67,10 +68,7 @@ void irq_handler(int_registers_block regs)
          case IRQ_DRIVER_FUNCTION:
             IRQ_DEBUG("[irq:%i] calling kernel function %p for IRQ %i (driver %p)\n",
                       CPU_ID, driver->func, regs.intnum, driver);
-            /* a post-default handler handler may force an end to proceedings through
-               a thread switch to a cold thread. this is where it gets a bit messy.
-               if such a driver function is about to run, and is last, then release the
-               irq lock early and assume we may not return from the function call */
+
             if(driver->next)
             {
                /* call the kernel function */
@@ -83,12 +81,6 @@ void irq_handler(int_registers_block regs)
                {
                   /* call the last kernel function */
                   kresult (*driver_func)(unsigned char intnum, int_registers_block *regs) = driver->func;
-                  
-                  /* hand the lock over to the new thread if the current one was rescheduled away */
-                  IRQ_DEBUG("[irq:%i] releasing IRQ lock early\n", CPU_ID);
-                  if(locker && locker != cpu_table[CPU_ID].current)
-                     LOCK_SET_OWNER(&irq_lock, cpu_table[CPU_ID].current);
-                  unlock_gate(&irq_lock, LOCK_READ);
                   
                   (driver_func)(regs.intnum, &regs);
                   handled = 1;
@@ -122,16 +114,19 @@ void irq_handler(int_registers_block regs)
       driver = driver->next;
    }
 
+irq_handler_exit:
    /* hand the lock over to the new thread if the current one was rescheduled away */
    if(locker && locker != cpu_table[CPU_ID].current)
       LOCK_SET_OWNER(&irq_lock, cpu_table[CPU_ID].current);
-   unlock_gate(&irq_lock, LOCK_READ);
 
-irq_handler_exit:
+   unlock_gate(&irq_lock, LOCK_READ);
+   
+#ifdef IRQ_DEBUG
    if(!handled)
    {
       IRQ_DEBUG("[irq:%i] spurious IRQ %i!\n", CPU_ID, regs.intnum);
    }
+#endif
    
    PERFORMANCE_DEBUG("[irq:%i] hardware interrupt %x took about %i cycles to process\n",
                      CPU_ID, regs.intnum, (unsigned int)(x86_read_cyclecount() - debug_cycles));
@@ -277,7 +272,7 @@ kresult irq_register_driver(unsigned int irq_num, unsigned int flags,
       }
       
       new->proc = proc; /* driver is a userspace process */
-      
+
       lock_gate(&(proc->lock), LOCK_WRITE);
       
       /* add the driver to the start of the process's list */

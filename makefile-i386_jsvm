@@ -10,7 +10,7 @@
 # set the architecture and any architecture flags
 ARCH = i386
 ARCH_TARGET = jsvm
-ARCH_FLAGS = -m32 -march=i386 -DARCH_HASIOPORTS -DARCH_NOMULTIBOOT -DARCH_NO4MPAGES
+ARCH_FLAGS = -m32 -march=i386 -DARCH_HASIOPORTS -DARCH_NOMULTIBOOT -DARCH_NO4MPAGES -DDEBUG_ENDING_CRLF
 
 # ARCH_NOMULTIBOOT and ARCH_NO4MPAGES must also be passed to nasm separately
 

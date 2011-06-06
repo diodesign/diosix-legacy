@@ -17,5 +17,8 @@ module /sbin/vfs
 module /sbin/drivers/i386/pcimngr
 module /sbin/drivers/i386/vbe
 module /sbin/drivers/i386/ps2kbd
+module /sbin/drivers/i386/rtl8139
+
+# ata is unfinished, serial is a test driver
 # module /sbin/drivers/i386/ata
-module /sbin/drivers/i386/serial
+# module /sbin/drivers/i386/serial

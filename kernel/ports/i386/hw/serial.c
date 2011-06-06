@@ -36,7 +36,10 @@ void serial_writebyte(unsigned char c)
    while((x86_inportb(SERIAL_HW + 5) & 0x20) == 0) __asm__ __volatile("pause");
    x86_outportb(SERIAL_HW + 0, c);
    
+   /* in case whatever's connected to the serial port expects CRLF */
+#ifdef DEBUG_ENDING_CRLF
    if(c == '\n') serial_writebyte('\r');
+#endif
 }
 
 /* serial_initialise
