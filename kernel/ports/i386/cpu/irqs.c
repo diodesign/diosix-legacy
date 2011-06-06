@@ -58,7 +58,8 @@ void irq_handler(int_registers_block regs)
 
             if(driver->next)
             {
-               /* call the kernel function */
+               /* call a kernel IRQ function  - it must not alter this
+                  linked driver structured nor reschedule the running thread */
                (driver->func)(regs.intnum, &regs);
                handled = 1;
             }
@@ -69,18 +70,19 @@ void irq_handler(int_registers_block regs)
                   /* get ready to call the last kernel function assigned to this IRQ line */
                   kresult (*driver_func)(unsigned char intnum, int_registers_block *regs) = driver->func;
                   
-                  /* we may not return from the kernel function as this thread might get scheduled away
-                     and restarted at the point the IRQ came in - so give up the IRQ lock. This is
-                     likely to happen if the IRQ is a timer interrupt, for example */
+                  /* we may not return from the last kernel function as it is allowed to forcibly
+                     reschedule this thread and (re)start another elsewhere - so give up the IRQ lock */
                   unlock_gate(&irq_lock, LOCK_READ);
                   
                   (driver_func)(regs.intnum, &regs);
                   
-                  /* if we're still here then reacquire the lock to carry on reading the structure,
-                     which should still be valid because no kernel IRQ function will alter 
-                     the driver structure */
-                  lock_gate(&irq_lock, LOCK_READ);
+                  /* if we're still here then we haven't been forcibly rescheduled away but 
+                     we may be running in the context of another thread and process, and the next return
+                     to usermode will be to run another thread. Either way, we no longer need the
+                     driver structure as this is the last in the chain for us so simply drop out of
+                     the processing loop */
                   handled = 1;
+                  goto irq_handler_exit_post_unlock;
                }
                else
                {
@@ -90,7 +92,7 @@ void irq_handler(int_registers_block regs)
                }
                
                /* bail out as there's no more to be done */
-               goto irq_handler_exit;
+               goto irq_handler_exit_pre_unlock;
             }
             break;
 
@@ -111,8 +113,9 @@ void irq_handler(int_registers_block regs)
       driver = driver->next;
    }
 
-irq_handler_exit:
+irq_handler_exit_pre_unlock:
    unlock_gate(&irq_lock, LOCK_READ);
+irq_handler_exit_post_unlock:
    
 #ifdef IRQ_DEBUG
    if(!handled)
