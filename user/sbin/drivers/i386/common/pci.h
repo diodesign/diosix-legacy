@@ -56,6 +56,8 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #define PCI_CLASS_CALC(c, s) (unsigned short)((((c) & 0xff) << 8) | ((s) & 0xff))
 #define PCI_CLASS_MASSSTORAGE (0x01)
 #define PCI_SUBCLASS_IDE      (0x01)
+#define PCI_CLASS_NETWORKING  (0x02)
+#define PCI_SUBCLASS_ETHERNET (0x00)
 
 /* PCI message definitions */
 #define PCI_MSG_MAGIC  (0xd1000002)

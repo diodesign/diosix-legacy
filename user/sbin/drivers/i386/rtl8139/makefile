@@ -20,13 +20,17 @@ OBJSDIR = ../../../../../build/$(ARCH)_$(ARCH_TARGET)/drivers/rtl8139
 FLAGS		= -O2 -std=c99 -Wall -static -I../../../../../user/lib/newlib/libgloss/libnosys -I../common
 CC		= $(PREFIX)gcc $(FLAGS)
 LD		= $(PREFIX)gcc $(FLAGS)
-OBJS	 	= $(OBJSDIR)/main.o
+OBJS	 	= $(OBJSDIR)/main.o $(OBJSDIR)/pci.o
 
 # targets
 all: rtl8139
 
 # dependencies
 $(OBJSDIR)/main.o:	main.c	makefile
+			$(WRITE) '==> COMPILE: $<'
+			$(Q)$(CC) -c -o $@ $<
+
+$(OBJSDIR)/pci.o:	../common/pci.c	makefile
 			$(WRITE) '==> COMPILE: $<'
 			$(Q)$(CC) -c -o $@ $<
 

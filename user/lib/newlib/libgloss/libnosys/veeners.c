@@ -154,12 +154,27 @@ unsigned int diosix_msg_send(diosix_msg_info *info)
 */
 {
    unsigned int retval;
+
+   while(1)
+   {
 #if defined (__i386__)
-   __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (info), "d" (SYSCALL_MSG_SEND));
+      __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (info), "d" (SYSCALL_MSG_SEND));
 #elif defined (__arm__)
-   __asm__ __volatile__("mov r4, %2; mov r0, %1; swi $0x0; mov %0, r0" : "=r" (retval) : "r" (info), "i" (SYSCALL_MSG_SEND));
+      __asm__ __volatile__("mov r4, %2; mov r0, %1; swi $0x0; mov %0, r0" : "=r" (retval) : "r" (info), "i" (SYSCALL_MSG_SEND));
 #endif
-   return retval;
+      
+      /* if a message is marked to queue then keep trying to resend
+         if the receiver is not available */
+      if(info->flags & DIOSIX_MSG_QUEUEME)
+      {
+         if(retval != e_no_receiver) return retval;
+      }
+      else
+         return retval;
+      
+      /* don't hog the cpu if there's no need */
+      diosix_thread_yield();
+   }
 }
 
 unsigned int diosix_msg_receive(diosix_msg_info *info)

@@ -30,12 +30,20 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 
 int main(void)
-{      
+{
+   unsigned short bus, slot;
+   unsigned int pid;
+   kresult err;
+   
    /* move into driver layer (1) and get access to IO ports */
    diosix_priv_layer_up(1);
    if(diosix_driver_register()) diosix_exit(1); /* or exit on failure */
 
-   diosix_debug_write("rtl8139 driver started\n");
+   /* attempt to find the rtl8139 PCI card */
+   err = pci_find_device(PCI_CLASS_CALC(PCI_CLASS_NETWORKING, PCI_SUBCLASS_ETHERNET),
+                   0, &bus, &slot, &pid);
+   
+   printf("rtl8139 driver started, device found on bus %i slot %i\n", bus, slot);
    
    while(1);
 }

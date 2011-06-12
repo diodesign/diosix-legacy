@@ -199,13 +199,15 @@ kresult pci_find_device(unsigned short class, unsigned char count,
    pci_msg.count = count;
    
    /* send the message and update the result variable
-    if successful */
+      if successful - retry sending the request if
+      the PCI manager is unavailable, it may have not
+      started yet */
    err = diosix_msg_send(&msg);
    if(err) return err;
-   
+
    /* give up if the manager gave us an error */
    if(reply.result) return reply.result;
-   
+
    /* write back the found device's details */
    *bus = reply.bus;
    *slot = reply.slot;
