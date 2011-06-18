@@ -54,7 +54,7 @@ void unlock_spin(volatile unsigned int *spinlock)
 {
 #ifndef UNIPROC
    /* just slap a zero in it to unlock */
-   *spinlock = 0;
+   x86_test_and_set(0, spinlock);
 #endif
 }
 
