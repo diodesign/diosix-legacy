@@ -91,8 +91,8 @@ void diosix_thread_yield(void)
 
 unsigned int diosix_thread_exit(unsigned int code)
 /* end execution of this thread with the given
- return code - will also kill the process if there are no
- other threads running */
+   return code - will also kill the process if there are no
+   other threads running */
 {
    /* send a message to the sysexec with the return code
     if it is non-zero */

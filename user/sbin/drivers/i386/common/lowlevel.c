@@ -92,3 +92,34 @@ void write_port_word(unsigned short port, unsigned int val)
                         :
                         : "a"(val), "dN"(port));
 }
+
+/* lock_spin
+   Atomically write 1 into the given byte and read the previous contents.
+   If the contents is 1 then retry until the previous contents is 0
+   This forms a primitive atomic lock
+*/
+void lock_spin(volatile unsigned char *byte)
+{
+   unsigned char i = 1;
+   
+   while(i)
+   {
+      __asm__ __volatile__("lock; xchgb %0, %1"
+                           : "=a"(i), "=m"(*byte)
+                           : "0"(i));
+      
+      /* don't hog the cpu, let another thread run if we're blocking */
+      if(i) diosix_thread_yield();
+   }
+}
+
+/* unlock_spin
+   Set the given lock variable to 0
+*/
+void unlock_spin(volatile unsigned char *byte)
+{
+   unsigned char i = 0;
+   __asm__ __volatile__("lock; xchgb %0, %1"
+                        : "=a"(i), "=m"(*byte)
+                        : "0"(i));
+}

@@ -45,6 +45,9 @@ struct pci_device
 #define PCI_PHYS_INDEX(b, s) (((b) + (s)) % PCI_HASH_MAX)
 #define PCI_CLASS_INDEX(c) ((((c) >> 8) + ((c) & 0xff)) % PCI_HASH_MAX)
 
+/* used to guarantee shared data integrity */
+volatile unsigned char pci_lock = 0;
+
 /* table to store detected PCI devices, hashed by physical connection */
 pci_device *pci_phys_tbl[PCI_HASH_MAX];
 
@@ -104,7 +107,11 @@ kresult pci_read_config(unsigned short bus, unsigned short slot, unsigned short 
 kresult pci_claim_device(unsigned short bus, unsigned short slot, unsigned int pid)
 {
    unsigned char index = PCI_PHYS_INDEX(bus, slot);
-   pci_device *device = pci_phys_tbl[index];
+   pci_device *device;
+   
+   lock_spin(&pci_lock);
+   
+   device = pci_phys_tbl[index];
    
    while(device)
    {
@@ -112,12 +119,14 @@ kresult pci_claim_device(unsigned short bus, unsigned short slot, unsigned int p
       {
          /* found it - change the pid */
          device->pid = pid;
+         unlock_spin(&pci_lock);
          return success;
       }
       
       device = device->phys_next;
    }
    
+   unlock_spin(&pci_lock);
    return e_not_found;
 }
 
@@ -134,10 +143,13 @@ kresult pci_find_device(unsigned short class, unsigned char count,
                         unsigned short *bus, unsigned short *slot, unsigned int *pid)
 {
    unsigned char index = PCI_CLASS_INDEX(class);
-   pci_device *search = pci_class_tbl[index];
+   pci_device *search;
    
    if(!bus || !slot) return e_bad_params;
-      
+
+   lock_spin(&pci_lock);
+   search = pci_class_tbl[index];
+   
    while(search)
    {
       if(search->class == class)
@@ -149,6 +161,7 @@ kresult pci_find_device(unsigned short class, unsigned char count,
             *bus = search->bus;
             *slot = search->slot;
             *pid = search->pid;
+            unlock_spin(&pci_lock);
             return success;
          }
       }
@@ -156,6 +169,7 @@ kresult pci_find_device(unsigned short class, unsigned char count,
       search = search->class_next;
    }
    
+   unlock_spin(&pci_lock);
    return e_not_found;
 }
 
@@ -167,16 +181,23 @@ kresult pci_find_device(unsigned short class, unsigned char count,
 unsigned int lookup_pid_from_phys(unsigned short bus, unsigned short slot)
 {
    unsigned char index = PCI_PHYS_INDEX(bus, slot);
-   pci_device *search = pci_phys_tbl[index];
+   pci_device *search;
+   
+   lock_spin(&pci_lock);
+   search = pci_phys_tbl[index];
    
    while(search)
    {
       if(search->bus == bus && search->slot == slot)
+      {
+         unlock_spin(&pci_lock);
          return search->pid; /* found a PID */
+      }
       
       search = search->phys_next;
    }
    
+   unlock_spin(&pci_lock);
    return 0; /* not found */
 }
 
@@ -387,6 +408,9 @@ int main(void)
    
    /* let's see what we've got on this system */
    discover_devices();
+   
+   /* split into two worker threads */
+   diosix_thread_fork();
    
    /* wait for work to come in */
    while(1) wait_for_request();

@@ -26,4 +26,8 @@ void write_port_byte(unsigned short port, unsigned char val);
 void write_port(unsigned short port, unsigned short val);
 void write_port_word(unsigned short port, unsigned int val);
 
+/* atomic operations */
+void lock_spin(volatile unsigned char *byte);
+void unlock_spin(volatile unsigned char *byte);
+
 #endif
