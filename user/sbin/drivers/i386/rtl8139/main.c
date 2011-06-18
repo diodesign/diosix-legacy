@@ -41,8 +41,8 @@ int main(void)
 
    /* attempt to find the rtl8139 PCI card */
    err = pci_find_device(PCI_CLASS_CALC(PCI_CLASS_NETWORKING, PCI_SUBCLASS_ETHERNET),
-                   0, &bus, &slot, &pid);
-   
+                         0, &bus, &slot, &pid);
+
    printf("rtl8139 driver started, device found on bus %i slot %i\n", bus, slot);
    
    while(1);

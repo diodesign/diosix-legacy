@@ -881,7 +881,7 @@ void lowlevel_thread_switch(thread *now, thread *next, int_registers_block *regs
 #ifdef LOCK_SANITY_CHECK
    /* thread+owner process locks should be released prior to switching tasks to avoid deadlocks */
    lock_spin(&(now->lock.spinlock));
-   if(now->lock.owner)
+   if(now->lock.owner && now->state != dead)
    {
       thread *o = (thread *)(now->lock.owner);
       KOOPS_DEBUG("[x86:%i] switching from thread %p (tid %i pid %i) with lock %p still engaged!\n",
