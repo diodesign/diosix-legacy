@@ -20,7 +20,7 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #define _PS2KBD_H 1
 
 /* hardware constants */
-#define PS2KBD_IRQ     (33)      /* ISA IRQ line of the kbd controller */
+#define PS2KBD_IRQ     (X86_PIC_IRQ_BASE + 1) /* ISA IRQ line of the kbd controller */
 #define PS2KBD_DATA    (0x60)    /* data port of the kbd controller */
 #define PS2KBD_BREAK   (1 << 7)  /* bit set to indicated key release */
 #define PS2KBD_ESCAPED (0xe0)    /* byte to indicate a special sequence to follow */

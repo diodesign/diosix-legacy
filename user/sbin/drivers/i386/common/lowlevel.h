@@ -30,4 +30,7 @@ void write_port_word(unsigned short port, unsigned int val);
 void lock_spin(volatile unsigned char *byte);
 void unlock_spin(volatile unsigned char *byte);
 
+/* PIC IRQ lines are mapped into the system IDT from this base number */
+#define X86_PIC_IRQ_BASE   (32)
+
 #endif
