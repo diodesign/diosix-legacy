@@ -107,6 +107,9 @@ typedef struct
 #define DIOSIX_SCHED_TICK     (100) /* 100 times a second, one tick is 10ms */
 /* calculate how many scheduling ticks there are per second */
 #define DIOSIX_TICKS_PER_SECOND(a) ((a) * DIOSIX_SCHED_TICK)
+/* define the number of scheduler ticks to sleep for inbetween trying to resend
+   a DIOSIX_MSG_QUEUEME message to a process that isn't revceiving yet */
+#define DIOSIX_SCHED_MSGWAIT  (10)
 
 /* message passing - control flags bits high */
 #define DIOSIX_MSG_REPLY       (1 << 31) /* message is a reply */

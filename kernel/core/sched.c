@@ -477,7 +477,7 @@ void sched_tick(int_registers_block *regs)
                         /* poke the owning process as a SIGALARM signal from the kernel */
                         msg_send_signal(snoozer->sleeper->proc, NULL, SIGALRM, 0);
                         
-                        SCHED_DEBUG("[sched:%i] sent SIGALRM to pid %i\n",
+                        SCHED_DEBUG("[sched:%i] sent SIGALRM to process %p pid %i\n",
                                     CPU_ID, snoozer->sleeper, snoozer->sleeper->proc->pid);
                      }
                   }

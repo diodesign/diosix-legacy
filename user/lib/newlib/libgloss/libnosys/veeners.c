@@ -172,8 +172,8 @@ unsigned int diosix_msg_send(diosix_msg_info *info)
       else
          return retval;
       
-      /* don't hog the cpu if there's no need */
-      diosix_thread_yield();
+      /* don't hog the cpu if there's no need - sleep for a bit before trying again */
+      diosix_thread_sleep(DIOSIX_SCHED_MSGWAIT);
    }
 }
 

@@ -36,7 +36,6 @@ void irq_handler(int_registers_block regs)
 
    unsigned int handled = 0;
    irq_driver_entry *driver;
-   thread *locker;
    
    IRQ_DEBUG("[irq:%i] processing IRQ %i (registers at %p)\n", CPU_ID, regs.intnum, &regs);
    
