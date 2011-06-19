@@ -29,7 +29,7 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
                => ebx = number of whole pages required
                <= ecx = base physical address of block
             DIOSIX_DRIVER_RET_PHYS: release a block of contiguous physical memory
-               => ecx = base physical address of the block
+               => ebx = base physical address of the block
             DIOSIX_DRIVER_REGISTER_IRQ: route the given IRQ to the caller as a signal
                => ebx = IRQ number to register
             DIOSIX_DRIVER_DEREGISTER_IRQ: stop routing IRQ signals to the caller

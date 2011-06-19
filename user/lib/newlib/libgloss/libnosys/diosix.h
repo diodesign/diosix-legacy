@@ -226,6 +226,9 @@ typedef struct
 #define DIOSIX_MEMORY_ACCESS         (3)
 #define DIOSIX_MEMORY_LOCATE         (4)
 
+/* size of a page in bytes */
+#define DIOSIX_MEMORY_PAGESIZE       (4096)
+
 /* vmm_area access flags */
 #define VMA_READABLE    (0 << 0)
 #define VMA_WRITEABLE   (1 << 0)
@@ -249,7 +252,7 @@ typedef struct
    void *paddr; /* the physical base address to map, must be page aligned */
    void *vaddr;  /* the virtual base address to map into, must be page aligned */
    unsigned int size;   /* number of bytes to map in, must be in whole number of pages */
-   unsigned char flags; /* set the type of mapping */
+   unsigned char flags; /* set the type of mapping using the above VMA flags */
 } diosix_phys_request;
 
 /* thread information block */

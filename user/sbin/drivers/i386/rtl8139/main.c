@@ -40,6 +40,13 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 #define RTL8139_PCI_CR_RESET  (1 << 4)
 
+#define RECV_BUFFER_PAGES     (3)
+#define SEND_BUFFER_PAGES     (3)
+
+#define RECV_BUFFER_VIRTUAL   (0x2000)
+#define SEND_BUFFER_VIRTUAL   (0x5000)
+
+
 /* process_interrupts
    Loop, receiving interrupt signals
    => bus, slot, irq = PCI and IRQ line details
@@ -103,7 +110,8 @@ int main(void)
    unsigned char count = 0, claimed = 0;
    unsigned short vendorid, deviceid, irq, iobase;
    unsigned char mac[6];
-   unsigned char *recv_buffer;
+   unsigned char *recv_buffer_phys, *recv_buffer;
+   diosix_phys_request phys_mem;
    kresult err;
    
    /* move into driver layer (1) and get access to IO ports */
@@ -188,7 +196,7 @@ int main(void)
           mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 
    /* grab some phys memo for the card's buffers */
-   err = diosix_driver_req_phys(3, (unsigned int *)&recv_buffer);
+   err = diosix_driver_req_phys(RECV_BUFFER_PAGES, (unsigned int *)&recv_buffer_phys);
    if(err)
    {
       printf("rtl8139.%i: unable to claim physical memory for send/receive buffers\n", count);
@@ -196,7 +204,23 @@ int main(void)
       diosix_thread_exit(1);
    }
    
-   printf("rtl8139.%i: allocated 3 pages of physical memory at %p\n", count, recv_buffer);
+   /* now make sure we can access this physical memory in virtual space */
+   phys_mem.size = RECV_BUFFER_PAGES * DIOSIX_MEMORY_PAGESIZE;
+   phys_mem.flags = VMA_WRITEABLE | VMA_NOCACHE;
+   phys_mem.paddr = recv_buffer_phys;
+   phys_mem.vaddr = (void *)RECV_BUFFER_VIRTUAL;
+   err = diosix_driver_map_phys(&phys_mem);
+   if(err)
+   {
+      printf("rtl8139.%i: unable to map physical memory into virtual space\n", count);
+      diosix_driver_ret_phys((unsigned int)recv_buffer_phys);
+      pci_release_device(bus, slot);
+      diosix_thread_exit(1);
+   }
+   
+   printf("rtl8139.%i: mapped in virtual memory. testing it...\n", count);
+   *((unsigned int *)RECV_BUFFER_VIRTUAL) = 1;
+   printf("rtl8139.%i: still here!!!\n", count);
    
    while(1);
 }
