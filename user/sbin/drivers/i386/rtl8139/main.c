@@ -31,18 +31,38 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #define RTL8139_VENDORID      (0x10ec)
 #define RTL8139_DEVICEID      (0x8139)
 
+/* registers */
 #define RTL8139_PCI_IDR0      (0x00)
 #define RTL8139_PCI_IOAR0     (0x10)
 #define RTL8139_PCI_IOAR1     (0x12)
+#define RTL8139_PCI_RBSTART   (0x30)
+#define RTL8139_PCI_IMR       (0x3C)
 #define RTL8139_PCI_CR        (0x37)
+#define RTL8139_PCI_RCR       (0x44)
 #define RTL8139_PCI_CONFIG0   (0x50)
 #define RTL8139_PCI_CONFIG1   (0x51)
 
-#define RTL8139_PCI_CR_RESET  (1 << 4)
+/* register flags */
+#define RTL8139_PCI_CR_RESET         (1 << 4)
+#define RTL8139_PCI_CR_RECVR_EN      (1 << 3)
+#define RTL8139_PCI_CR_TRANS_EN      (1 << 3)
 
+#define RTL8139_PCI_IMR_TOK          (1 << 2)
+#define RTL8139_PCI_IMR_ROK          (1 << 0)
+
+#define RTL8139_PCI_RCR_WRAP         (1 << 7)
+#define RTL8139_PCI_RCR_ACCEPT_ERROR (1 << 5)
+#define RTL8139_PCI_RCR_ACCEPT_RUNT  (1 << 4)
+#define RTL8139_PCI_RCR_ACCEPT_BROAD (1 << 3)
+#define RTL8139_PCI_RCR_ACCEPT_MCAST (1 << 2)
+#define RTL8139_PCI_RCR_ACCEPT_MATCH (1 << 1)
+#define RTL8139_PCI_RCR_ACCEPT_ALL   (1 << 0)
+
+/* size of buffers in whole pages */
 #define RECV_BUFFER_PAGES     (3)
 #define SEND_BUFFER_PAGES     (3)
 
+/* where to place the buffers in virtual space */
 #define RECV_BUFFER_VIRTUAL   (0x2000)
 #define SEND_BUFFER_VIRTUAL   (0x5000)
 
@@ -110,7 +130,7 @@ int main(void)
    unsigned char count = 0, claimed = 0;
    unsigned short vendorid, deviceid, irq, iobase;
    unsigned char mac[6];
-   unsigned char *recv_buffer_phys, *recv_buffer;
+   unsigned char *recv_buffer_phys;
    diosix_phys_request phys_mem;
    kresult err;
    
@@ -186,14 +206,6 @@ int main(void)
    write_port_byte(iobase + RTL8139_PCI_CONFIG1, 0x00);
    write_port_byte(iobase + RTL8139_PCI_CR, RTL8139_PCI_CR_RESET);
    while((read_port_byte(iobase + RTL8139_PCI_CR) & RTL8139_PCI_CR_RESET) != 0);
-   
-   /* get the card's MAC address */
-   read_macaddress(iobase, mac);
-   
-   printf("rtl8139.%i: initialised 8139 PCI card %x:%x irq %x iobase %x "
-          "[mac %x %x %x %x %x %x]\n",
-          count, bus, slot, irq, iobase,
-          mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 
    /* grab some phys memo for the card's buffers */
    err = diosix_driver_req_phys(RECV_BUFFER_PAGES, (unsigned int *)&recv_buffer_phys);
@@ -218,9 +230,30 @@ int main(void)
       diosix_thread_exit(1);
    }
    
-   printf("rtl8139.%i: mapped in virtual memory. testing it...\n", count);
-   *((unsigned int *)RECV_BUFFER_VIRTUAL) = 1;
-   printf("rtl8139.%i: still here!!!\n", count);
+   /* tell the PCI card where to find this physical memory */
+   write_port_word(iobase + RTL8139_PCI_RBSTART, (unsigned int)recv_buffer_phys);
+   
+   /* enable the transmit OK and receive OK interrupts */
+   write_port_word(iobase + RTL8139_PCI_IMR,
+                   RTL8139_PCI_IMR_TOK | RTL8139_PCI_IMR_ROK);
+   
+   /* set the acceptable packet bits and the wrap bit */
+   write_port_word(iobase + RTL8139_PCI_RCR,
+                   RTL8139_PCI_RCR_ACCEPT_BROAD |
+                   RTL8139_PCI_RCR_ACCEPT_MATCH |
+                   RTL8139_PCI_RCR_WRAP);
+
+   /* enable transmission and receiving */
+   write_port_byte(iobase + RTL8139_PCI_CR,
+                   RTL8139_PCI_CR_RECVR_EN | RTL8139_PCI_CR_TRANS_EN);
+
+   /* get the card's MAC address */
+   read_macaddress(iobase, mac);
+   
+   printf("rtl8139.%i: initialised 8139 PCI card %x:%x irq %x iobase %x "
+          "[mac %x %x %x %x %x %x]\n",
+          count, bus, slot, irq, iobase,
+          mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
    
    while(1);
 }
