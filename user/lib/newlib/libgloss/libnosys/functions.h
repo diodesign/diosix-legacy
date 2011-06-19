@@ -80,6 +80,8 @@ unsigned int diosix_driver_register(void);
 unsigned int diosix_driver_deregister(void);
 unsigned int diosix_driver_unmap_phys(diosix_phys_request *block);
 unsigned int diosix_driver_map_phys(diosix_phys_request *block);
+unsigned int diosix_driver_req_phys(unsigned short pages, unsigned int *addr);
+unsigned int diosix_driver_ret_phys(unsigned int addr);
 unsigned int diosix_driver_register_irq(unsigned char irq);
 unsigned int diosix_driver_deregister_irq(unsigned char irq);
 unsigned int diosix_driver_iorequest(diosix_ioport_request *req);

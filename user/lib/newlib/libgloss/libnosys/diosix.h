@@ -201,6 +201,8 @@ typedef struct
 #define DIOSIX_DRIVER_REGISTER_IRQ   (4)
 #define DIOSIX_DRIVER_DEREGISTER_IRQ (5)
 #define DIOSIX_DRIVER_IOREQUEST      (6)
+#define DIOSIX_DRIVER_REQ_PHYS       (7)
+#define DIOSIX_DRIVER_RET_PHYS       (8)
 
 /* define an IO request via a hardware IO port, if available */
 typedef enum

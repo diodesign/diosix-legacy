@@ -160,6 +160,16 @@ typedef struct
    unsigned int gid;
 } posix_supplementary_group;
 
+/* physical memory allocations for privileged processes */
+typedef struct process_phys_mem_block process_phys_mem_block;
+struct process_phys_mem_block
+{
+   process_phys_mem_block *previous, *next;
+   
+   void *base;
+   unsigned short pages;
+};
+
 /* describe each process */
 struct process
 {
@@ -193,6 +203,7 @@ struct process
    /* memory management */
    unsigned int entry; /* where code execution should begin */
    vmm_tree *mem; /* tree of memory areas */
+   process_phys_mem_block *phys_mem_head;
    
    /* rights management */
    /* processes are ordered by layers - these are not to be confused
@@ -277,5 +288,7 @@ kresult thread_kill(process *owner, thread *victim);
 process *proc_role_lookup(unsigned int role);
 kresult proc_role_add(process *target, unsigned int role);
 kresult proc_role_remove(process *target, unsigned int role);
+kresult proc_remove_phys_mem_allocation(process *proc, void *addr);
+kresult proc_add_phys_mem_allocation(process *proc, void *addr, unsigned short pages);
 
 #endif

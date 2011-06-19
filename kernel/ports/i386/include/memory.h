@@ -168,6 +168,8 @@ struct vmm_tree
 };
 
 kresult vmm_initialise(multiboot_info_t *mbd);
+kresult vmm_req_phys_pages(unsigned short pages, void **ptr, unsigned int pref);
+kresult vmm_return_phys_pages(void *addr, unsigned int pages);
 kresult vmm_req_phys_pg(void **addr, int pref);
 kresult vmm_return_phys_pg(void *addr);
 kresult vmm_enough_pgs(unsigned int size);

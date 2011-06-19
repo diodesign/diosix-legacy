@@ -25,6 +25,11 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
             DIOSIX_DRIVER_DEREGISTER: deregister a thread as a driver.
             DIOSIX_DRIVER_MAP_PHYS: map some physical memory into the driver's virtual space
                => ebx = pointer to phys map request block
+            DIOSIX_DRIVER_REQ_PHYS: request a block of contiguous physical memory
+               => ebx = number of whole pages required
+               <= ecx = base physical address of block
+            DIOSIX_DRIVER_RET_PHYS: release a block of contiguous physical memory
+               => ecx = base physical address of the block
             DIOSIX_DRIVER_REGISTER_IRQ: route the given IRQ to the caller as a signal
                => ebx = IRQ number to register
             DIOSIX_DRIVER_DEREGISTER_IRQ: stop routing IRQ signals to the caller
@@ -154,6 +159,49 @@ void syscall_do_driver(int_registers_block *regs)
             
          }
          else SYSCALL_RETURN(e_no_rights);
+         
+      case DIOSIX_DRIVER_REQ_PHYS:
+         if(current->flags & THREAD_FLAG_ISDRIVER)
+         {
+            kresult err;
+            unsigned short pages = regs->ebx & 0xffff;
+            void *addr;
+            
+            /* sanity check - 512 pages = 8M, far too
+               large for a contiguous allocation */
+            if(pages > 512) SYSCALL_RETURN(e_too_big);
+            
+            /* go grab the physical pages required */
+            err = vmm_req_phys_pages(pages, &addr, 0);
+            if(err) SYSCALL_RETURN(err);
+            
+            /* register this with the process so that if it
+               dies, the system can automatically free the pages */
+            err = proc_add_phys_mem_allocation(current->proc, addr, pages);
+            if(err)
+            {
+               vmm_return_phys_pages(addr, pages);
+               SYSCALL_RETURN(err);
+            }
+            
+            /* don't forget to save the new pointer in ecx */
+            regs->ecx = (unsigned int)addr;
+            SYSCALL_RETURN(err);
+         }
+
+      case DIOSIX_DRIVER_RET_PHYS:
+         if(current->flags & THREAD_FLAG_ISDRIVER)
+         {
+            kresult err;
+            void *addr = (void *)regs->ebx;
+            
+            /* proc_remove_phys_mem_allocation() will call 
+               vmm_return_phys_pages() for us */
+            err = proc_remove_phys_mem_allocation(current->proc, addr);
+            if(err) SYSCALL_RETURN(err);
+                        
+            SYSCALL_RETURN(err);
+         }
          
       case DIOSIX_DRIVER_REGISTER_IRQ:
          if(current->flags & THREAD_FLAG_ISDRIVER)

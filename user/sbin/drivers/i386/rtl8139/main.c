@@ -103,6 +103,7 @@ int main(void)
    unsigned char count = 0, claimed = 0;
    unsigned short vendorid, deviceid, irq, iobase;
    unsigned char mac[6];
+   unsigned char *recv_buffer;
    kresult err;
    
    /* move into driver layer (1) and get access to IO ports */
@@ -186,7 +187,16 @@ int main(void)
           count, bus, slot, irq, iobase,
           mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 
+   /* grab some phys memo for the card's buffers */
+   err = diosix_driver_req_phys(3, (unsigned int *)&recv_buffer);
+   if(err)
+   {
+      printf("rtl8139.%i: unable to claim physical memory for send/receive buffers\n", count);
+      pci_release_device(bus, slot);
+      diosix_thread_exit(1);
+   }
    
+   printf("rtl8139.%i: allocated 3 pages of physical memory at %p\n", count, recv_buffer);
    
    while(1);
 }

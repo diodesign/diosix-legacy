@@ -647,6 +647,9 @@ do_proc_kill:
    vmm_destroy_vmas(victim);
    pg_destroy_process(victim);
    
+   /* teardown the process's physical memory structures */
+   proc_remove_phys_mem_allocation(victim, NULL);
+   
    /* remove any role entry the process held */
    if(victim->role) proc_role_remove(victim, victim->role);
    
@@ -668,6 +671,113 @@ do_proc_kill:
    PROC_DEBUG("[proc:%i] killed process %i (%p)\n", CPU_ID, victim->pid, victim);
    
    return success;
+}
+
+/* proc_add_phys_mem_allocation
+   Register a block of contiguous physical memory with the given process
+   => proc = process to add the phys mem allocation to
+      addr = base address of the block
+      pages = number of pages in the block
+   <= 0 for success, or an error code
+*/
+kresult proc_add_phys_mem_allocation(process *proc, void *addr, unsigned short pages)
+{
+   kresult err;
+   process_phys_mem_block *block;
+   
+   /* sanity check */
+   if(!proc || !addr || !pages) return e_bad_params;
+   
+   lock_gate(&(proc->lock), LOCK_WRITE);
+   
+   err = vmm_malloc((void **)&block, sizeof(process_phys_mem_block));
+   if(err)
+   {
+      unlock_gate(&(proc->lock), LOCK_WRITE);
+      return err;
+   }
+   
+   /* fill in the block and add it to the process's linked list of
+      physical memory allocations */
+   block->base = addr;
+   block->pages = pages;
+   
+   if(proc->phys_mem_head)
+   {
+      proc->phys_mem_head->previous = block;
+      block->next = proc->phys_mem_head;
+   }
+   else
+   {
+      block->next = NULL;
+   }
+   proc->phys_mem_head = block;
+   block->previous = NULL;
+   
+   unlock_gate(&(proc->lock), LOCK_WRITE);
+   
+   return success;
+}
+
+/* proc_remove_phys_mem_allocation
+   Remove a previously allocated block of physical memory from a given process
+   and also return the block's pages to the system
+   => proc = process to release the memory from
+      addr = base address of the block, or NULL to remove all the process's
+             physical memory allocations
+   <= 0 for success, or an error code
+*/
+kresult proc_remove_phys_mem_allocation(process *proc, void *addr)
+{
+   process_phys_mem_block *block;
+   
+   /* sanity check */
+   if(!proc) return e_bad_params;
+   
+   lock_gate(&(proc->lock), LOCK_WRITE);
+   block = proc->phys_mem_head;
+   
+   /* are we tearing down everything in one go? */
+   if(!addr)
+   {
+      while(block)
+      {
+         process_phys_mem_block *victim = block;
+         
+         vmm_return_phys_pages(block->base, block->pages);
+         block = block->next;
+         vmm_free(victim);
+      }
+
+      unlock_gate(&(proc->lock), LOCK_WRITE);
+      return success;
+   }
+   
+   while(block)
+   {
+      if(block->base == addr)
+      {
+         vmm_return_phys_pages(block->base, block->pages);
+         
+         /* unlink it from the process's chain if we're not
+            tearing down everything */
+         if(block->next)
+            block->next->previous = block->previous;
+         if(block->previous)
+            block->previous->next = block->next;
+         else
+            proc->phys_mem_head = block->next;
+
+         vmm_free(block);
+         unlock_gate(&(proc->lock), LOCK_WRITE);
+         return success;
+      }
+      
+      block = block->next;
+   }
+      
+   unlock_gate(&(proc->lock), LOCK_WRITE);
+   return e_not_found;
 }
 
 kresult proc_initialise(void)

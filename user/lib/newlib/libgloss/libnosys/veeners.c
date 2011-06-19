@@ -426,6 +426,32 @@ unsigned int diosix_driver_unmap_phys(diosix_phys_request *block)
    return retval;
 }
 
+unsigned int diosix_driver_req_phys(unsigned short pages, unsigned int *addr)
+/* request a block of contiguous physical memory, store base address in addr */
+{
+   unsigned int retval, data;
+#if defined (__i386__)
+   __asm__ __volatile__("int $0x90" : "=a" (retval), "=c" (data) : "a" (DIOSIX_DRIVER_REQ_PHYS), "b" (pages), "d" (SYSCALL_DRIVER));
+#elif defined (__arm__)
+   __asm__ __volatile__("mov r4, %4; mov r1, %3; mov r0, %2; swi $0x0; mov %0, r0; mov %1, r1" : "=r" (retval), "=r" (data) : "i" (DIOSIX_DRIVER_REQ_PHYS), "r" (pages), "i" (SYSCALL_DRIVER));
+#endif
+   
+   *addr = data;
+   return retval;
+}
+
+unsigned int diosix_driver_ret_phys(unsigned int addr)
+/* release a previously allocated block of physical memory */
+{
+   unsigned int retval;
+#if defined (__i386__)
+   __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (DIOSIX_DRIVER_RET_PHYS), "b" (addr), "d" (SYSCALL_DRIVER));
+#elif defined (__arm__)
+   __asm__ __volatile__("mov r4, %3; mov r1, %2; mov r0, %1; swi $0x0; mov %0, r0" : "=r" (retval) : "i" (DIOSIX_DRIVER_RET_PHYS), "r" (addr), "i" (SYSCALL_DRIVER));
+#endif
+   return retval;
+}
+
 unsigned int diosix_driver_register_irq(unsigned char irq)
 /* tell the kernel to send irq signals to the calling thread */
 {

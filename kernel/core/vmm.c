@@ -879,6 +879,93 @@ unsigned int vmm_count_pool_inuse(kpool *pool)
     Physical page management
    ------------------------------------------------------------------------- */
 
+/* vmm_req_phys_pages
+   Request a block of contiguous physical memory in whole number of pages.
+   If a sub-DMA marker page is requested and no such physical page is
+   available, this function will give up and return 1. If no preference is
+   given, this function will attempt to grab a physical page from above the
+   DMA marker first, and look below the DMA marker if it has no success.
+   => pages = number of pages to claim
+      ptr = pointer to 32bit word to store the base address of the block in
+      pref = 0 to request a page from below the DMA marker, otherwise 1 for no
+             preference.
+   <= 0 for success or error code
+*/
+kresult vmm_req_phys_pages(unsigned short pages, void **ptr, unsigned int pref)
+{
+   kresult err;
+   unsigned short page_count = pages;
+   unsigned int base = 0;
+   
+   /* prevent race conditions */
+   lock_gate(&(vmm_lock), LOCK_READ);
+   
+   /* check we have a contiguous run */
+   err = vmm_ensure_pgs(pages * MEM_PGSIZE, pref);
+   if(err)
+   {
+      unlock_gate(&(vmm_lock), LOCK_READ);
+      return err;
+   }
+   
+   /* grab those pages */
+   while(page_count)
+   {
+      void *addr;
+      
+      err = vmm_req_phys_pg(&addr, pref);
+      
+      if(err)
+      {
+         KOOPS_DEBUG("[vmm:%i] OMGWTF! vmm_req_phys_pages was assured %i pages are available in "
+                     "page stack %i, but vmm_req_phys_pg() returned an error (%i) at %i pages\n",
+                     CPU_ID, pages, pref, err, page_count);
+         
+         unlock_gate(&(vmm_lock), LOCK_READ);
+         return err;
+      }
+      
+      if(!base)
+         base = (unsigned int)addr;
+      else
+      {
+         if(base > (unsigned int)addr)
+            base = (unsigned int)addr;
+      }
+      
+      page_count--;
+   }
+   
+   unlock_gate(&(vmm_lock), LOCK_READ);
+   *(unsigned int *)ptr = base;
+   
+   return success;
+}
+
+/* vmm_return_phys_pages
+   Return a number of contiguous physical pages to the system. Don't call
+   this unless you know that pages is valid!
+   => addr = base address of the block
+      pages = number of physical pages to return
+   <= 0 for success, or an error code
+*/
+kresult vmm_return_phys_pages(void *addr, unsigned int pages)
+{
+   /* addr must be valid and aligned */
+   if(!addr || MEM_PGALIGN(addr) != addr) return e_bad_params;
+   
+   /* run through the pages, returning them one by one */
+   while(pages)
+   {
+      vmm_return_phys_pg(addr);
+      
+      addr = (void *)((unsigned int)addr + MEM_PGSIZE);
+      pages--;
+   }
+   
+   return success;
+}
+
 /* vmm_req_phys_pg
    Request an available physical page frame. If a sub-DMA marker page is
    requested and no such physical page is available, this function will give up
