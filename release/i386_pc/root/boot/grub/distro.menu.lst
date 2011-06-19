@@ -12,6 +12,7 @@ module /boot/kernel.sym
 # system services
 module /sbin/init
 module /sbin/vfs
+module /sbin/lwip
 
 # base device drivers
 module /sbin/drivers/i386/pcimngr

@@ -223,6 +223,8 @@ kernel: $(OBJS) $(LDSCRIPT)
 	$(Q)make -C user/sbin/init
 	$(WRITE) '[+] building virtual filesystem manager (/sbin/vfs)'
 	$(Q)make -C user/sbin/vfs
+	$(WRITE) '[+] building lightweight TCP/IP stack (/sbin/lwip)'
+	$(Q)make -C user/sbin/lwip
 	$(WRITE) '[+] building testsuite (/bin/testsuite)'
 	$(Q)make -C user/bin/testsuite
 	$(WRITE) '[+] building filesystem'
