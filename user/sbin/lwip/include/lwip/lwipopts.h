@@ -124,7 +124,7 @@
 /**
  * MEMP_NUM_SYS_TIMEOUT: the number of simulateously active timeouts.
  */
-#define MEMP_NUM_SYS_TIMEOUT            3
+#define MEMP_NUM_SYS_TIMEOUT            5
 
 /**
  * MEMP_NUM_NETBUF: the number of struct netbufs.
@@ -261,7 +261,7 @@
 /**
  * LWIP_DHCP==1: Enable DHCP module.
  */
-#define LWIP_DHCP                       0
+#define LWIP_DHCP                       1
 
 /*
    ------------------------------------

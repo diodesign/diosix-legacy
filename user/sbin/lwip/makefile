@@ -20,23 +20,27 @@ PATHTOMKFS = ../../../release/$(ARCH)_$(ARCH_TARGET)/makeiso.sh
 
 # defines
 FLAGS		= -O2 -std=c99 -Wall -static -I../../lib/newlib/libgloss/libnosys -I. \
-			-Iinclude -Iinclude/arch -Iinclude/ipv4
+			-Iinclude -Iinclude/ipv4
 CC		= $(PREFIX)gcc $(FLAGS)
 LD		= $(PREFIX)gcc $(FLAGS)
-OBJS	 	= $(OBJSDIR)/core/dhcp.o $(OBJSDIR)/core/init.o $(OBJSDIR)/core/mem.o \
+OBJS	 	= $(OBJSDIR)/core/dhcp.o $(OBJSDIR)/core/init.o $(OBJSDIR)/core/mem.o $(OBJSDIR)/core/def.o \
 			$(OBJSDIR)/core/memp.o $(OBJSDIR)/core/netif.o $(OBJSDIR)/core/pbuf.o \
-			$(OBJSDIR)/core/raw.o $(OBJSDIR)/core/stats.o $(OBJSDIR)/core/sys.o \
+			$(OBJSDIR)/core/raw.o $(OBJSDIR)/core/stats.o $(OBJSDIR)/core/sys.o $(OBJSDIR)/core/timers.o \
 			$(OBJSDIR)/core/tcp.o $(OBJSDIR)/core/tcp_in.o $(OBJSDIR)/core/tcp_out.o \
 			$(OBJSDIR)/core/udp.o $(OBJSDIR)/core/ipv4/autoip.o $(OBJSDIR)/core/ipv4/icmp.o \
 			$(OBJSDIR)/core/ipv4/igmp.o $(OBJSDIR)/core/ipv4/ip.o $(OBJSDIR)/core/ipv4/ip_addr.o \
-			$(OBJSDIR)/core/ipv4/ip_frag.o $(OBJSDIR)/netif/etharp.o $(OBJSDIR)/api/tcpip.o \
-			$(OBJSDIR)/api/err.o $(OBJSDIR)/api/netifapi.o $(OBJSDIR)/api/api_lib.o \
+			$(OBJSDIR)/core/ipv4/ip_frag.o $(OBJSDIR)/core/ipv4/inet_chksum.o $(OBJSDIR)/netif/etharp.o \
+			$(OBJSDIR)/api/tcpip.o $(OBJSDIR)/api/err.o $(OBJSDIR)/api/netifapi.o $(OBJSDIR)/api/api_lib.o \
 			$(OBJSDIR)/api/api_msg.o $(OBJSDIR)/api/sockets.o $(OBJSDIR)/sys_arch.o
 
 # targets
 all: lwip
 
 # dependencies
+$(OBJSDIR)/core/def.o:		core/def.c	makefile
+				$(WRITE) '==> COMPILE: $<'
+				$(Q)$(CC) -c -o $@ $<
+
 $(OBJSDIR)/core/dhcp.o:		core/dhcp.c	makefile
 				$(WRITE) '==> COMPILE: $<'
 				$(Q)$(CC) -c -o $@ $<
@@ -70,6 +74,10 @@ $(OBJSDIR)/core/stats.o:	core/stats.c	makefile
 				$(Q)$(CC) -c -o $@ $<
 
 $(OBJSDIR)/core/sys.o:		core/sys.c	makefile
+				$(WRITE) '==> COMPILE: $<'
+				$(Q)$(CC) -c -o $@ $<
+
+$(OBJSDIR)/core/timers.o:	core/timers.c	makefile
 				$(WRITE) '==> COMPILE: $<'
 				$(Q)$(CC) -c -o $@ $<
 
@@ -113,6 +121,12 @@ $(OBJSDIR)/core/ipv4/ip_addr.o:	core/ipv4/ip_addr.c	makefile
 $(OBJSDIR)/core/ipv4/ip_frag.o:	core/ipv4/ip_frag.c	makefile
 				$(WRITE) '==> COMPILE: $<'
 				$(Q)$(CC) -c -o $@ $<
+
+$(OBJSDIR)/core/ipv4/inet_chksum.o:	core/ipv4/inet_chksum.c		makefile
+					$(WRITE) '==> COMPILE: $<'
+					$(Q)$(CC) -c -o $@ $<
+
+
 
 $(OBJSDIR)/netif/etharp.o:	netif/etharp.c		makefile
 				$(WRITE) '==> COMPILE: $<'
