@@ -57,5 +57,5 @@ sub arch_generate_cmdline
       $redirect = " >/dev/null 2>/dev/null";
    }
    
-   return "$arch_qemu_exe -M pc -cpu $_[0] -smp $_[1] -m $_[2] $_[4] -pidfile $filename.pid -serial file:$filename.log -boot order=d -cdrom release/$arch_name/cd.iso -net nic,model=rtl8139".$redirect;
+   return "$arch_qemu_exe -M pc -cpu $_[0] -smp $_[1] -m $_[2] $_[4] -pidfile $filename.pid -serial file:$filename.log -boot order=d -cdrom release/$arch_name/cd.iso -net nic,model=rtl8139,vlan=0 -net user,vlan=0,net=172.16.150.0/24,host=172.16.150.201".$redirect;
 }

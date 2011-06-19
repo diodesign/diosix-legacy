@@ -27,45 +27,55 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 #include "lowlevel.h"
 #include "pci.h"
+#include "nic.h"
 
 #define RTL8139_VENDORID      (0x10ec)
 #define RTL8139_DEVICEID      (0x8139)
 
 /* registers */
-#define RTL8139_PCI_IDR0      (0x00)
-#define RTL8139_PCI_IOAR0     (0x10)
-#define RTL8139_PCI_IOAR1     (0x12)
-#define RTL8139_PCI_RBSTART   (0x30)
-#define RTL8139_PCI_IMR       (0x3C)
-#define RTL8139_PCI_CR        (0x37)
-#define RTL8139_PCI_RCR       (0x44)
-#define RTL8139_PCI_CONFIG0   (0x50)
-#define RTL8139_PCI_CONFIG1   (0x51)
+#define RTL8139_REG_IDR0      (0x00)
+#define RTL8139_REG_IOAR0     (0x10)
+#define RTL8139_REG_IOAR1     (0x12)
+#define RTL8139_REG_RBSTART   (0x30)
+#define RTL8139_REG_IMR       (0x3C)
+#define RTL8139_REG_CR        (0x37)
+#define RTL8139_REG_ISR       (0x3e)
+#define RTL8139_REG_RCR       (0x44)
+#define RTL8139_REG_CONFIG0   (0x50)
+#define RTL8139_REG_CONFIG1   (0x51)
+#define RTL8139_REG_BMCR      (0x62)
+#define RTL8139_REG_BMSR      (0x64)
 
 /* register flags */
-#define RTL8139_PCI_CR_RESET         (1 << 4)
-#define RTL8139_PCI_CR_RECVR_EN      (1 << 3)
-#define RTL8139_PCI_CR_TRANS_EN      (1 << 3)
+#define RTL8139_REG_CR_RESET         (1 << 4)
+#define RTL8139_REG_CR_RECVR_EN      (1 << 3)
+#define RTL8139_REG_CR_TRANS_EN      (1 << 3)
 
-#define RTL8139_PCI_IMR_TOK          (1 << 2)
-#define RTL8139_PCI_IMR_ROK          (1 << 0)
+#define RTL8139_REG_IMR_TOK          (1 << 2)
+#define RTL8139_REG_IMR_ROK          (1 << 0)
 
-#define RTL8139_PCI_RCR_WRAP         (1 << 7)
-#define RTL8139_PCI_RCR_ACCEPT_ERROR (1 << 5)
-#define RTL8139_PCI_RCR_ACCEPT_RUNT  (1 << 4)
-#define RTL8139_PCI_RCR_ACCEPT_BROAD (1 << 3)
-#define RTL8139_PCI_RCR_ACCEPT_MCAST (1 << 2)
-#define RTL8139_PCI_RCR_ACCEPT_MATCH (1 << 1)
-#define RTL8139_PCI_RCR_ACCEPT_ALL   (1 << 0)
+#define RTL8139_REG_RCR_WRAP         (1 << 7)
+#define RTL8139_REG_RCR_ACCEPT_ERROR (1 << 5)
+#define RTL8139_REG_RCR_ACCEPT_RUNT  (1 << 4)
+#define RTL8139_REG_RCR_ACCEPT_BROAD (1 << 3)
+#define RTL8139_REG_RCR_ACCEPT_MCAST (1 << 2)
+#define RTL8139_REG_RCR_ACCEPT_MATCH (1 << 1)
+#define RTL8139_REG_RCR_ACCEPT_ALL   (1 << 0)
 
 /* size of buffers in whole pages */
 #define RECV_BUFFER_PAGES     (3)
-#define SEND_BUFFER_PAGES     (3)
+#define SEND_BUFFER_PAGES     (1)
 
 /* where to place the buffers in virtual space */
 #define RECV_BUFFER_VIRTUAL   (0x2000)
 #define SEND_BUFFER_VIRTUAL   (0x5000)
 
+/* size of buffer to hold diosix messages */
+#define MSG_RECEIVE_BUFFER_SIZE (256)
+
+/* --------------------------------------------------------------
+                        useful functions
+   -------------------------------------------------------------- */
 
 /* process_interrupts
    Loop, receiving interrupt signals
@@ -73,10 +83,10 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
       for the card this thread is responsible for
    <= should never return
 */
-void process_interrupts(unsigned short bus, unsigned short slot, unsigned short irq)
+void process_interrupts(unsigned short bus, unsigned short slot, unsigned short irq, unsigned short iobase)
 {
    diosix_msg_info msg;
-   
+
    /* prepare to sleep until an interrupt comes in */
    msg.role = msg.pid = DIOSIX_MSG_ANY_PROCESS;
    msg.tid = DIOSIX_MSG_ANY_THREAD;
@@ -101,7 +111,7 @@ unsigned short read_iobase(unsigned short bus, unsigned short slot)
 {
    unsigned short ioaddr_low;
    
-   pci_read_config(bus, slot, 0, RTL8139_PCI_IOAR0, &ioaddr_low);
+   pci_read_config(bus, slot, 0, RTL8139_REG_IOAR0, &ioaddr_low);
 
    /* bit 0 of IOAR0 must be set for IO space to be usable */
    if(!(ioaddr_low & 1)) return 0;
@@ -120,8 +130,31 @@ void read_macaddress(unsigned short iobase, unsigned char *mac)
    unsigned char count;
    
    for(count = 0; count < 6; count++)
-      mac[count] = read_port_byte(iobase + RTL8139_PCI_IDR0 + count);
+      mac[count] = read_port_byte(iobase + RTL8139_REG_IDR0 + count);
 }
+
+/* --------------------------------------------------------------
+                   diosix specific stuff
+   -------------------------------------------------------------- */
+/* reply to a request from another process */
+void reply_to_request(diosix_msg_info *msg, kresult result)
+{
+   diosix_nic_reply reply;
+   
+   /* sanity check */
+   if(!msg) return;
+   
+   /* ping a reply back to unlock the requesting thread */
+   reply.result = result;
+   msg->send = &reply;
+   msg->send_size = sizeof(diosix_nic_reply);
+   
+   diosix_msg_reply(msg);
+}
+
+/* --------------------------------------------------------------
+                     driver main program
+ -------------------------------------------------------------- */
 
 int main(void)
 {
@@ -130,10 +163,13 @@ int main(void)
    unsigned char count = 0, claimed = 0;
    unsigned short vendorid, deviceid, irq, iobase;
    unsigned char mac[6];
-   unsigned char *recv_buffer_phys;
+   unsigned char *recv_buffer_phys, *send_buffer_phys;
    diosix_phys_request phys_mem;
    kresult err;
    
+   diosix_msg_info msg;
+   unsigned char msg_recv_buffer[MSG_RECEIVE_BUFFER_SIZE];
+      
    /* move into driver layer (1) and get access to IO ports */
    diosix_priv_layer_up(1);
    if(diosix_driver_register()) diosix_exit(1); /* or exit on failure */
@@ -176,6 +212,9 @@ int main(void)
    /* catch the card detection thread and kill it */
    if(!claimed) diosix_thread_exit(0);
    
+   /* decode the IO space address bits into the PCI config */
+   iobase = read_iobase(bus, slot);
+   
    /* read the PIC IRQ line (lowest 8 bits) and channel IRQs from the network
       card to our process */
    pci_read_config(bus, slot, 0, PCI_HEADER_INT_LINE, &irq);
@@ -184,10 +223,7 @@ int main(void)
    diosix_driver_register_irq(irq);
    
    /* fork a worker thread to handle the interrupt */
-   if(diosix_thread_fork() == 0) process_interrupts(bus, slot, irq);
-   
-   /* decode the IO space address bits into the PCI config */
-   iobase = read_iobase(bus, slot);
+   if(diosix_thread_fork() == 0) process_interrupts(bus, slot, irq, iobase);
    
    /* give up if we don't have an IO space base */
    if(!iobase)
@@ -203,15 +239,24 @@ int main(void)
          command register
        - wait for the software reset bit to clear
    */
-   write_port_byte(iobase + RTL8139_PCI_CONFIG1, 0x00);
-   write_port_byte(iobase + RTL8139_PCI_CR, RTL8139_PCI_CR_RESET);
-   while((read_port_byte(iobase + RTL8139_PCI_CR) & RTL8139_PCI_CR_RESET) != 0);
+   write_port_byte(iobase + RTL8139_REG_CONFIG1, 0x00);
+   write_port_byte(iobase + RTL8139_REG_CR, RTL8139_REG_CR_RESET);
+   while((read_port_byte(iobase + RTL8139_REG_CR) & RTL8139_REG_CR_RESET) != 0);
 
-   /* grab some phys memo for the card's buffers */
+   /* grab some phys memo for the card's receive buffers */
    err = diosix_driver_req_phys(RECV_BUFFER_PAGES, (unsigned int *)&recv_buffer_phys);
    if(err)
    {
-      printf("rtl8139.%i: unable to claim physical memory for send/receive buffers\n", count);
+      printf("rtl8139.%i: unable to claim physical memory for receive buffers\n", count);
+      pci_release_device(bus, slot);
+      diosix_thread_exit(1);
+   }
+   
+   /* grab some phys memo for the card's send buffers */
+   err = diosix_driver_req_phys(SEND_BUFFER_PAGES, (unsigned int *)&send_buffer_phys);
+   if(err)
+   {
+      printf("rtl8139.%i: unable to claim physical memory for send buffers\n", count);
       pci_release_device(bus, slot);
       diosix_thread_exit(1);
    }
@@ -231,21 +276,21 @@ int main(void)
    }
    
    /* tell the PCI card where to find this physical memory */
-   write_port_word(iobase + RTL8139_PCI_RBSTART, (unsigned int)recv_buffer_phys);
+   write_port_word(iobase + RTL8139_REG_RBSTART, (unsigned int)recv_buffer_phys);
    
    /* enable the transmit OK and receive OK interrupts */
-   write_port_word(iobase + RTL8139_PCI_IMR,
-                   RTL8139_PCI_IMR_TOK | RTL8139_PCI_IMR_ROK);
+   write_port_word(iobase + RTL8139_REG_IMR,
+                   RTL8139_REG_IMR_TOK | RTL8139_REG_IMR_ROK);
    
    /* set the acceptable packet bits and the wrap bit */
-   write_port_word(iobase + RTL8139_PCI_RCR,
-                   RTL8139_PCI_RCR_ACCEPT_BROAD |
-                   RTL8139_PCI_RCR_ACCEPT_MATCH |
-                   RTL8139_PCI_RCR_WRAP);
+   write_port_word(iobase + RTL8139_REG_RCR,
+                   RTL8139_REG_RCR_ACCEPT_BROAD | RTL8139_REG_RCR_ACCEPT_RUNT |
+                   RTL8139_REG_RCR_ACCEPT_MATCH | RTL8139_REG_RCR_ACCEPT_ERROR |
+                   RTL8139_REG_RCR_WRAP | RTL8139_REG_RCR_ACCEPT_ALL);
 
    /* enable transmission and receiving */
-   write_port_byte(iobase + RTL8139_PCI_CR,
-                   RTL8139_PCI_CR_RECVR_EN | RTL8139_PCI_CR_TRANS_EN);
+   write_port_byte(iobase + RTL8139_REG_CR,
+                   RTL8139_REG_CR_RECVR_EN | RTL8139_REG_CR_TRANS_EN);
 
    /* get the card's MAC address */
    read_macaddress(iobase, mac);
@@ -255,5 +300,45 @@ int main(void)
           count, bus, slot, irq, iobase,
           mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
    
-   while(1);
+   /* wait for a generic message to come in */
+   memset(&msg, 0, sizeof(diosix_msg_info));
+   msg.flags = DIOSIX_MSG_GENERIC;
+   msg.recv = msg_recv_buffer;
+   msg.recv_max_size = MSG_RECEIVE_BUFFER_SIZE;
+   
+   while(1)
+   {
+      unsigned char failed = 0;
+      
+      if(diosix_msg_receive(&msg) == success)
+      {
+         diosix_nic_req *req = (diosix_nic_req *)msg_recv_buffer;
+         
+         if(msg.recv_size < sizeof(diosix_nic_req))
+         {
+            /* malformed request, it's too small to even hold a request */
+            reply_to_request(&msg, e_too_small);
+            failed = 1;
+         }
+         
+         /* sanity check the message header */
+         if(req->magic != NIC_MSG_MAGIC)
+         {
+            /* malformed request, bad magic */
+            reply_to_request(&msg, e_bad_magic);
+            failed = 1;
+         }
+         
+         if(!failed)
+         {
+            /* decode the request type */
+            switch(req->type)
+            {
+               /* if the type is unknown then fail it */
+               default:
+               reply_to_request(&msg, e_bad_params);
+            }
+         }
+      }
+   }
 }
