@@ -17,6 +17,8 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 #include <portdefs.h>
 
+/* maintain a rough msec counter since scheduler start up */ 
+volatile unsigned int sched_msec_counter = 0;
 unsigned int tick = SCHED_CARETAKER;
 kpool *sched_bedroom; /* queued pool of sleeping threads waiting for an alarm timeout */
 
@@ -439,6 +441,11 @@ void sched_tick(int_registers_block *regs)
    /* make sure only the boot cpu runs this? */
    if(CPU_ID == mp_boot_cpu)
    {
+      /* update the rough msec counter  - only one processor has write
+         access to it */
+      sched_msec_counter += DIOSIX_MSEC_PER_TICK;
+      
+      /* check to run the caretaker */
       if(tick)
          tick--;
       else

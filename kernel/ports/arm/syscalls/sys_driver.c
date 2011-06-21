@@ -147,6 +147,51 @@ void syscall_do_driver(int_registers_block *regs)
          }
          else SYSCALL_RETURN(e_no_rights);
          
+         
+      case DIOSIX_DRIVER_REQ_PHYS:
+         if(current->flags & THREAD_FLAG_ISDRIVER)
+         {
+            kresult err;
+            unsigned short pages = regs->r1 & 0xffff;
+            void *addr;
+            
+            /* sanity check - 512 pages = 8M, far too
+             large for a contiguous allocation */
+            if(pages > 512) SYSCALL_RETURN(e_too_big);
+            
+            /* go grab the physical pages required */
+            err = vmm_req_phys_pages(pages, &addr, 0);
+            if(err) SYSCALL_RETURN(err);
+            
+            /* register this with the process so that if it
+             dies, the system can automatically free the pages */
+            err = proc_add_phys_mem_allocation(current->proc, addr, pages);
+            if(err)
+            {
+               vmm_return_phys_pages(addr, pages);
+               SYSCALL_RETURN(err);
+            }
+            
+            /* don't forget to save the new pointer in ecx */
+            regs->r2 = (unsigned int)addr;
+            SYSCALL_RETURN(err);
+         }
+         
+      case DIOSIX_DRIVER_RET_PHYS:
+         if(current->flags & THREAD_FLAG_ISDRIVER)
+         {
+            kresult err;
+            void *addr = (void *)regs->r1;
+            
+            /* proc_remove_phys_mem_allocation() will call 
+             vmm_return_phys_pages() for us */
+            err = proc_remove_phys_mem_allocation(current->proc, addr);
+            if(err) SYSCALL_RETURN(err);
+            
+            SYSCALL_RETURN(err);
+         }
+
+         
       case DIOSIX_DRIVER_REGISTER_IRQ:
          if(current->flags & THREAD_FLAG_ISDRIVER)
          {

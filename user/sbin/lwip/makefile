@@ -20,7 +20,7 @@ PATHTOMKFS = ../../../release/$(ARCH)_$(ARCH_TARGET)/makeiso.sh
 
 # defines
 FLAGS		= -O2 -std=c99 -Wall -static -I../../lib/newlib/libgloss/libnosys -I. \
-			-Iinclude -Iinclude/ipv4
+			-Iinclude -Iinclude/ipv4 -DARCH_DIOSIX
 CC		= $(PREFIX)gcc $(FLAGS)
 LD		= $(PREFIX)gcc $(FLAGS)
 OBJS	 	= $(OBJSDIR)/core/dhcp.o $(OBJSDIR)/core/init.o $(OBJSDIR)/core/mem.o $(OBJSDIR)/core/def.o \

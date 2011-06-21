@@ -56,6 +56,8 @@ typedef enum
    priority_check
 } sched_priority_request;
 
+extern volatile unsigned int sched_msec_counter;
+
 /* scheduling */
 void sched_initialise(void);
 kresult sched_pre_initalise(void);

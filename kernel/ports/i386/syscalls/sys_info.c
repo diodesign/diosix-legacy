@@ -28,18 +28,18 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 */
 void syscall_do_info(int_registers_block *regs)
 {
-   diosix_info_block *block = (diosix_info_block *)(regs->ebx);
+   diosix_info_block *block = (diosix_info_block *)(regs->eax);
    thread *current = cpu_table[CPU_ID].current;
    
    SYSCALL_DEBUG("[sys:%i] SYSCALL_INFO(%i) called by process %i (thread %i)\n",
-                 CPU_ID, regs->eax, current->proc->pid, current->tid);
+                 CPU_ID, regs->ebx, current->proc->pid, current->tid);
 
    /* sanity check pointer for badness */
-   if(!block || (regs->ebx + MEM_CLIP(block, sizeof(diosix_info_block))) > KERNEL_SPACE_BASE)
+   if(!block || (regs->eax + MEM_CLIP(block, sizeof(diosix_info_block))) > KERNEL_SPACE_BASE)
       SYSCALL_RETURN(e_bad_address);
    
    /* fill out the block, a bad pointer will page fault in the caller's virtual space */
-   switch(regs->eax)
+   switch(regs->ebx)
    {
       case DIOSIX_THREAD_INFO:
          block->data.t.tid      = current->tid;
@@ -70,6 +70,13 @@ void syscall_do_info(int_registers_block *regs)
          block->data.k.release_major       = KERNEL_RELEASE_MAJOR;
          block->data.k.release_minor       = KERNEL_RELEASE_MINOR;
          block->data.k.kernel_api_revision = KERNEL_API_REVISION;
+         SYSCALL_RETURN(success);
+      }
+         
+      /* return kernel statistics */
+      case DIOSIX_KERNEL_STATISTICS:
+      {
+         block->data.s.kernel_uptime       = sched_msec_counter;
          SYSCALL_RETURN(success);
       }
    }

@@ -107,6 +107,7 @@ typedef struct
 #define DIOSIX_SCHED_TICK     (100) /* 100 times a second, one tick is 10ms */
 /* calculate how many scheduling ticks there are per second */
 #define DIOSIX_TICKS_PER_SECOND(a) ((a) * DIOSIX_SCHED_TICK)
+#define DIOSIX_MSEC_PER_TICK       (1000 / DIOSIX_SCHED_TICK)
 /* define the number of scheduler ticks to sleep for inbetween trying to resend
    a DIOSIX_MSG_QUEUEME message to a process that isn't revceiving yet */
 #define DIOSIX_SCHED_MSGWAIT  (10)
@@ -189,9 +190,10 @@ typedef struct
 #define DIOSIX_DEBUG_WRITE     (0)
 
 /* reason codes for requesting info from the kernel */
-#define DIOSIX_THREAD_INFO  (0)
-#define DIOSIX_PROCESS_INFO (1)
-#define DIOSIX_KERNEL_INFO  (2)
+#define DIOSIX_THREAD_INFO       (0)
+#define DIOSIX_PROCESS_INFO      (1)
+#define DIOSIX_KERNEL_INFO       (2)
+#define DIOSIX_KERNEL_STATISTICS (3)
 
 /* reason codes for driver management */
 #define DIOSIX_DRIVER_REGISTER       (0)
@@ -288,11 +290,17 @@ typedef struct
 
 typedef struct
 {
+   unsigned int kernel_uptime; /* rough uptime in msec */
+} diosix_kernel_stats;
+
+typedef struct
+{
    union
    {
       diosix_thread_info  t;
       diosix_process_info p;
       diosix_kernel_info  k;
+      diosix_kernel_stats s;
    } data;
 } diosix_info_block;
 

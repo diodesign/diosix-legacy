@@ -40,6 +40,9 @@ extern unsigned int KernelBootStackBase;
 #define KERNEL_LOG2PHYS(a)   ((void *)((unsigned int)(a) - KERNEL_SPACE_BASE))
 #define KERNEL_PHYS2LOG(a)   ((void *)((unsigned int)(a) + KERNEL_SPACE_BASE))
 
+/* not used in the ARM build - yet - but park it at the 16M mark */
+#define INITRD_LOAD_ADDR     (0x01000000)
+
 /* the kernel is loaded at the 64K mark and the 16K boot page directory is placed at
    the 48K mark - all must be included in the critical section */
 #define KERNEL_CRITICAL_BASE (KERNEL_PHYSICAL_BASE - (16 * 1024))

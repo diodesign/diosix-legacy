@@ -527,6 +527,18 @@ unsigned int diosix_get_kernel_info(diosix_kernel_info *block)
    return retval;
 }
 
+unsigned int diosix_get_kernel_stats(diosix_kernel_stats *block)
+/* get statistics about this kernel */
+{
+   unsigned int retval;
+#if defined (__i386__)
+   __asm__ __volatile__("int $0x90" : "=a" (retval) : "a" (block), "b" (DIOSIX_KERNEL_STATISTICS), "d" (SYSCALL_INFO));  
+#elif defined (__arm__)
+   __asm__ __volatile__("mov r4, %3; mov r1, %2; mov r0, %1; swi $0x0; mov %0, r0"  : "=r" (retval) : "r" (block), "i" (DIOSIX_KERNEL_STATISTICS), "i" (SYSCALL_INFO));
+#endif
+   return retval;
+}
+
 /* ----------------------- virtual memory management ---------------- */
 unsigned int diosix_memory_create(void *ptr, unsigned int size)
 /* create a new virtual memory area at address ptr of size bytes */
