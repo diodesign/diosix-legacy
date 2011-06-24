@@ -37,6 +37,11 @@ typedef struct
    pci_req_type type;
    unsigned int magic;
    
+   /* for a send/write/share request, select the buffer */
+   unsigned int send_buffer_select;
+   
+   /* base address for a share request and size of the buffer */
+   unsigned int addr, size;
 } diosix_nic_req;
 
 /* the main reply structure */

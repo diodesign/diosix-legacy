@@ -1,5 +1,5 @@
 /* user/sbin/drivers/i386/rtl8139/main.c
- * Driver to send and receive ethernet frames from a rtl8139 card
+ * Driver to send and receive ethernet frames to and from a rtl8139 card
  * Author : Chris Williams
  * Date   : Sun,29 May 2011.06:11:00
 
@@ -28,6 +28,15 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #include "lowlevel.h"
 #include "pci.h"
 #include "nic.h"
+
+/* ---------------------------------------------------------------
+   Protocol notes:
+   * The NIC driver initialises the card and grabs physical memory
+     for the receive and send buffers 
+   * It then waits for interrupts and requests
+   * The TCPIP stack process then 
+
+ */
 
 #define RTL8139_VENDORID      (0x10ec)
 #define RTL8139_DEVICEID      (0x8139)
@@ -62,16 +71,22 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #define RTL8139_REG_RCR_ACCEPT_MATCH (1 << 1)
 #define RTL8139_REG_RCR_ACCEPT_ALL   (1 << 0)
 
-/* size of buffers in whole pages */
-#define RECV_BUFFER_PAGES     (3)
-#define SEND_BUFFER_PAGES     (1)
+/* size of each buffer in whole pages */
+#define RECV_BUFFER_PAGES            (3)
+#define SEND_BUFFER_PAGES            (1)
+   
+/* number of send buffers supported */
+#define SEND_BUFFERS                 (4)
 
+/* *** This code assumes 4KB (4096 bytes, 0x1000 bytes) page size! *** */
 /* where to place the buffers in virtual space */
-#define RECV_BUFFER_VIRTUAL   (0x2000)
-#define SEND_BUFFER_VIRTUAL   (0x5000)
+#define RECV_BUFFER_VIRTUAL      (0x2000)
+#define RECV_BUFFER_VIRTUAL_END  (RECV_BUFFER_VIRTUAL + RECV_BUFFER_PAGES * 0x1000)
+/* Place a guard page between each of the buffers */
+#define SEND_BUFFER_VIRTUAL(a)   ((RECV_BUFFER_VIRTUAL_END + 0x1000) + ((a) * (SEND_BUFFER_PAGES + 1) * 0x1000))
 
 /* size of buffer to hold diosix messages */
-#define MSG_RECEIVE_BUFFER_SIZE (256)
+#define MSG_RECEIVE_BUFFER_SIZE  (256)
 
 /* --------------------------------------------------------------
                         useful functions
@@ -160,10 +175,10 @@ int main(void)
 {
    unsigned short bus, slot;
    unsigned int pid;
-   unsigned char count = 0, claimed = 0;
+   unsigned char count = 0, claimed = 0, loop;
    unsigned short vendorid, deviceid, irq, iobase;
    unsigned char mac[6];
-   unsigned char *recv_buffer_phys, *send_buffer_phys;
+   void *recv_buffer_phys, *send_buffer_phys[SEND_BUFFERS];
    diosix_phys_request phys_mem;
    kresult err;
    
@@ -243,20 +258,11 @@ int main(void)
    write_port_byte(iobase + RTL8139_REG_CR, RTL8139_REG_CR_RESET);
    while((read_port_byte(iobase + RTL8139_REG_CR) & RTL8139_REG_CR_RESET) != 0);
 
-   /* grab some phys memo for the card's receive buffers */
+   /* grab some phys mem for the card's receive buffers */
    err = diosix_driver_req_phys(RECV_BUFFER_PAGES, (unsigned int *)&recv_buffer_phys);
    if(err)
    {
       printf("rtl8139.%i: unable to claim physical memory for receive buffers\n", count);
-      pci_release_device(bus, slot);
-      diosix_thread_exit(1);
-   }
-   
-   /* grab some phys memo for the card's send buffers */
-   err = diosix_driver_req_phys(SEND_BUFFER_PAGES, (unsigned int *)&send_buffer_phys);
-   if(err)
-   {
-      printf("rtl8139.%i: unable to claim physical memory for send buffers\n", count);
       pci_release_device(bus, slot);
       diosix_thread_exit(1);
    }
@@ -270,11 +276,36 @@ int main(void)
    if(err)
    {
       printf("rtl8139.%i: unable to map physical memory into virtual space\n", count);
-      diosix_driver_ret_phys((unsigned int)recv_buffer_phys);
       pci_release_device(bus, slot);
       diosix_thread_exit(1);
    }
    
+   /* grab some phys mem for the card's send buffers and also map them into virtual space */
+   for(loop = 0; loop < SEND_BUFFERS; loop++)
+   {
+      err = diosix_driver_req_phys(SEND_BUFFER_PAGES, (unsigned int *)&(send_buffer_phys[loop]));
+      if(err)
+      {
+         printf("rtl8139.%i: unable to claim physical memory for send buffer %i\n", count, loop);
+         pci_release_device(bus, slot);
+         diosix_thread_exit(1); /* physical memory claimed will be released by the kernel */
+      }
+      
+      /* now make sure we can access this physical memory in virtual space */
+      phys_mem.size = SEND_BUFFER_PAGES * DIOSIX_MEMORY_PAGESIZE;
+      phys_mem.flags = VMA_WRITEABLE | VMA_NOCACHE;
+      phys_mem.paddr = send_buffer_phys[loop];
+      phys_mem.vaddr = (void *)SEND_BUFFER_VIRTUAL(loop);
+      err = diosix_driver_map_phys(&phys_mem);
+      if(err)
+      {
+         printf("rtl8139.%i: unable to map physical memory for send buffer %i into virtual space\n", count, loop);
+         pci_release_device(bus, slot);
+         diosix_thread_exit(1); /* physical memory claimed will be released by the kernel */
+      }
+
+   }
+
    /* tell the PCI card where to find this physical memory */
    write_port_word(iobase + RTL8139_REG_RBSTART, (unsigned int)recv_buffer_phys);
    
@@ -284,9 +315,9 @@ int main(void)
    
    /* set the acceptable packet bits and the wrap bit */
    write_port_word(iobase + RTL8139_REG_RCR,
-                   RTL8139_REG_RCR_ACCEPT_BROAD | RTL8139_REG_RCR_ACCEPT_RUNT |
-                   RTL8139_REG_RCR_ACCEPT_MATCH | RTL8139_REG_RCR_ACCEPT_ERROR |
-                   RTL8139_REG_RCR_WRAP | RTL8139_REG_RCR_ACCEPT_ALL);
+                   RTL8139_REG_RCR_ACCEPT_BROAD |
+                   RTL8139_REG_RCR_ACCEPT_MATCH |
+                   RTL8139_REG_RCR_WRAP);
 
    /* enable transmission and receiving */
    write_port_byte(iobase + RTL8139_REG_CR,
