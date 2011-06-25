@@ -1,5 +1,5 @@
 /* user/sbin/drivers/i386/common/nic.h
- * Defines for interfacing with Interface to a userspace NIC driver
+ * Defines for interfacing with a userspace NIC driver
  * Author : Chris Williams
  * Date   : Sun,16 Jan 2011.23:21:00
 
@@ -20,34 +20,70 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 #include "diosix.h" /* for kresult */
 
-#define NIC_MSG_MAGIC (0xd1000003)
+#define NIC_MSG_MAGIC   (0xd1000003)
+#define NIC_MAC_LENGTH  (6)
+
+#define NIC_NAME_LENGTH (6)
 
 /* define the types of request */
 typedef enum
 {
-   read_packet = 0,
-   write_packet,
-   config
+   nic_announce_device = 0,
+   nic_share_buffer,
+   nic_lock_buffer,
+   nic_unlock_buffer
 } nic_req_type;
+
+typedef enum
+{
+   nic_send_buffer = 0,
+   nic_recv_buffer
+} nic_buffer_type;
+
+/* describe a NIC device in terms of buffers etc */
+typedef struct
+{
+   unsigned char id; /* per-driver process device id */
+   
+   /* interface name of the device */
+   char name[NIC_NAME_LENGTH];
+
+   /* describe the buffer set up of the device */
+   unsigned char send_buffers, recv_buffers;
+   unsigned int send_buffer_size, recv_buffer_size;
+} diosix_nic_announce_req;
+
+typedef struct
+{
+   nic_buffer_type type;
+   unsigned char buffer_nr;
+   unsigned short buffer_size; /* used in unlocking a send */
+} diosix_nic_buffer_req;
 
 /* the main request structure */
 typedef struct
 {
    /* define the request */
-   pci_req_type type;
+   nic_req_type type;
    unsigned int magic;
    
-   /* for a send/write/share request, select the buffer */
-   unsigned int send_buffer_select;
-   
-   /* base address for a share request and size of the buffer */
-   unsigned int addr, size;
+   union
+   {
+      diosix_nic_announce_req announce_req;
+      diosix_nic_buffer_req buffer_req;
+   } data;
+
 } diosix_nic_req;
 
 /* the main reply structure */
 typedef struct
 {
    kresult result; /* return code */
+   unsigned char buffer_nr; /* returned buffer number (if required) */
 } diosix_nic_reply;
+
+
+/* prototypes */
+kresult nic_send_to_stack(nic_req_type type, void *data, diosix_nic_reply *reply);
 
 #endif

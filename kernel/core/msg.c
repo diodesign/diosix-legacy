@@ -538,6 +538,7 @@ kresult msg_deliver(thread *receiver, diosix_msg_info *rmsg, thread *sender, dio
                smsg->flags &= ~DIOSIX_MSG_SHAREVMA;
                rmsg->flags &= ~DIOSIX_MSG_SHAREVMA;
             }
+
          }
          else
             /* replier didn't want to share so clear the flag in the sender */

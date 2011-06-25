@@ -24,15 +24,16 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #define DIOSIX_ROLE_SYSTEM_EXECUTIVE (1) /* usually init */
 #define DIOSIX_ROLE_VFS              (2) /* the virtual filesystem manager */
 #define DIOSIX_ROLE_PAGER            (3) /* the secondary storage swapper */
+#define DIOSIX_ROLE_NETWORKSTACK     (4) /* the TCP/IP networking stack */
 
 /* basic 'console' hardware */
-#define DIOSIX_ROLE_CONSOLEVIDEO     (4) /* default display hardware */
-#define DIOSIX_ROLE_CONSOLEKEYBOARD  (5) /* default keyboard hardware */
+#define DIOSIX_ROLE_CONSOLEVIDEO     (5) /* default display hardware */
+#define DIOSIX_ROLE_CONSOLEKEYBOARD  (6) /* default keyboard hardware */
 
 /* system architecture */
-#define DIOSIX_ROLE_PCIMANAGER       (6) /* the PCI bus driver */
+#define DIOSIX_ROLE_PCIMANAGER       (7) /* the PCI bus driver */
 
 /* total number of roles - not including DIOSIX_ROLE_NONE */
-#define DIOSIX_ROLES_NR              (6)
+#define DIOSIX_ROLES_NR              (7)
 
 #endif
