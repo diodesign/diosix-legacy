@@ -58,26 +58,25 @@
 
 #include "diosix.h"
 #include "functions.h"
-
-#define UMAX(a, b)      ((a) > (b) ? (a) : (b))
+#include "roles.h"
 
 /*-----------------------------------------------------------------------------------*/
 int main()
 {      
+   /* name this process so others can find it */
+   diosix_set_role(DIOSIX_ROLE_NETWORKSTACK);
+   
+   /* step into the correct layer - layer 3 */
+   diosix_priv_layer_up(3);
+   
    printf("lwip: TCPIP stack running\n");
    
-   while(1)
-   {
-      diosix_kernel_stats stats;
-      diosix_get_kernel_stats(&stats);
-      printf("uptime = %i\n", stats.kernel_uptime);
-   }
+   
 }
 /*-----------------------------------------------------------------------------------*/
 
 /*-----------------------------------------------------------------------------------*/
-u32_t
-sys_now(void)
+u32_t sys_now(void)
 {
    diosix_kernel_stats stats;
    

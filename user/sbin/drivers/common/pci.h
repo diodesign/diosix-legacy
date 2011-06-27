@@ -1,4 +1,4 @@
-/* user/sbin/drivers/i386/common/pci.h
+/* user/sbin/drivers/common/pci.h
  * Defines for interfacing with the PCI bus from userspace
  * Author : Chris Williams
  * Date   : Sun,16 Jan 2011.23:21:00

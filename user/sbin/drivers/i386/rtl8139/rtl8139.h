@@ -139,12 +139,12 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #define PER_THREAD_BUFFERS_TOTAL     (RECV_BUFFERS_TOTAL + SEND_BUFFERS_TOTAL)
 
 /* calculate the base address of the per-thread buffer space, a is the driver thread id (from 0) */
-#define THREAD_BUFFERS_BASE(a)       ((a) * PER_THREAD_BUFFERS_TOTAL)
+#define THREAD_BUFFERS_BASE(a)       (BUFFERS_BASE + ((a) * PER_THREAD_BUFFERS_TOTAL * DIOSIX_MEMORY_PAGESIZE))
 
 /* calculate the base address of the recv buffer for a given thread id (a) and buffer number (b) */
-#define THREAD_RECV_BUFFER(a,b)      (THREAD_BUFFERS_BASE(a) + (RECV_BUFFER_PAGES + 1) * (b))
+#define THREAD_RECV_BUFFER(a,b)      (THREAD_BUFFERS_BASE(a) + ((RECV_BUFFER_PAGES + 1) * ((b) - 1) * DIOSIX_MEMORY_PAGESIZE))
 /* calculate the base address of the send buffer for a given thread id (a) and buffer number (b) */
-#define THREAD_SEND_BUFFER(a,b)      (THREAD_RECV_BUFFER(a, (RECV_BUFFERS + 1)) + (SEND_BUFFER_PAGES + 1) * (b))
+#define THREAD_SEND_BUFFER(a,b)      (THREAD_RECV_BUFFER(a, (RECV_BUFFERS + 1)) + ((SEND_BUFFER_PAGES + 1) * ((b) - 1) * DIOSIX_MEMORY_PAGESIZE))
 
 /* size of buffer to hold diosix messages */
 #define MSG_RECEIVE_BUFFER_SIZE      (sizeof(diosix_nic_req))

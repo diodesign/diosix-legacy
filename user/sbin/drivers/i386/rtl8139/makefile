@@ -17,7 +17,7 @@ PATHTOROOT = ../../../../../release/$(ARCH)_$(ARCH_TARGET)/root
 OBJSDIR = ../../../../../build/$(ARCH)_$(ARCH_TARGET)/drivers/rtl8139
 
 # defines
-FLAGS		= -O2 -std=c99 -Wall -static -I. -I../../../../../user/lib/newlib/libgloss/libnosys -I../common
+FLAGS		= -O2 -std=c99 -Wall -static -I. -I../../../../../user/lib/newlib/libgloss/libnosys -I../common -I../../common
 CC		= $(PREFIX)gcc $(FLAGS)
 LD		= $(PREFIX)gcc $(FLAGS)
 OBJS	 	= $(OBJSDIR)/main.o $(OBJSDIR)/pci.o $(OBJSDIR)/lowlevel.o $(OBJSDIR)/nic.o
@@ -30,11 +30,11 @@ $(OBJSDIR)/main.o:	main.c			makefile
 			$(WRITE) '==> COMPILE: $<'
 			$(Q)$(CC) -c -o $@ $<
 
-$(OBJSDIR)/pci.o:	../common/pci.c		makefile
+$(OBJSDIR)/pci.o:	../../common/pci.c		makefile
 			$(WRITE) '==> COMPILE: $<'
 			$(Q)$(CC) -c -o $@ $<
 
-$(OBJSDIR)/nic.o:	../common/nic.c		makefile
+$(OBJSDIR)/nic.o:	../../common/nic.c		makefile
 			$(WRITE) '==> COMPILE: $<'
 			$(Q)$(CC) -c -o $@ $<
 

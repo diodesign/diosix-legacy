@@ -38,7 +38,7 @@ $(OBJSDIR)/lowlevel.o:	../common/lowlevel.c	makefile
 			$(WRITE) '==> COMPILE: $<'
 			$(Q)$(CC) -c -o $@ $<
 
-$(OBJSDIR)/pci.o:		../common/pci.c	makefile
+$(OBJSDIR)/pci.o:	../../ccommon/pci.c	makefile
 			$(WRITE) '==> COMPILE: $<'
 			$(Q)$(CC) -c -o $@ $<
 

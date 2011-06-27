@@ -1,4 +1,4 @@
-/* user/sbin/drivers/i386/common/nic.h
+/* user/sbin/drivers/common/nic.h
  * Defines for interfacing with a userspace NIC driver
  * Author : Chris Williams
  * Date   : Sun,16 Jan 2011.23:21:00

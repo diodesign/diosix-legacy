@@ -1,4 +1,4 @@
-/* user/sbin/drivers/i386/common/pci.c
+/* user/sbin/drivers/common/pci.c
  * Interface to the userspace PCI manager
  * Author : Chris Williams
  * Date   : Tue,7 Dec 2010.06:55:00

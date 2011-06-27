@@ -17,7 +17,7 @@ PATHTOROOT = ../../../../../release/$(ARCH)_$(ARCH_TARGET)/root
 OBJSDIR = ../../../../../build/$(ARCH)_$(ARCH_TARGET)/drivers/pcimngr
 
 # defines
-FLAGS		= -O2 -std=c99 -Wall -static -I../../../../../user/lib/newlib/libgloss/libnosys -I../common/
+FLAGS		= -O2 -std=c99 -Wall -static -I../../../../../user/lib/newlib/libgloss/libnosys -I../common/ -I../../common
 CC		= $(PREFIX)gcc $(FLAGS)
 LD		= $(PREFIX)gcc $(FLAGS)
 OBJS	 	= $(OBJSDIR)/main.o $(OBJSDIR)/lowlevel.o
