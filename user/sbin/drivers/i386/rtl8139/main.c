@@ -429,10 +429,7 @@ int main(void)
       phys_mem.flags = VMA_WRITEABLE | VMA_NOCACHE;
       phys_mem.paddr = nic->recv_phys[loop];
       phys_mem.vaddr = (void *)THREAD_RECV_BUFFER(nic->id, loop);
-      
-      printf("*** recv[%i] size = %x phys = %x virt = %x\n",
-             loop, (unsigned int)phys_mem.size, (unsigned int)phys_mem.paddr, (unsigned int)phys_mem.vaddr);
-      
+
       err = diosix_driver_map_phys(&phys_mem);
       if(err)
       {
@@ -465,9 +462,6 @@ int main(void)
       phys_mem.flags = VMA_WRITEABLE | VMA_NOCACHE;
       phys_mem.paddr = nic->recv_phys[loop];
       phys_mem.vaddr = (void *)THREAD_SEND_BUFFER(nic->id, loop);
-      
-      printf("*** send[%i] size = %x phys = %x virt = %x\n",
-             loop, (unsigned int)phys_mem.size, (unsigned int)phys_mem.paddr, (unsigned int)phys_mem.vaddr);
       
       err = diosix_driver_map_phys(&phys_mem);
       if(err)
