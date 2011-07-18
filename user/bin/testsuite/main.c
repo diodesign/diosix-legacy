@@ -27,14 +27,63 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 #include "defs.h"
 
+/* ------------------------------------------------------------------------
+      list of tests to perform
+   ------------------------------------------------------------------------ */
+
+test_def test_list[] = { test__is_running, "testsuite running",
+                         test__diosix_fork, "direct fork syscall",
+                         test__fp_addition, "fp: addition",
+                         NULL, "" }; /* last item */
+
+/* ------------------------------------------------------------------------ */
+
+/* TEST: test_is_running: Establish execution
+   Simply prove that userland execution has been reached and that
+   the debug output channel is working.
+   Expected result: successully return
+*/
+kresult test__is_running(void)
+{
+   return success;
+}
+
+/* ------------------------------------------------------------------------ */
+
+/* do_test
+   Attempt to perform a test and write the output to the log
+   => nr = test ID number
+*/
+void do_test(test_nr nr)
+{
+   kresult result;
+   int (*test)(void);
+   char buffer[LOG_MAX_LINE_LENGTH];
+   
+   /* locate the test and run it */
+   test = test_list[nr].func;
+   if(!test) return;
+   result = test();
+   
+   if(result == success)
+      snprintf(buffer, LOG_MAX_LINE_LENGTH, LOG "test%i OK # %s \n", nr, test_list[nr].comment);
+   else
+      snprintf(buffer, LOG_MAX_LINE_LENGTH, LOG "test%i FAIL # %s \n", nr, test_list[nr].comment);
+   
+   /* push result of test out to the kernel's debug channel */
+   diosix_debug_write(buffer);
+}
+
 int main(void)
 {
-   /* TEST 0: Establish execution
-      Simply prove that userland execution has been reached.
-      => no conditions
-      <= no conditions
-   */
-   printf(LOG "test0 OK # testsuite running, built: " __TIME__ " " __DATE__ "\n");
+   test_nr test_id = 0;
+   
+   while(test_list[test_id].func)
+   {
+      do_test(test_id);
+      test_id++;
+   }
    
    while(1); /* idle */
 }
+

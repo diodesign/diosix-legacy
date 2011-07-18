@@ -130,7 +130,7 @@ typedef struct
 #define DIOSIX_MSG_ANY_THREAD  (0)
 #define DIOSIX_MSG_ANY_PROCESS (0)
 
-/* the kernel will refuse to deliver individual messages greater than this size in bytes */
+/* the kernel will refuse to deliver individual messages greater than this size in bytes* */
 #define DIOSIX_MSG_MAX_SIZE    (4096 * 4)
 
 /* describe a queued asynchronous message */

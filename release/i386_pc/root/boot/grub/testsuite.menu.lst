@@ -9,6 +9,6 @@ kernel /boot/kernel
 # kernel symbol table
 module /boot/kernel.sym
 
-# run the kernel API testsuite 
+# run the kernel API testsuite on a minimal system
 module /bin/testsuite
-
+module /sbin/init

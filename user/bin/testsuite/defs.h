@@ -20,5 +20,28 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 /* prepended to each output line to be picked up by the testsuite log processor */
 #define LOG "__DTS__"
+#define LOG_MAX_LINE_LENGTH (200)
+
+/* define a test's structure */
+typedef struct
+{
+   int (*func)(void); /* test function */
+   const char *comment; /* human-readable string for the log */
+} test_def;
+
+/* ------------------------------------------------------- */
+
+/* list of possible tests */
+typedef enum
+{
+   test_is_running = 0,
+   test_diosix_fork = 1,
+   test_fp_addition = 2
+} test_nr;
+
+/* test functions */
+kresult test__is_running(void);
+kresult test__diosix_fork(void);
+kresult test__fp_addition(void);
 
 #endif

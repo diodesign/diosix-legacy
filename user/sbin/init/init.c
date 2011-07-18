@@ -23,10 +23,46 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #include "async.h"
 #include "roles.h"
 
-int main(void)
+/* process_kernel_signals
+   Handle incoming signals from the kernel
+*/
+void process_signals(void)
 {
+   diosix_msg_info msg;
+   
+   /* accept signals telling us of process teardowns */
+   diosix_signals_kernel(SIGX_ENABLE(SIGXPROCKILLED));
+   diosix_signals_kernel(SIGX_ENABLE(SIGXPROCEXIT));
+   
+   /* prepare to sleep until an interrupt comes in */
+   msg.role = msg.pid = DIOSIX_MSG_ANY_PROCESS;
+   msg.tid = DIOSIX_MSG_ANY_THREAD;
+   msg.flags = DIOSIX_MSG_SIGNAL | DIOSIX_MSG_KERNELONLY;
+   
+   while(1)
+      /* block until a signal comes in from the kernel */
+      if(diosix_msg_receive(&msg) == success)
+      {
+         switch(msg.signal.number)
+         {
+            case SIGXPROCEXIT:
+            case SIGXPROCKILLED:
+               diosix_debug_write("process needs killing\n");
+               diosix_kill(msg.signal.number);
+               break;
+               
+            default:
+               break;
+         }
+      }
+}
+
+int main(void)
+{   
    /* name this process so others can find it */
    diosix_set_role(DIOSIX_ROLE_SYSTEM_EXECUTIVE);
 
+   if(diosix_thread_fork() > 0) process_kernel_signals();
+   
    while(1); /* idle */
 }
