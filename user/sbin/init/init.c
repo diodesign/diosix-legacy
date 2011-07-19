@@ -23,10 +23,12 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #include "async.h"
 #include "roles.h"
 
+unsigned int init_pid; /* PID of this init process */
+
 /* process_kernel_signals
    Handle incoming signals from the kernel
 */
-void process_signals(void)
+void process_kernel_signals(void)
 {
    diosix_msg_info msg;
    
@@ -47,8 +49,9 @@ void process_signals(void)
          {
             case SIGXPROCEXIT:
             case SIGXPROCKILLED:
-               diosix_debug_write("process needs killing\n");
-               diosix_kill(msg.signal.number);
+               /* don't kill yourself... */
+               if(msg.signal.extra && msg.signal.extra != init_pid)
+                  diosix_kill(msg.signal.extra);
                break;
                
             default:
@@ -62,6 +65,8 @@ int main(void)
    /* name this process so others can find it */
    diosix_set_role(DIOSIX_ROLE_SYSTEM_EXECUTIVE);
 
+   init_pid = getpid();
+   
    if(diosix_thread_fork() > 0) process_kernel_signals();
    
    while(1); /* idle */
