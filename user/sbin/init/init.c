@@ -61,13 +61,16 @@ void process_kernel_signals(void)
 }
 
 int main(void)
-{   
+{
+   int kernel_signals_thread;
+   
    /* name this process so others can find it */
    diosix_set_role(DIOSIX_ROLE_SYSTEM_EXECUTIVE);
 
    init_pid = getpid();
    
-   if(diosix_thread_fork() > 0) process_kernel_signals();
+   kernel_signals_thread = diosix_thread_fork();
+   if(kernel_signals_thread != -1 && kernel_signals_thread > 0) process_kernel_signals();
    
    while(1); /* idle */
 }
