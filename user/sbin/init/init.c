@@ -70,7 +70,7 @@ int main(void)
    init_pid = getpid();
    
    kernel_signals_thread = diosix_thread_fork();
-   if(kernel_signals_thread != -1 && kernel_signals_thread > 0) process_kernel_signals();
+   if(kernel_signals_thread == 0) process_kernel_signals();
    
    while(1); /* idle */
 }
