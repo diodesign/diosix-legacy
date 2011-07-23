@@ -34,6 +34,8 @@ global KernelGDTEnd
 global KernelGDTPtr
 global TSS_Selector
 global APStack
+global KernelFPPresent
+global KernelSIMDPresent
 extern _main                            ; _main is defined elsewhere
 extern _mp_catch_ap
 extern exception_handler                ; common exception handler
@@ -48,6 +50,17 @@ CHECKSUM    equ -(MAGIC + FLAGS)        ; checksum required
 
 ATAGBASE    equ 0x500                   ; generate ATAG list at this phys addr
 LOADERMAGIC equ 0x2BADB002              ; magic number used by the loader (see mutliboot.h)
+
+CR0_TS      equ (1 << 3)                 ; FP task switches, cleared when FP is used
+CR0_EM      equ (1 << 2)                 ; Route all FP through undef instr exception
+CR0_MP      equ (1 << 1)                 ; set to allow fwait to side-step the TS bit
+CR0FPBITS   equ (-1) - (CR0_TS + CR0_EM) ; clear TS and EM in CR0
+
+; SIMD presence bits in edx/ecx returned from CPUID func 1
+CPUID_MMX   equ (1 << 23) ; in edx
+CPUID_SSE   equ (1 << 25) ; in edx
+CPUID_SSE2  equ (1 << 26) ; in edx
+CPUID_SSE3  equ (1 << 0)  ; in ecx
 
 ; This is the virtual base address of kernel space. It must be used to
 ; convert virtual addresses into physical addresses until paging is enabled.
@@ -219,6 +232,12 @@ gdt_ptr:
    dw gdt_end - gdt - 1
    dd gdt
 
+KernelFPPresent:
+   dw 0F0F0h
+KernelSIMDPresent:
+   db 0
+
+align 4
 APStack:
    dd 0
    
@@ -308,6 +327,57 @@ FixupStack:
    mov ebx, eax
    mov eax, LOADERMAGIC
 %endif
+
+; --------------------------------------------------------------------------------------------------
+   ; detect FPU - cribbed from http://wiki.osdev.org/FPU
+   ; preserve eax and ebx registers
+   push eax
+   push ebx
+
+   mov edx, cr0
+   and edx, CR0FPBITS                      ; clear TS and EM to force fpu access
+   mov cr0, edx
+   fninit                                  ; load defaults to fpu
+   fnstsw [KernelFPPresent]                ; store status word
+   cmp word [KernelFPPresent], 0           ; compare the written status with the expected fpu state
+   jne SkipFPInit 
+   or edx, CR0_MP                          ; set the MP bit in CR0
+   mov cr0, edx
+
+   ; detect the presence of SSE
+   mov eax, 00000001                       ; read core features
+   cpuid                                   ; we're only interested in edx and ecx
+   ; test for MMX (stored in edx)
+   mov eax, edx
+   and eax, CPUID_MMX
+   cmp eax, 0
+   jz SkipFPInit
+   mov byte [KernelSIMDPresent], 1         ; 1 = our internal representation for MMX
+   ; test for SSE (stored in edx)
+   mov eax, edx
+   and eax, CPUID_SSE
+   cmp eax, 0
+   jz SkipFPInit
+   mov byte [KernelSIMDPresent], 2         ; 2 = our internal representation for SSE1
+   ; test for SSE2 (stored in edx)
+   mov eax, edx
+   and eax, CPUID_SSE2
+   cmp eax, 0
+   jz SkipFPInit
+   mov byte [KernelSIMDPresent], 3         ; 3 = our internal representation for SSE2
+   ; test for SSE3 (stored in ecx)
+   mov eax, ecx
+   and eax, CPUID_SSE3
+   cmp eax, 0
+   jz SkipFPInit
+   mov byte [KernelSIMDPresent], 4         ; 4 = our internal representation for SSE3
+
+   ; restore eax and ebx
+   SkipFPInit:
+   pop ebx
+   pop eax
+; --------------------------------------------------------------------------------------------------
+
 
    push eax                           ; pass Multiboot magic number
 

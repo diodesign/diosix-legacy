@@ -64,6 +64,10 @@ void serial_initialise(void);
 #define X86_IOPORT_MAXWORDS   (2048) /* number of 32bit words in (2^16)-bit IO port access bitmap */
 #define X86_IOPORT_BITMAPSIZE (X86_IOPORT_MAXWORDS * sizeof(unsigned int))
 
+/* probe the CPU for features, return data in eax,ebx,ecx,edx */
+#define x86_cpuid(func,ax,bx,cx,dx) \
+   __asm__ __volatile__ ("cpuid" : "=a" (ax), "=b" (bx), "=c" (cx), "=d" (dx) : "a" (func));
+
 unsigned x86_inportb(unsigned short port);
 void x86_outportb(unsigned port, unsigned val);
 kresult x86_ioports_clear_all(process *p);

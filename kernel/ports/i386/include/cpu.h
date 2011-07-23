@@ -19,7 +19,7 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #define   _CPU_H
          
 /* find this cpu's unique id */
-#define CPU_ID                 ((mp_cpus > 1) ? (*(LAPIC_ID_REG) >> 24) : mp_boot_cpu)
+#define CPU_ID               ((mp_cpus > 1) ? (*(LAPIC_ID_REG) >> 24) : mp_boot_cpu)
 
 /* keep track of available processor resources */
 extern unsigned char mp_cpus;
@@ -27,18 +27,18 @@ extern unsigned char mp_ioapics;
 extern unsigned char mp_boot_cpu;
 extern unsigned char mp_is_smp;
 
-#define MP_MAGIC_SIG     (0x5f504d5f)   /* _MP_ */
-#define MP_RSDT_SIG      (0x52534454)   /* RSDT */
+#define MP_MAGIC_SIG         (0x5f504d5f)   /* _MP_ */
+#define MP_RSDT_SIG          (0x52534454)   /* RSDT */
 
 /* areas of memory to search for the magic _MP_ word */
-#define MP_EBDA_START   (0x80000)
-#define MP_EBDA_END     (0x90000)
-#define MP_LASTK_START  ((640 * 1024) - 1024)
-#define MP_LASTK_END    (640 * 1024)
-#define MP_ROM_START    (0xf0000)
-#define MP_ROM_END      (0xfffff)
+#define MP_EBDA_START        (0x80000)
+#define MP_EBDA_END          (0x90000)
+#define MP_LASTK_START       ((640 * 1024) - 1024)
+#define MP_LASTK_END         (640 * 1024)
+#define MP_ROM_START         (0xf0000)
+#define MP_ROM_END           (0xfffff)
 /* MP structure bits */
-#define MP_IS_BSP              (1 << 1)
+#define MP_IS_BSP            (1 << 1)
 #define MP_IS_IOAPIC_ENABLED (1 << 0)
 
 /* various multiproc info structures */

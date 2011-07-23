@@ -988,8 +988,13 @@ void lowlevel_proc_preinit(void)
    x86_proc_preinit();
 }
 
+extern unsigned short KernelFPPresent;
+extern unsigned char KernelSIMDPresent;
+
 void lowlevel_kickstart(void)
-{
+{   
+   dprintf("lowlevel_kickstart: FP test word = %x, SIMD level = %i\n",
+           KernelFPPresent, KernelSIMDPresent);
    x86_kickstart(NULL);
 }
 
