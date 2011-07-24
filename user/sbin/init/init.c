@@ -51,7 +51,12 @@ void process_kernel_signals(void)
             case SIGXPROCKILLED:
                /* don't kill yourself... */
                if(msg.signal.extra && msg.signal.extra != init_pid)
+               {
+                  char buffer[100];
+                  snprintf(buffer, 100, "init: killing dying process %i\n", msg.signal.extra);
+                  diosix_debug_write(buffer);
                   diosix_kill(msg.signal.extra);
+               }
                break;
                
             default:
@@ -62,12 +67,16 @@ void process_kernel_signals(void)
 
 int main(void)
 {
+   char buffer[100];
    int kernel_signals_thread;
    
    /* name this process so others can find it */
    diosix_set_role(DIOSIX_ROLE_SYSTEM_EXECUTIVE);
 
    init_pid = getpid();
+   
+   snprintf(buffer, 100, "init: pid = %i\n", init_pid);
+   diosix_debug_write(buffer);
    
    kernel_signals_thread = diosix_thread_fork();
    if(kernel_signals_thread == 0) process_kernel_signals();
