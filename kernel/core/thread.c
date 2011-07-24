@@ -394,6 +394,9 @@ kresult thread_kill(process *owner, thread *victim)
       owner->thread_count--;
       unlock_gate(&(owner->lock), LOCK_WRITE);
       
+      /* if the thread was using FP, free its context block */
+      if(victim->fp) vmm_free(victim->fp);
+      
       /* free up resources */
       vmm_free((void *)(victim->kstackblk));
       vmm_free(victim);
