@@ -372,7 +372,10 @@ kresult thread_kill(process *owner, thread *victim)
          a thread if it's still running on another core so spin until 
          it's clear that the thread is no longer being run on the cpu
          it was last on */
-      while(cpu_table[victim->cpu].current != victim);
+      dprintf("**** thread_kill: spinning on current [%i of %i] != victim [%i of %i]\n",
+              cpu_table[victim->cpu].current->tid, cpu_table[victim->cpu].current->proc->pid,
+              victim->tid, victim->proc->pid);
+      if(victim->cpu != CPU_ID) while(cpu_table[victim->cpu].current != victim);
       
       /* destroy the thread's user stack vma */
       stackbase = KERNEL_SPACE_BASE - (THREAD_MAX_STACK * MEM_PGSIZE * victim->tid);
