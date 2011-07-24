@@ -10,5 +10,5 @@ kernel /boot/kernel
 module /boot/kernel.sym
 
 # run the kernel API testsuite on a minimal system
-module /bin/testsuite
 module /sbin/init
+module /bin/testsuite

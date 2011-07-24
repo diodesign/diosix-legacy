@@ -840,6 +840,9 @@ kresult proc_initialise(void)
          
          if(payload.areas[PAYLOAD_CODE].flags & (PAYLOAD_READ | PAYLOAD_EXECUTE))
          {
+            unsigned int code_virtual_flags = VMA_READABLE | VMA_FIXED | VMA_EXECUTABLE | VMA_TEXT;
+            unsigned int code_physical_flags = PG_PRESENT | PG_PRIVLVL;
+
             virtual = (unsigned int)payload.areas[PAYLOAD_CODE].virtual;
             virtual_top = virtual + payload.areas[PAYLOAD_CODE].memsize;
             
@@ -849,20 +852,18 @@ kresult proc_initialise(void)
 
             while(virtual <= virtual_top)
             {
-               pg_add_4K_mapping(new->pgdir, virtual, physical, PG_PRESENT | PG_PRIVLVL);
+               pg_add_4K_mapping(new->pgdir, virtual, physical, code_physical_flags);
                virtual += MEM_PGSIZE;
                physical += MEM_PGSIZE;
             }
             
             err = vmm_add_vma(new, (unsigned int)payload.areas[PAYLOAD_CODE].virtual,
-                              payload.areas[PAYLOAD_CODE].memsize,
-                              VMA_READABLE | VMA_FIXED | VMA_EXECUTABLE | VMA_TEXT, 0);
+                              payload.areas[PAYLOAD_CODE].memsize, code_virtual_flags, 0);
             if(err)
             {
-               BOOT_DEBUG("[proc:%i] failed to create executable area for process (%p %x %x %x)\n",
-                          CPU_ID, new, (unsigned int)payload.areas[PAYLOAD_CODE].virtual,
-                          payload.areas[PAYLOAD_CODE].memsize,
-                          VMA_READABLE | VMA_FIXED | VMA_EXECUTABLE | VMA_TEXT);
+               KOOPS_DEBUG("[proc:%i] WTF? failed to create executable area for process (%p %x %x %x)\n",
+                           CPU_ID, new, (unsigned int)payload.areas[PAYLOAD_CODE].virtual,
+                           payload.areas[PAYLOAD_CODE].memsize, code_virtual_flags);
                return err;
             }
          }
@@ -895,9 +896,9 @@ kresult proc_initialise(void)
                              payload.areas[PAYLOAD_DATA].memsize, vflags, 0);
             if(err)
             {
-               BOOT_DEBUG("[proc:%i] failed to create data area for process (%p %x %x %x)\n",
-                          CPU_ID, new, (unsigned int)payload.areas[PAYLOAD_DATA].virtual,
-                          payload.areas[PAYLOAD_DATA].memsize, vflags);
+               KOOPS_DEBUG("[proc:%i] WTF? failed to create data area for process (%p %x %x %x)\n",
+                           CPU_ID, new, (unsigned int)payload.areas[PAYLOAD_DATA].virtual,
+                           payload.areas[PAYLOAD_DATA].memsize, vflags);
                return err;
             }
          }

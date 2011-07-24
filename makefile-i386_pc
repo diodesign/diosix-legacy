@@ -59,7 +59,7 @@ FLAGS		= -g -std=c99 -Wall -nostdlib -nostartfiles \
 # DEBUGFLAGS	= -DDEBUG -DMSG_DEBUG -DBUS_DEBUG -DPROC_DEBUG -DSCHED_DEBUG -DTHREAD_DEBUG -DVMM_DEBUG -DXPT_DEBUG -DINT_DEBUG -DIRQ_DEBUG -DMP_DEBUG -DPAGE_DEBUG -DKSYM_DEBUG -DIOAPIC_DEBUG -DLAPIC_DEBUG -DLOCK_DEBUG -DLOLVL_DEBUG -DPIC_DEBUG -DSYSCALL_DEBUG -DPERFORMANCE_DEBUG -DLOCK_TIME_CHECK
 
 # basic debugging
-DEBUGFLAGS	= -DDEBUG -DLOCK_TIME_CHECK
+DEBUGFLAGS	= -DDEBUG -DLOCK_TIME_CHECK -DPAGE_HALT_ON_SEGV_DEBUG
 
 CC		= $(CCbin) $(SVNDEF) $(FLAGS) -I$(INCDIR) -I$(COREDIR)/include -I$(LIBDIOSIXDIR) $(DEBUGFLAGS) $(VERSION)
 LD		= $(CCbin) $(FLAGS) -Xlinker --script=$(LDSCRIPT) -Xlinker
@@ -68,7 +68,7 @@ LD		= $(CCbin) $(FLAGS) -Xlinker --script=$(LDSCRIPT) -Xlinker
 # the order of code in the kernel binary is quite important...
 # try to keep often-used functions together for cache performance
 OBJS	 = $(OBJSDIR)/locore.o \
-	   $(OBJSDIR)/lowlevel.o $(OBJSDIR)/exceptions.o $(OBJSDIR)/irqs.o $(OBJSDIR)/msg.o $(OBJSDIR)/sched.o \
+	   $(OBJSDIR)/lowlevel.o $(OBJSDIR)/exceptions.o $(OBJSDIR)/irqs.o $(OBJSDIR)/msg.o $(OBJSDIR)/sched.o $(OBJSDIR)/fpu.o \
 	   $(OBJSDIR)/sys_driver.o $(OBJSDIR)/sys_info.o $(OBJSDIR)/sys_memory.o $(OBJSDIR)/sys_msg.o $(OBJSDIR)/sys_privs.o \
 	   $(OBJSDIR)/sys_proc.o $(OBJSDIR)/sys_thread.o $(OBJSDIR)/sys_debug.o \
 	   $(OBJSDIR)/vmm.o $(OBJSDIR)/page.o $(OBJSDIR)/thread.o $(OBJSDIR)/proc.o $(OBJSDIR)/ioapic.o $(OBJSDIR)/pic.o \
@@ -152,6 +152,10 @@ $(OBJSDIR)/page.o:	$(PORTDIR)/cpu/page.c		$(MAKEDEP)
 			$(COMPILE.c)
 
 $(OBJSDIR)/mp.o:	$(PORTDIR)/cpu/mp.c		$(MAKEDEP)
+			$(WRITE) '==> COMPILE: $<'
+			$(COMPILE.c)
+
+$(OBJSDIR)/fpu.o:	$(PORTDIR)/cpu/fpu.c		$(MAKEDEP)
 			$(WRITE) '==> COMPILE: $<'
 			$(COMPILE.c)
 

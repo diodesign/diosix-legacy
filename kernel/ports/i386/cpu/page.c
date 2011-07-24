@@ -250,6 +250,16 @@ pf_fault_bad:
       /* shouldn't return */
    }
    
+   /* if a process faults and it looks like it's the kernel's bug, 
+      define PAGE_HALT_ON_SEGV_DEBUG to trap the 1st unhandled ring3 fault */
+#ifdef PAGE_HALT_ON_SEGV_DEBUG
+   dprintf("*** thread %i process %i faulted at address %x eip %x errcode %x\n"
+           "    eax %x ebx %x ecx %x edx %x esp %x\n",
+           cpu_table[CPU_ID].current->tid, cpu_table[CPU_ID].current->proc->pid, faultaddr, regs->eip,
+           regs->errcode, regs->eax, regs->ebx, regs->ecx, regs->edx, regs->useresp);
+   debug_panic("PAGE_HALT_ON_SEGV_DEBUG set: halting on first unhandled page fault in userspace");
+#endif
+
    /* fall through to indicating that the process has made a run-time error */
    return e_failure;
 }

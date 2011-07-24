@@ -24,8 +24,7 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 #include "defs.h"
 
-volatile kresult test__fp_addition_child_result;
-volatile char test__fp_addition_child_flag = 0;
+volatile char fp_child_flag;
 
 /* TEST: test__fp_addition
    Test that a process can add up using floating-point while
@@ -33,49 +32,39 @@ volatile char test__fp_addition_child_flag = 0;
 */
 kresult test__fp_addition(void)
 {
-   int child, parent_loop = 0;
-   float control_var = 1.00, addition_var = 0.00;
+   int sibling;
+   volatile float x = 0.00;
    
-   child = diosix_thread_fork();
-   if(child == -1) return e_failure;
-      
-   if(child == 0)
+   fp_child_flag = 0;
+   
+   sibling = diosix_thread_fork();
+   if(sibling == -1) return e_failure;
+   
+   if(sibling)
    {
-      /* get the child to do some addition */
-      unsigned int loop;
-      
-      for(loop = 0; loop < 10; loop++)
-      {
-         addition_var += 1.23;
-         diosix_thread_yield();
-      }
-      
-      if(addition_var == (10 * 1.23))
-         test__fp_addition_child_result = success;
-      else
-         test__fp_addition_child_result = e_failure;
-      
-      /* mark the child as done and kill (or park) the thread */
-      test__fp_addition_child_flag = 1;
-      diosix_thread_exit(0);
-      while(1);
+      x = 1.01;
+
+      /* spin the older sibling waiting for the worker thread to finish */
+      while(!fp_child_flag) diosix_thread_yield();
    }
    else
-   {      
-      /* get the parent to wait, crudely, on a flag */
-      while(!test__fp_addition_child_flag)
+   {
+      /* get the younger sibling to do some FP */
+      volatile float y = 0.00;
+      
+      while(y < 100.00)
       {
-         control_var += 0.33;
-         parent_loop++;
+         y = y + 23.01;
          diosix_thread_yield();
       }
+      
+      /* signal we're done and clean up */
+      fp_child_flag = 1;
+      diosix_thread_exit(0);
    }
    
-   /* the control variable must be preserved */
-   if(control_var == (0.33 * parent_loop) &&
-      test__fp_addition_child_result == success)
-      return success;
+   /* check to see that this thread's FP context is untampered */
+   if(x != 1.01) return e_failure;
    
-   /* fall through to failure */
-   return e_failure;
+   return success;
 }

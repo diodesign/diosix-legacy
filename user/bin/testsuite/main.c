@@ -74,8 +74,11 @@ void do_test(test_nr nr)
    diosix_debug_write(buffer);
 }
 
+volatile unsigned char data = 0;
+
 int main(void)
 {
+#if 0
    test_nr test_id = 0;
    
    while(test_list[test_id].func)
@@ -83,7 +86,20 @@ int main(void)
       do_test(test_id);
       test_id++;
    }
+#endif
    
+   data = 1;
+   
+   diosix_debug_write("hello world!\n");
+   
+   diosix_fork();
+   
+   diosix_debug_write("process post-fork()\n");
+   
+   data = 0;
+   
+   diosix_debug_write("process still running\n");
+      
    while(1); /* idle */
 }
 

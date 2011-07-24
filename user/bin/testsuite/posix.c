@@ -28,7 +28,7 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 kresult test__diosix_fork_parent(void)
 {
    int child = diosix_fork();
-   
+    
    if(child == -1) return e_failure;
    if(child > 0) return success;
    
@@ -65,7 +65,7 @@ kresult test__diosix_fork(void)
    /* test the child can run */
    child = test__diosix_fork_child();
    if(child != success) return e_failure;
-   
+      
    /* fall through to success */
    return success;
 }

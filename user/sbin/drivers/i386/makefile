@@ -7,8 +7,8 @@ all:	makefile
 	make -C ps2kbd
 	make -C pcimngr
 	make -C rtl8139
+	make -C serial
 	
-	# ata is unfinished, serial is a test driver
+	# ata is unfinished
 	# make -C ata
-	# make -C serial
 

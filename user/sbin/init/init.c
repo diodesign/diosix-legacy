@@ -68,9 +68,7 @@ int main(void)
    diosix_set_role(DIOSIX_ROLE_SYSTEM_EXECUTIVE);
 
    init_pid = getpid();
-   
-   diosix_debug_write(buffer);
-   
+      
    kernel_signals_thread = diosix_thread_fork();
    if(kernel_signals_thread == 0) process_kernel_signals();
    

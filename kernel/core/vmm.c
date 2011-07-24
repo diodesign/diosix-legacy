@@ -1790,7 +1790,7 @@ kresult vmm_add_vma(process *proc, unsigned int base, unsigned int size,
    /* sanity check, no null pointers, zero sizes or overflows */
    if(!base || !size) return e_bad_params;
    if(base >= (unsigned int)(base + size)) return e_bad_params; 
-      
+
    /* round down the base to 4K page multiples and calculate 
       new size to ensure the vma covers a whole number of pages */
    base = base & ~MEM_PGMASK;
