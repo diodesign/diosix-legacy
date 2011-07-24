@@ -64,6 +64,9 @@ void serial_initialise(void);
 #define X86_IOPORT_MAXWORDS   (2048) /* number of 32bit words in (2^16)-bit IO port access bitmap */
 #define X86_IOPORT_BITMAPSIZE (X86_IOPORT_MAXWORDS * sizeof(unsigned int))
 
+/* CR0 flags */
+#define X86_CR0_TS            (1 << 3)
+
 /* probe the CPU for features, return data in eax,ebx,ecx,edx */
 #define x86_cpuid(func,ax,bx,cx,dx) \
    __asm__ __volatile__ ("cpuid" : "=a" (ax), "=b" (bx), "=c" (cx), "=d" (dx) : "a" (func));
@@ -100,5 +103,32 @@ void lowlevel_kickstart(void);
 void lowlevel_ioports_clone(process *new, process *current);
 void lowlevel_ioports_new(process *new);
 unsigned int x86_test_and_set(unsigned int value, volatile unsigned int *lock); /* defined in start.s */
+
+/* fp stuff */
+
+/* when KernelFPPresent is zero then an FPU is present, otherwise the word contains garbage */
+#define X86_FPU_PRESENT            (0)
+#define X86_FPU_STATE_PADDING      (16)   /* state block must be stored on 16-byte boundary */
+#define X86_FPU_STATE_ALIGNMASK    (~(X86_FPU_STATE_PADDING - 1))
+#define X86_FPU_STATE_SIZE_PRESSE  (108)  /* for x87/MMX, from the Intel manuals */
+#define X86_FPU_STATE_SIZE_SSE     (512)  /* for x87/MMX/SSE/SSE2/SSE3/SSSE3/SSE4, from Intel manuals */
+
+extern unsigned short KernelFPConfig;
+extern unsigned short KernelFPPresent;
+extern unsigned char KernelSIMDPresent;
+kresult fpu_restore_state(thread *target);
+kresult fpu_save_state(thread *target);
+
+/* types of FPU unit the kernel is aware of, see _loader in locore.s
+   which is where the system's SIMD type is detected and stored in
+   KernelSIMDPresent */
+typedef enum
+{
+   fpu_type_basic = 0,
+   fpu_type_mmx   = 1,
+   fpu_type_sse   = 2,
+   fpu_type_sse2  = 3,
+   fpu_type_sse3  = 4
+} fpu_type;
 
 #endif

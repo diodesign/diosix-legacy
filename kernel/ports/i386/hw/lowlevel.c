@@ -568,7 +568,7 @@ void x86_timer_init(unsigned char freq)
 
 /* x86_load_cr3
    Reload the page directory base register with a new physical address
-   => ptr = value to move into cr3
+   => ptr = value to move into CR3
 */
 void x86_load_cr3(void *ptr)
 {
@@ -578,12 +578,33 @@ void x86_load_cr3(void *ptr)
 }
 
 /* x86_read_cr2
- <= return the contents of CR2 (faulting address reg)
+   <= return the contents of CR2 (faulting address reg)
  */
 unsigned int x86_read_cr2(void)
 {
    unsigned int ret_val;
    __asm__ __volatile__("movl %%cr2, %%eax"
+                        : "=a" (ret_val));
+   return ret_val;
+}
+
+/* x86_load_cr0
+   => val = value to move into CR0 (general processor control register)
+*/
+void x86_load_cr0(unsigned int val)
+{
+   __asm__ __volatile__("movl %%eax, %%cr0"
+                        :
+                        : "a"(val));
+}
+
+/* x86_read_cr0
+   <= return the contents of CR0 (general processor control register)
+*/
+unsigned int x86_read_cr0(void)
+{
+   unsigned int ret_val;
+   __asm__ __volatile__("movl %%cr0, %%eax"
                         : "=a" (ret_val));
    return ret_val;
 }
@@ -622,7 +643,20 @@ void x86_thread_switch(thread *now, thread *next, int_registers_block *regs)
               CPU_ID, regs->ds, regs->edi, regs->esi, regs->ebp, regs->esp, regs->ebx, regs->edx, regs->ecx, regs->eax,
               regs->intnum, regs->errcode, regs->eip, regs->cs, regs->eflags, regs->useresp, regs->ss);
    }
-      
+   
+   /* check to see if we have to preserve the FP context */
+   if(KernelFPPresent == X86_FPU_PRESENT)
+   {      
+      /* check to see if the thread running used FP.
+         if TS is cleared then FP was used */
+      if(now && !(x86_read_cr0() & X86_CR0_TS))
+         fpu_save_state(now); /* XXX can this fail here? the memory is already allocated */
+         
+      /* ensure TS is set in cr0 for the next thread. if it uses FP,
+         an exception will occur and we'll demand load its FP state */
+      x86_load_cr0(x86_read_cr0() | X86_CR0_TS);
+   }
+   
    /* preserve state of the thread */
    vmm_memcpy(&(now->regs), regs, sizeof(int_registers_block));
    
@@ -774,6 +808,12 @@ void x86_warm_kickstart(void)
    }
 #endif
    
+   /* prepare FP support if needed */
+   if(KernelFPPresent == X86_FPU_PRESENT)
+   /* ensure TS is set in cr0 for the next thread. if it uses FP,
+    an exception will occur and we'll demand load its FP state */
+      x86_load_cr0(x86_read_cr0() | X86_CR0_TS);
+   
    /* now return to the usermode thread - all the registers are stacked up in the 
       thread's reg block - see int_handler in locore.s for this return code */
    regs->eflags |= 0x200; /* iret must reenable interrupts so force the flag */
@@ -827,6 +867,12 @@ void x86_kickstart(thread *torun)
    torun->timeslice = SCHED_TIMESLICE;
    cpu_table[CPU_ID].current = torun;
    torun->flags |= THREAD_FLAG_INUSERMODE; /* well, we're about to be.. */
+   
+   /* prepare FP support if needed */
+   if(KernelFPPresent == X86_FPU_PRESENT)
+      /* ensure TS is set in cr0 for the next thread. if it uses FP,
+      an exception will occur and we'll demand load its FP state */
+      x86_load_cr0(x86_read_cr0() | X86_CR0_TS);
    
    /* assume we're going to kickstart an i386-elf, so prepare the stack pointer appropriately.
       the page holding the stack will have been zero'd, so we just move the ptr down a few words
@@ -988,13 +1034,8 @@ void lowlevel_proc_preinit(void)
    x86_proc_preinit();
 }
 
-extern unsigned short KernelFPPresent;
-extern unsigned char KernelSIMDPresent;
-
 void lowlevel_kickstart(void)
 {   
-   dprintf("lowlevel_kickstart: FP test word = %x, SIMD level = %i\n",
-           KernelFPPresent, KernelSIMDPresent);
    x86_kickstart(NULL);
 }
 

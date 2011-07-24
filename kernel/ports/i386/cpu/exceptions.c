@@ -59,28 +59,67 @@ void exception_handler(int_registers_block regs)
          XPT_DEBUG("[xpt:%i] DOUBLE FAULT: code %i (%x)\n",
                    CPU_ID, regs.errcode, regs.errcode & ((1 << 16) - 1));
 
-         proc_kill(cpu_table[CPU_ID].current->proc->pid, cpu_table[CPU_ID].current->proc);
+         syscall_do_exit(&regs);
          break;
+         
+      case INT_FPTRAP: /* FPU NOT PRESENT / TRAP */
+         XPT_DEBUG("[xpt:%i] FPU not present / trap exception\n", CPU_ID);
+         if(KernelFPPresent == X86_FPU_PRESENT)
+         {
+            /* don't forget to clear the TS bit */
+            __asm__ __volatile__("clts");
+            
+            /* FPU present, so load the FP registers with this thread's FP state */
+            if(fpu_restore_state(cpu_table[CPU_ID].current) == success)
+               break;
+            
+            /* failed to restore or create a blank FP state - kill the process because we can
+               no longer guarantee its environment */
+            KOOPS_DEBUG("OMGWTF! Failed to restore/create FP state of thread %i of process %i\n",
+                        cpu_table[CPU_ID].current->tid, cpu_table[CPU_ID].current->proc->pid);
+            syscall_do_exit(&regs);
+            break;
+         }
+         
+         /* fall through to undefined instruction... */
+         
+      case INT_UNDEFINSTR: /* UNDEFINED INSTRUCTION */
+         XPT_DEBUG("[xpt:%i] Undefined instruction exception\n", CPU_ID);
+         if(regs.eip > KERNEL_SPACE_BASE)
+         {
+            KOOPS_DEBUG("[xpt:%i] UD: code %i (0x%x) eip %x\n"
+                        "        ds %x edi %x ebp %x esp %x\n"
+                        "        eax %x cs %x eflags %x useresp %x ss %x\n",
+                        CPU_ID, regs.errcode, regs.errcode, regs.eip,
+                        regs.ds, regs.edi, regs.ebp, regs.esp,
+                        regs.eax, regs.cs, regs.eflags, regs.useresp, regs.ss);
+            debug_stacktrace();
+            debug_panic("unhandled serious fault in the kernel");
+         }
+         else
+            /* this process is broken, so default action is shoot to kill */
+            syscall_do_exit(&regs);
+         break;
+         
          
       case INT_GPF: /* GENERAL PROTECTION FAULT */
          if(regs.eip > KERNEL_SPACE_BASE)
          {
-            XPT_DEBUG("[xpt:%i] GPF: code %i (0x%x) eip %x\n"
-                      "        ds %x edi %x ebp %x esp %x\n"
-                      "        eax %x cs %x eflags %x useresp %x ss %x\n",
-                      CPU_ID, regs.errcode, regs.errcode, regs.eip,
-                      regs.ds, regs.edi, regs.ebp, regs.esp,
-                      regs.eax, regs.cs, regs.eflags, regs.useresp, regs.ss);
+            KOOPS_DEBUG("[xpt:%i] GPF: code %i (0x%x) eip %x\n"
+                        "        ds %x edi %x ebp %x esp %x\n"
+                        "        eax %x cs %x eflags %x useresp %x ss %x\n",
+                        CPU_ID, regs.errcode, regs.errcode, regs.eip,
+                        regs.ds, regs.edi, regs.ebp, regs.esp,
+                        regs.eax, regs.cs, regs.eflags, regs.useresp, regs.ss);
             debug_stacktrace();
             debug_panic("unhandled serious fault in the kernel");
          }
          else
          {
             /* if this process was already trying to handle a GPF then kill it.
-               the kernel's signal code in msg.c will clear this bit when the
-               thread next */
-            if(cpu_table[CPU_ID].current->proc->unix_signals_inprogress & (1 << SIGBUS))
-               proc_kill(cpu_table[CPU_ID].current->proc->pid, cpu_table[CPU_ID].current->proc);
+               the kernel's signal code in msg.c will clear this bit */
+             if(cpu_table[CPU_ID].current->proc->unix_signals_inprogress & (1 << SIGBUS))
+               syscall_do_exit(&regs);
             else
             {
                /* mark this process as attempting to handle the fault */
@@ -88,7 +127,11 @@ void exception_handler(int_registers_block regs)
                
                if(msg_send_signal(cpu_table[CPU_ID].current->proc, NULL, SIGBUS, 0))
                   /* something went wrong, so default action is shoot to kill */
-                  proc_kill(cpu_table[CPU_ID].current->proc->pid, cpu_table[CPU_ID].current->proc);
+                  syscall_do_exit(&regs);
+               else
+                  /* sleep this thread until it's woken up by the signal handler */
+                  sched_remove(cpu_table[CPU_ID].current, waitingaftersig);
+
             }
          }
          break;
@@ -111,8 +154,13 @@ void exception_handler(int_registers_block regs)
                {
                   /* something went wrong, so shoot to kill */
                   regs.eax = POSIX_GENERIC_FAILURE;
+                  dprintf("*** going to kill process %i (in thread %i)\n",
+                          cpu_table[CPU_ID].current->proc->pid, cpu_table[CPU_ID].current->tid);
                   syscall_do_exit(&regs);
                }
+               else
+                  /* sleep this thread until it's woken up by the signal handler */
+                  sched_remove(cpu_table[CPU_ID].current, waitingaftersig);
             }
          }
          break;
@@ -214,8 +262,8 @@ void exception_handler(int_registers_block regs)
          break;
       
       default:
-         XPT_DEBUG("[xpt:%i] unhandled exception %x/%x received!\n",
-                   CPU_ID, regs.intnum, regs.errcode);
+         KOOPS_DEBUG("[xpt:%i] OMGWTF! unhandled exception %x/%x received!\n",
+                     CPU_ID, regs.intnum, regs.errcode);
    }
    
    /* there might be a thread of a higher-priority waiting to be run or the current process

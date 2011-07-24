@@ -130,6 +130,8 @@ kresult irq_deregister_driver(unsigned int irq_num, unsigned int type, process *
 #define int_disable  x86_disable_interrupts
 
 /* interrupt numbers and flags */
+#define INT_UNDEFINSTR     (6)
+#define INT_FPTRAP         (7)
 #define INT_DOUBLEF        (8)
 #define INT_GPF            (13)
 #define INT_PF             (14)
