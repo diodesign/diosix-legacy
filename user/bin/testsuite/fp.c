@@ -42,7 +42,7 @@ kresult test__fp_addition(void)
    
    if(sibling)
    {
-      x = 1.01;
+      x = 1.23;
 
       /* spin the older sibling waiting for the worker thread to finish */
       while(!fp_child_flag) diosix_thread_yield();
@@ -54,7 +54,10 @@ kresult test__fp_addition(void)
       
       while(y < 100.00)
       {
+         char buffer[100];
          y = y + 23.01;
+         snprintf(buffer, 100, "y = %f\n", y);
+         diosix_debug_write(buffer);
          diosix_thread_yield();
       }
       
@@ -64,7 +67,7 @@ kresult test__fp_addition(void)
    }
    
    /* check to see that this thread's FP context is untampered */
-   if(x != 1.01) return e_failure;
+   if((int)x != 1) return e_failure;
    
    return success;
 }
