@@ -840,7 +840,7 @@ kresult proc_initialise(void)
          
          if(payload.areas[PAYLOAD_CODE].flags & (PAYLOAD_READ | PAYLOAD_EXECUTE))
          {
-            unsigned int code_virtual_flags = VMA_READABLE | VMA_FIXED | VMA_EXECUTABLE | VMA_TEXT;
+            unsigned int code_virtual_flags = VMA_READABLE | VMA_FIXED | VMA_EXECUTABLE | VMA_TEXT | VMA_MEMSOURCE;
             unsigned int code_physical_flags = PG_PRESENT | PG_PRIVLVL;
 
             virtual = (unsigned int)payload.areas[PAYLOAD_CODE].virtual;
@@ -870,7 +870,7 @@ kresult proc_initialise(void)
          if(payload.areas[PAYLOAD_DATA].flags & (PAYLOAD_READ))
          {
             unsigned int pflags = PG_PRESENT | PG_PRIVLVL;
-            unsigned int vflags = VMA_FIXED | VMA_DATA;
+            unsigned int vflags = VMA_FIXED | VMA_DATA | VMA_MEMSOURCE;
             
             if(payload.areas[PAYLOAD_DATA].flags & PAYLOAD_WRITE)
             {

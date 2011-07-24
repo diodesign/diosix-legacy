@@ -70,7 +70,7 @@ kresult pg_do_fault(thread *target, unsigned int faultaddr, unsigned int cpuflag
    
    /* use to mark new pages as read-only or read-write */
    if(rw_flag) rw_flag = PG_RW;
-   
+
    switch(decision)
    {
       case newsharedpage:
@@ -370,7 +370,7 @@ unsigned int **pg_clone_pgdir(unsigned int **source)
             /* if page is writeable, then disable writing so we can later fault and
                perform the copy-on-write */
             if(pgtable[page] & PG_RW)
-            {
+            {               
                /* in the child */
                pgtable[page] = pgtable[page] & (~(PG_RW | PG_PRIVATE)); /* clear R/W + private flags */
                
@@ -399,12 +399,12 @@ unsigned int **pg_clone_pgdir(unsigned int **source)
 }
 
 /* pg_new_process
- Called when a new process is being created so port-specific stuff
- can take place. We'll base 
- => new = pointer to process structure
- current = pointer or NULL for initial system processes
- <= 0 for success or an error code
- */
+   Called when a new process is being created so port-specific stuff
+   can take place. We'll base 
+   => new = pointer to process structure
+      current = pointer or NULL for initial system processes
+   <= 0 for success or an error code
+*/
 kresult pg_new_process(process *new, process *current)
 {
    unsigned int **pgdir;
