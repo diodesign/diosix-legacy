@@ -31,6 +31,7 @@ typedef enum
    running,           /* in queue, is running, not waiting */
    waitingforreply,   /* not in queue, not running, waiting for a msg reply */
    waitingformsg,     /* not in queue, not running, waiting for a non-reply msg */
+   waitingaftersig,   /* not in queue, not running, waiting after a signal interrupted it */
    held,              /* not in queue, not running, forced to wait by a senior process */
    dead               /* not in queue, not running, not waiting, soon to be destroyed */
 } thread_state;
@@ -131,8 +132,10 @@ struct thread
    unsigned int stackbase; /* where this thread's user stack should start */
    unsigned int kstackbase, kstackblk; /* kernel stack ptrs */
    
-   int_registers_block regs; /* saved state of a thread */
-   tss_descr *tss; /* pointer to the task-state block */
+   /* port implementation specific stuff */
+   int_registers_block regs; /* saved general purpose register state of a thread */
+   void *fp; /* saved state of the thread's floating-point state */
+   tss_descr *tss; /* x86 - pointer to the task-state block */
 };
 
 /* process status flags (scheduling) */

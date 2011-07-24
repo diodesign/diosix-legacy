@@ -592,7 +592,7 @@ do_proc_kill:
    else
       /* we were the hash table entry head, so fixup table */
       proc_table[victim->pid % PROC_HASH_BUCKETS] = victim->hash_next;
-   lock_gate(&proc_lock, LOCK_WRITE);
+   unlock_gate(&proc_lock, LOCK_WRITE);
    
    /* destroy the threads */
    thread_kill(victim, NULL);
