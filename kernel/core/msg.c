@@ -646,7 +646,6 @@ kresult msg_send(thread *sender, diosix_msg_info *msg)
    if(pg_preempt_fault(receiver, (unsigned int)(rmsg->recv), rmsg->recv_max_size, VMA_WRITEABLE))
    {
       unlock_gate(&(receiver->lock), LOCK_WRITE);
-      unlock_gate(&(receiver->proc->lock), LOCK_READ); /* give up the process lock */
       
       /* let the receiver know about its buffer screw up */
       syscall_post_msg_recv(receiver, e_bad_target_address);
@@ -840,7 +839,6 @@ kresult msg_recv(thread *receiver, diosix_msg_info *msg)
          if(pg_preempt_fault(sender, (unsigned int)(smsg->send), smsg->send_size, VMA_READABLE))
          {
             unlock_gate(&(sender->lock), LOCK_READ);
-            unlock_gate(&(receiver->lock), LOCK_WRITE);
             
             /* let the sender know about its buffer screw up and wake it up */
             syscall_post_msg_send(sender, e_bad_source_address);
