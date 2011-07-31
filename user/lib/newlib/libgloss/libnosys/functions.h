@@ -102,6 +102,7 @@ unsigned int diosix_memory_locate(void **ptr, unsigned int type);
 /* debugging */
 unsigned int diosix_debug_write(const char *ptr);
 
+
 /* --------------------------------------------
    interface with the vfs 
    -------------------------------------------- */

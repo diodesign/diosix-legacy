@@ -54,22 +54,13 @@ kresult test__fp_addition(void)
       
       while(y < 100.00)
       {
-         char buffer[100];
          y += 23.01;
-         snprintf(buffer, 100, "variable in thread 2 = %f (z = %f)\n", y, z);
-         diosix_debug_write(buffer);
          diosix_thread_yield();
       }
       
       /* signal we're done and clean up */
       fp_child_flag = 1;
       diosix_thread_exit(0);
-   }
-   
-   {
-      char buffer[100];
-      snprintf(buffer, 100, "control value in thread 1 = %f (z = %f)\n", x, z);
-      diosix_debug_write(buffer);
    }
    
    /* check to see that this thread's FP context is untampered */

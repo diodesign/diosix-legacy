@@ -34,6 +34,7 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 test_def test_list[] = { test__is_running, "testsuite running",
                          test__diosix_fork, "direct fork syscall",
                          test__fp_addition, "fp: addition",
+                         test__msg_send, "ipc: send a simple message",
                          NULL, "" }; /* last item */
 
 /* ------------------------------------------------------------------------ */

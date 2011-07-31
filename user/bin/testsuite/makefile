@@ -21,7 +21,7 @@ OBJSDIR = ../../../build/$(ARCH)_$(ARCH_TARGET)/testsuite
 FLAGS		= -O2 -std=c99 -Wall -static -I../../lib/newlib/libgloss/libnosys
 CC		= $(PREFIX)gcc $(FLAGS)
 LD		= $(PREFIX)gcc $(FLAGS)
-OBJS	 	= $(OBJSDIR)/main.o $(OBJSDIR)/posix.o $(OBJSDIR)/fp.o
+OBJS	 	= $(OBJSDIR)/main.o $(OBJSDIR)/posix.o $(OBJSDIR)/fp.o $(OBJSDIR)/msg.o
 
 # targets
 all: testsuite
@@ -36,6 +36,10 @@ $(OBJSDIR)/posix.o:	posix.c	defs.h makefile
 			$(Q)$(CC) -c -o $@ $<
 
 $(OBJSDIR)/fp.o:	fp.c	defs.h makefile
+			$(WRITE) '==> COMPILE: $<'
+			$(Q)$(CC) -c -o $@ $<
+
+$(OBJSDIR)/msg.o:	msg.c	defs.h makefile
 			$(WRITE) '==> COMPILE: $<'
 			$(Q)$(CC) -c -o $@ $<
 

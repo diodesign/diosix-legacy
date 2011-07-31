@@ -25,7 +25,7 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 /* define a test's structure */
 typedef struct
 {
-   int (*func)(void); /* test function */
+   kresult (*func)(void); /* test function */
    const char *comment; /* human-readable string for the log */
 } test_def;
 
@@ -36,12 +36,14 @@ typedef enum
 {
    test_is_running = 0,
    test_diosix_fork = 1,
-   test_fp_addition = 2
+   test_fp_addition = 2,
+   test_msg_send = 3
 } test_nr;
 
 /* test functions */
 kresult test__is_running(void);
 kresult test__diosix_fork(void);
 kresult test__fp_addition(void);
+kresult test__msg_send(void);
 
 #endif
