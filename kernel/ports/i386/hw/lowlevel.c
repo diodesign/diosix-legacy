@@ -631,11 +631,21 @@ void x86_proc_preinit(void)
 void x86_thread_switch(thread *now, thread *next, int_registers_block *regs)
 {
    tss_descr *new_tss;
-   
+
+   /* bail out if invalid pointers */
+   if(!now || !regs)
+   {
+      KOOPS_DEBUG("OMGWTF! x86_thread_switch() called with invalid pointer: now = %p, next = %p, regs = %p\n",
+                  now, next, regs);
+      debug_panic("x86_thread_switch() cannot continue with a wild pointer");
+      /* shouldn't return */
+   }
+      
+#ifdef LOLVL_DEBUG
    if(next)
    {
       new_tss = next->tss;
-   
+         
       LOLVL_DEBUG("[x86:%i] switching thread %p for %p (regs %p state %i) (ds/ss %x cs %x ss0 %x esp0 %x)\n",
               CPU_ID, now, next, regs, next->state, new_tss->ss, new_tss->cs, new_tss->ss0, new_tss->esp0);
       LOLVL_DEBUG("[x86:%i] PRE-SWAP: ds %x edi %x esi %x ebp %x esp %x ebx %x edx %x ecx %x eax %x\n"
@@ -643,13 +653,14 @@ void x86_thread_switch(thread *now, thread *next, int_registers_block *regs)
               CPU_ID, regs->ds, regs->edi, regs->esi, regs->ebp, regs->esp, regs->ebx, regs->edx, regs->ecx, regs->eax,
               regs->intnum, regs->errcode, regs->eip, regs->cs, regs->eflags, regs->useresp, regs->ss);
    }
+#endif
    
    /* check to see if we have to preserve the FP context */
    if(KernelFPPresent == X86_FPU_PRESENT)
    {      
       /* check to see if the thread running used FP.
          if TS is cleared then FP was used */
-      if(now && !(x86_read_cr0() & X86_CR0_TS))
+      if(!(x86_read_cr0() & X86_CR0_TS))
          fpu_save_state(now); /* XXX can this fail here? the memory is already allocated */
          
       /* ensure TS is set in cr0 for the next thread. if it uses FP,
@@ -659,22 +670,23 @@ void x86_thread_switch(thread *now, thread *next, int_registers_block *regs)
    
    /* preserve state of the thread */
    vmm_memcpy(&(now->regs), regs, sizeof(int_registers_block));
-   
+
    if(next)
    {
       /* load state for new thread */
       vmm_memcpy(regs, &(next->regs), sizeof(int_registers_block));
-      
+
       LOLVL_DEBUG("[x86:%i] POST-SWAP: ds %x edi %x esi %x ebp %x esp %x ebx %x edx %x ecx %x eax %x\n"
-              "      intnum %x errcode %x eip %x cs %x eflags %x useresp %x ss %x\n",
-              CPU_ID, regs->ds, regs->edi, regs->esi, regs->ebp, regs->esp, regs->ebx, regs->edx, regs->ecx, regs->eax,
-              regs->intnum, regs->errcode, regs->eip, regs->cs, regs->eflags, regs->useresp, regs->ss);
+                  "      intnum %x errcode %x eip %x cs %x eflags %x useresp %x ss %x\n",
+                  CPU_ID, regs->ds, regs->edi, regs->esi, regs->ebp, regs->esp, regs->ebx, regs->edx, regs->ecx, regs->eax,
+                  regs->intnum, regs->errcode, regs->eip, regs->cs, regs->eflags, regs->useresp, regs->ss);
       
       /* reload page directory if we're switching to a new address space */
       if(now->proc->pgdir != next->proc->pgdir)
          x86_load_cr3(KERNEL_LOG2PHYS(next->proc->pgdir));
       
       /* inform the CPU that things have changed */
+      new_tss = next->tss;
       new_tss->esp0 = next->kstackbase;
       x86_change_tss(&(cpu_table[CPU_ID].gdtptr),
                      cpu_table[CPU_ID].tssentry, new_tss,
@@ -700,7 +712,12 @@ kresult x86_init_tss(thread *toinit)
    if(toinit->tss)
    {
       if(vmm_free(toinit->tss))
+      {
+         KOOPS_DEBUG("[x86:%i] OMGWTF! x86_init_tss: failed to free previous TSS %p from thread %p (tid %i pid %i)\n",
+                     CPU_ID, toinit->tss, toinit, toinit->tid, toinit->proc->pid);
          return e_failure;
+      }
+
       toinit->tss = NULL;
    }
 
@@ -712,7 +729,11 @@ kresult x86_init_tss(thread *toinit)
          
    /* allocate a new TSS */
    if(vmm_malloc((void **)&(toinit->tss), size_req))
+   {
+      KOOPS_DEBUG("[x86:%i] OMGWTF! x86_init_tss: failed to allocate %i bytes for TSS for thread %p (tid %i pid %i)\n",
+                  CPU_ID, size_req, toinit, toinit->tid, toinit->proc->pid);
       return e_failure;
+   }
 
    /* copy in the process's IO map into the TSS if required, the IO
       map will be located at the end of the tss_descr structure */
@@ -730,7 +751,7 @@ kresult x86_init_tss(thread *toinit)
    tss->ss0 = 0x10; /* kernel stack seg (aka data seg) for the IRQ handler */
    tss->esp0 = toinit->kstackbase;
    tss->iomap_base = sizeof(tss_descr);
-   
+
    LOLVL_DEBUG("[x86:%i] initialised TSS %p size %i for thread %p tid %i pid %i\n",
                CPU_ID, tss, size_req, toinit, toinit->tid, toinit->proc->pid);
    
@@ -748,6 +769,9 @@ void x86_change_tss(gdtptr_descr *cpugdt, gdt_entry *gdt, tss_descr *tss, unsign
 {
    unsigned int base = (unsigned int)tss;
    unsigned int limit = sizeof(tss_descr);
+   
+   /* sanity checks */
+   if(!cpugdt || !gdt || !tss) debug_panic("x86_change_tss() called with a NULL pointer");
    
    /* calculate the correct size of the TSS */
    if(flags & THREAD_FLAG_HASIOBITMAP)
@@ -959,7 +983,7 @@ void lowlevel_thread_switch(thread *now, thread *next, int_registers_block *regs
    }
    unlock_spin(&(irq_lock.spinlock));
 #endif
-
+   
    /* if the thread is already in usermode then switch to it */
    if(next->flags & THREAD_FLAG_INUSERMODE)
    {
@@ -970,7 +994,7 @@ void lowlevel_thread_switch(thread *now, thread *next, int_registers_block *regs
    else
    {
       LOLVL_DEBUG("[x86:%i] switching to cold thread %i process %i (%p) from thread %i process %i (%p)\n",
-                   CPU_ID, next->tid, next->proc->pid, next, now->tid, now->proc->pid, now);
+                  CPU_ID, next->tid, next->proc->pid, next, now->tid, now->proc->pid, now);
       
       /* suspend the currently running thread */
       x86_thread_switch(now, NULL, regs);

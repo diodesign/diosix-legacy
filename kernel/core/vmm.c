@@ -89,6 +89,16 @@ kresult vmm_malloc(void **addr, unsigned int size)
 
    VMM_DEBUG("[vmm:%i] request to allocate %i bytes (rounded up to %i)\n", CPU_ID,
              size, required_capacity);
+
+/* define VMM_MALLOC_OVERSIZE_DEBUG to report larger-than-page-size allocation equests */
+#ifdef VMM_MALLOC_OVERSIZE_DEBUG
+   if(required_capacity > MEM_PGSIZE)
+   {
+      KOOPS_DEBUG("[vmm:%i] VMM_MALLOC_OVERSIZE_DEBUG set: vmm_malloc() called with size %i (greater than page size)\n",
+                  CPU_ID, size);
+      debug_stacktrace();
+   }
+#endif
    
    /* scan through free list to find the first block that will fit the
       requested size */
@@ -127,8 +137,8 @@ kresult vmm_malloc(void **addr, unsigned int size)
          result = vmm_ensure_pgs(required_capacity, type);
          if(result)
          {
-            VMM_DEBUG("[vmm:%i] failed to grab physical pages for kernel heap (req size %i bytes)\n",
-                    CPU_ID, required_capacity);
+            VMM_DEBUG("[vmm:%i] failed to ensure physical pages for kernel heap (req size %i bytes)\n",
+                      CPU_ID, required_capacity);
             unlock_gate(&(vmm_lock), LOCK_WRITE);
             return result; /* give up otherwise */
          }
@@ -924,7 +934,7 @@ kresult vmm_req_phys_pages(unsigned short pages, void **ptr, unsigned int pref)
          unlock_gate(&(vmm_lock), LOCK_READ);
          return err;
       }
-      
+            
       if(!base)
          base = (unsigned int)addr;
       else
@@ -1117,14 +1127,16 @@ kresult vmm_enough_pgs(unsigned int size)
 /* vmm_ensure_pgs
    Check that there is a contiguous run of physical pages available in the
    given area. Note: it will only check the selected type of mem.
+   it will also rearrange the page stack to accommodate the physical page
+   run, if possible.
    => size = number of bytes to check for
       type = 0 for DMA-able memory, 2 for non-DMA-able
 */
 kresult vmm_ensure_pgs(unsigned int size, int type)
 {
-   unsigned int pg_loop;
-   unsigned int *pg_ptr, *pg_base;
-   
+   unsigned int pgs_required, pg_run_count;
+   unsigned int *pg_ptr, *pg_base, *pg_ptr_saved, *pg_run_start;
+
    lock_gate(&(vmm_lock), LOCK_READ);
 
    /* are we checking DMA-able physical memory? */
@@ -1138,42 +1150,89 @@ kresult vmm_ensure_pgs(unsigned int size, int type)
       pg_ptr = phys_pg_stack_high_ptr;
       pg_base = phys_pg_stack_high_base;
    }
-
+   
    /* find number of pages fitting into size, rounding down for the benefit
       of the following checks. make sure physical pages are avaliable and
       that there's enough to bother checking before continuing. */
-   pg_loop = (size / MEM_PGSIZE); 
+   pgs_required = (MEM_PG_ROUND_UP(size) / MEM_PGSIZE); 
    
-   if(pg_ptr > pg_base)
+   if(pg_ptr >= pg_base)
    {
       unlock_gate(&(vmm_lock), LOCK_READ);
       return e_no_phys_pgs;
    }
    
-   if((pg_base - pg_ptr) < pg_loop)
+   if((pg_base - pg_ptr) < pgs_required)
    {
       unlock_gate(&(vmm_lock), LOCK_READ);
       return e_no_phys_pgs;
    }
 
+   /* a request for one or zero pages will always succeed if there's any pages in the stack */
+   if(pgs_required < 2)
+   {
+      unlock_gate(&(vmm_lock), LOCK_READ);
+      return success;
+   }
+
+   /* save a copy of the page stack pointer in case we have to
+      do a little stack rewriting */
+   pg_ptr_saved = pg_ptr;
+   
+   /* mark the start of the first search for a run of contig pages */
+   pg_run_start = pg_ptr;
+   pg_run_count = 0;
+
    /* we check to see if there is a run of contiguous stack frame pointers
       that descend in value as the loop moves up towards the stack base */
-   while(pg_loop)
+   while((unsigned int)pg_ptr < (unsigned int)pg_base - sizeof(unsigned int))
    {
       unsigned int *pg_next = pg_ptr;
       pg_next++;
 
       if(*pg_ptr != (*pg_next + MEM_PGSIZE))
       {
-         unlock_gate(&(vmm_lock), LOCK_READ);
-         return e_not_contiguous;
+         /* restart the run */
+         pg_run_count = 0;
+         pg_run_start = pg_next;
+         pg_ptr = pg_next;
       }
-      pg_loop--;
-      pg_ptr++;
+      else
+      {
+         if(pg_run_count == pgs_required)
+         {
+            unsigned int pg_loop;
+         
+            /* success, but do we need to move these page stack entries to the top? */
+            if(pg_ptr_saved == pg_run_start)
+            {
+               unlock_gate(&(vmm_lock), LOCK_READ);
+               return success;
+            }
+            
+            /* we have to rewrite the page stack */
+            lock_gate(&(vmm_lock), LOCK_WRITE);
+
+            for(pg_loop = 0; pg_loop < pgs_required; pg_loop++)
+            {
+               unsigned int temp = pg_ptr_saved[pg_loop];
+               pg_ptr_saved[pg_loop] = pg_run_start[pg_loop];
+               pg_run_start[pg_loop] = temp;
+            }
+            
+            unlock_gate(&(vmm_lock), LOCK_WRITE);
+            unlock_gate(&(vmm_lock), LOCK_READ);
+            return success;
+         }
+         
+         /* keep checking this run */
+         pg_run_count++;
+         pg_ptr++;
+      }
    }
 
    unlock_gate(&(vmm_lock), LOCK_READ);
-   return success; /* managed to find run of pages */
+   return e_not_contiguous;
 }
 
 /* -------------------------------------------------------------------------
