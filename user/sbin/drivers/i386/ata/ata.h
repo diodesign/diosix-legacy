@@ -32,14 +32,14 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #define ATA_IRQ_SECONDARY        (15)
 
 /* command/status bits */
-#define ATA_SR_BSY               (0x80)
-#define ATA_SR_DRDY              (0x40)
-#define ATA_SR_DF                (0x20)
-#define ATA_SR_DSC               (0x10)
-#define ATA_SR_DRQ               (0x08)
-#define ATA_SR_CORR              (0x04)
-#define ATA_SR_IDX               (0x02)
-#define ATA_SR_ERR               (0x01)
+#define ATA_SR_BSY               (1 << 7)
+#define ATA_SR_DRDY              (1 << 6)
+#define ATA_SR_DFAULT            (1 << 5)
+#define ATA_SR_DSEEKCCOMPLETE    (1 << 4)
+#define ATA_SR_DRQ               (1 << 3)
+#define ATA_SR_CORR              (1 << 2)
+#define ATA_SR_IDX               (1 << 1)
+#define ATA_SR_ERR               (1 << 0)
 
 /* features/errors bits */
 #define ATA_ER_BBK               (0x80)
@@ -71,46 +71,57 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #define ATAPI_CMD_EJECT          (0x1b)
 
 /* ATA_CMD_IDENTIFY_PACKET and ATA_CMD_IDENTIFY return
-   a 512-byte block of information; these are the
-   offsets we're interested in */
+   a 256 x 16-bit block of information; these are the
+   16-bit word indices we're interested in */
 #define ATA_IDENT_DEVICETYPE     (0)
-#define ATA_IDENT_CYLINDERS      (2)
-#define ATA_IDENT_HEADS          (6)
-#define ATA_IDENT_SECTORS        (12)
-#define ATA_IDENT_SERIAL         (20)
-#define ATA_IDENT_MODEL          (54)
-#define ATA_IDENT_CAPABILITIES   (98)
-#define ATA_IDENT_FIELDVALID     (106)
-#define ATA_IDENT_MAX_LBA        (120)
-#define ATA_IDENT_COMMANDSETS    (164)
-#define ATA_IDENT_MAX_LBA_EXT    (200)
+#define ATA_IDENT_SERIALSTART    (10)
+#define ATA_IDENT_SERIALEND      (19)
+#define ATA_IDENT_MODELSTART     (27)
+#define ATA_IDENT_MODELEND       (46)
+#define ATA_IDENT_CAPABILITIES   (49)
+#define ATA_IDENT_FIELDVALID     (53)
+#define ATA_IDENT_MAX_LBA0       (60)
+#define ATA_IDENT_MAX_LBA1       (61)
+#define ATA_IDENT_COMMANDSET0    (82)
+#define ATA_IDENT_COMMANDSET1    (83)
+#define ATA_IDENT_COMMANDSET2    (84)
+#define ATA_IDENT_COMMANDSET3    (85)
+#define ATA_IDENT_COMMANDSET4    (86)
+#define ATA_IDENT_COMMANDSET5    (87)
+#define ATA_IDENT_ULTRADMAMODE   (88)
+#define ATA_IDENT_MAX_LBA_EXT0   (100)
+#define ATA_IDENT_MAX_LBA_EXT1   (101)
+#define ATA_IDENT_MAX_LBA_EXT2   (102)
+#define ATA_IDENT_MAX_LBA_EXT3   (103)
+#define ATA_IDENT_SECTORSIZE     (106)
+#define ATA_IDENT_MAXWORDS       (256) /* number of 16-bit words in the data block */
 
 /* each channel has a number of registers in IO space. these are the
-   offsets from BAR0 and BAR1 (or BAR2 and BAR3) */
+   offsets from BAR0 and BAR1 (or BAR2 and BAR3 for secondary channels) */
 #define ATA_REG_DATA             (0x00)   /* BAR0+0  RW */
 #define ATA_REG_ERROR            (0x01)   /* BAR0+1  R  */
 #define ATA_REG_FEATURES         (0x01)   /* BAR0+1  W  */
-#define ATA_REG_SECCOUNT0        (0x02)   /* BAR0+2  RW */
+#define ATA_REG_SECTORCOUNT      (0x02)   /* BAR0+2  RW */
 #define ATA_REG_LBA0             (0x03)   /* BAR0+3  RW */
 #define ATA_REG_LBA1             (0x04)   /* BAR0+3  RW */
 #define ATA_REG_LBA2             (0x05)   /* BAR0+5  RW */
 #define ATA_REG_HDDEVSEL         (0x06)   /* BAR0+6  RW */
 #define ATA_REG_COMMAND          (0x07)   /* BAR0+7  W  */
 #define ATA_REG_STATUS           (0x07)   /* BAR0+7  R  */
-#define ATA_REG_SECCOUNT1        (0x08)   /* BAR0+8  RW */
-#define ATA_REG_LBA3             (0x09)   /* BAR0+9  RW */
-#define ATA_REG_LBA4             (0x0a)   /* BAR0+10 RW */
-#define ATA_REG_LBA5             (0x0b)   /* BAR0+11 RW */
-#define ATA_REG_CONTROL          (0x0c)   /* BAR1+12 R  */
-#define ATA_REG_ALTSTATUS        (0x0c)   /* BAR1+2  W  */
+#define ATA_REG_OFFSET           (0x10)   /* use this to differentiate command IO ports and control IO ports */
+#define ATA_REG_CONTROL          (0x02 + ATA_REG_OFFSET)   /* BAR1+2  W  */
+#define ATA_REG_ALTSTATUS        (0x02 + ATA_REG_OFFSET)   /* BAR1+2  R  */
 
 /* select the correct interface, drive and channel */
 #define SELECT_ATA               (0x00)
 #define SELECT_ATAPI             (0x01)
 #define ATA_MASTER               (0x00)
 #define ATA_SLAVE                (0x01)
+#define ATA_MAX_DEVS_PER_CHANNEL (2)
 #define ATA_PRIMARY              (0x00)
 #define ATA_SECONDARY            (0x01)
+#define ATA_MAX_CHANS_PER_CNTRLR (2)
+#define ATA_SELECT_DRIVE_SHIFT   (4)
 
 #define ATA_READ                 (0x00)
 #define ATA_WRITE                (0x01)
@@ -120,24 +131,49 @@ typedef enum
 {
    ata_type_unknown,
    ata_type_patapi, ata_type_satapi,
-   ata_type_pata, ata_type_sata;
+   ata_type_pata, ata_type_sata
 } ata_drive_type;
+
+/* drive status flags */
+#define ATA_DEVICE_PRESENT       (1 << 0)
+#define ATA_DEVICE_IS_ATA        (1 << 1)
+#define ATA_DEVICE_IS_ATAPI      (1 << 2)
 
 /* define a drive connected to a channel */
 typedef struct
 {
    ata_drive_type type;
    unsigned char flags; /* set status */
+   
+   /* data returned from the device */
+   unsigned short signature, capabilities;
+   unsigned int command_sets;
+   
+   /* capacity of the drive in sectors */
+   unsigned int size;
+   
+   /* ascii identification string */
+   unsigned char model[41];
 } ata_device;
 
 /* define a controller channel */
 typedef struct
 {
+   /* define the base IO port addresses for this channel */
    unsigned short ioport, control_ioport, busmaster_ioport;
-   unsigned char irq;
-   ata_device drive;
+   unsigned char irq, nIEN; /* nIEN is no interrupt */
+   
+   /* max of two devices per channel */
+   ata_device drive[ATA_MAX_DEVS_PER_CHANNEL];
 } ata_channel;
 
+/* how a device will describe itself when IDENTIFY'd */
+typedef struct
+{
+   unsigned short word[ATA_IDENT_MAXWORDS];
+} ata_identify_data;
+
+/* controller flags */
 #define ATA_CONTROLLER_PCI       (1 << 0)  /* controller is a PCI device */
 #define ATA_CONTROLLER_BUILTIN   (1 << 1)  /* controller is an ISA/chipset device */
 
@@ -152,10 +188,16 @@ typedef struct
    /* PCI interrupt handling */
    unsigned short irq_line, irq_pin;
    
-   /* hardware interfaces */
-   ata_channel primary;
-   ata_channel secondary;
+   /* hardware interfaces, max two per controller */
+   ata_channel channels[ATA_MAX_CHANS_PER_CNTRLR];
 } ata_controller;
+
+extern ata_controller controllers[ATA_MAX_CONTROLLERS];
+
+/* prototypes for functions in ata.c */
+unsigned char ata_detect_drives(ata_controller *controller);
+unsigned char ata_read_register(ata_controller *controller, unsigned char channel, unsigned char reg);
+void ata_write_register(ata_controller *controller, unsigned char chan, unsigned char reg, unsigned char data);
 
 /* prototype functions in fs.c */
 void wait_for_request(void);

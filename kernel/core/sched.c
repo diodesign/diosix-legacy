@@ -661,7 +661,7 @@ void sched_pick(int_registers_block *regs)
       sched_rescan_queues(CPU_ID);
       unlock_gate(&(cpu->lock), LOCK_WRITE);
    }
-
+   
    /* keep with the currently running thread if it's
       the highest priority thread allowed to run */
    if(next == now)

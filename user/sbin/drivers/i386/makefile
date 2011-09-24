@@ -8,7 +8,5 @@ all:	makefile
 	make -C pcimngr
 	make -C rtl8139
 	make -C serial
-	
-	# ata is unfinished
-	# make -C ata
+	make -C ata
 
