@@ -33,7 +33,7 @@ typedef struct pci_device pci_device;
 struct pci_device
 {
    unsigned short bus, slot;
-   unsigned short deviceid, vendorid, class;
+   unsigned short deviceid, vendorid, func, class;
    unsigned int pid;
    
    /* hash table links */
@@ -208,57 +208,70 @@ unsigned int lookup_pid_from_phys(unsigned short bus, unsigned short slot)
    Populate the class hash table of devices with detected cards */
 void discover_devices(void)
 {
-   unsigned short bus, slot, vendor, count = 0;
+   unsigned short bus, slot, func, vendor, count = 0;
    
    for(bus = 0; bus < (1 << 8); bus++)
       for(slot = 0; slot < (1 << 5); slot++)
-         if(pci_read_config(bus, slot, 0, PCI_HEADER_VENDORID, &vendor) == success)
-         {
-            unsigned short deviceid, class, phys_index, class_index;
-            pci_device *new = malloc(sizeof(pci_device));
-            pci_device *head;
-            if(!new)
+         for(func = 0; func < (1 << 3); func++)
+         {            
+            if(pci_read_config(bus, slot, func, PCI_HEADER_VENDORID, &vendor) == success)
             {
-               printf("pcimngr: malloc() failed during device discovery\n");
-               return; /* bail out if memory is a problem */
+               unsigned short deviceid, class, phys_index, class_index, type;
+               pci_device *new;
+               pci_device *head;
+               
+               /* check the details - skip non-generic cards */
+               pci_read_config(bus, slot, func, PCI_HEADER_TYPE, &type);
+               if((type & PCI_HEADER_TYPEMASK) != PCI_HEADER_GENERIC) continue;
+               
+               pci_read_config(bus, slot, func, PCI_HEADER_DEVICEID, &deviceid);
+               pci_read_config(bus, slot, func, PCI_HEADER_CLASS, &class);
+               
+               new = malloc(sizeof(pci_device));
+               if(!new)
+               {
+                  printf("pcimngr: malloc() failed during device discovery\n");
+                  return; /* bail out if memory is a problem */
+               }
+               
+               new->bus = bus;
+               new->slot = slot;
+               new->func = func;
+               new->deviceid = deviceid;
+               new->class = class;
+               new->pid = 0; /* no registered process yet */
+               
+               /* add into the hash tables */
+               phys_index = PCI_PHYS_INDEX(bus, slot);
+               class_index = PCI_CLASS_INDEX(class);
+                           
+               head = pci_phys_tbl[phys_index];
+               if(head)
+               {
+                  head->phys_prev = new;
+                  new->phys_next = head;
+               }
+               else
+                  new->phys_next = NULL;
+               pci_phys_tbl[phys_index] = new;
+               new->phys_prev = NULL;
+               
+               head = pci_class_tbl[class_index];
+               if(head)
+               {
+                  head->class_prev = new;
+                  new->class_next = head;
+               }
+               else
+                  new->class_next = NULL;
+               pci_class_tbl[class_index] = new;
+               new->class_prev = NULL;
+               
+               count++;
+               
+               /* break out of the loop if this is a single function card */
+               if(!(type & PCI_HEADER_MULTIFUNC)) break;
             }
-            
-            pci_read_config(bus, slot, 0, PCI_HEADER_DEVICEID, &deviceid);
-            pci_read_config(bus, slot, 0, PCI_HEADER_CLASS, &class);
-            
-            new->bus = bus;
-            new->slot = slot;
-            new->deviceid = deviceid;
-            new->class = class;
-            new->pid = 0; /* no registered process yet */
-            
-            /* add into the hash tables */
-            phys_index = PCI_PHYS_INDEX(bus, slot);
-            class_index = PCI_CLASS_INDEX(class);
-                        
-            head = pci_phys_tbl[phys_index];
-            if(head)
-            {
-               head->phys_prev = new;
-               new->phys_next = head;
-            }
-            else
-               new->phys_next = NULL;
-            pci_phys_tbl[phys_index] = new;
-            new->phys_prev = NULL;
-            
-            head = pci_class_tbl[class_index];
-            if(head)
-            {
-               head->class_prev = new;
-               new->class_next = head;
-            }
-            else
-               new->class_next = NULL;
-            pci_class_tbl[class_index] = new;
-            new->class_prev = NULL;
-            
-            count++;
          }
    
    printf("pcimngr: found %i PCI device(s)\n", count);

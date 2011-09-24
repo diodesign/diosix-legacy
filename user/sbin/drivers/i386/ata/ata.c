@@ -210,19 +210,50 @@ kresult ata_select_device(unsigned char drive, unsigned char channel, ata_contro
 kresult ata_identify_device(unsigned char drive, unsigned char channel, ata_controller *controller, ata_identify_data *data)
 {
    unsigned short loop;
+   unsigned char check_for_atapi = 0;
    
    /* sanity checks */
    if(!controller || !data) return e_bad_params;
    
    /* select the correct drive */
-   printf("ata_identify_device: selecting drive %i\n", drive);
+   printf("ata_identify_device: selecting channel %i drive %i\n", channel, drive);
    if(ata_select_device(drive, channel, controller) != success) return e_bad_params;
-
+   diosix_thread_sleep(1);
+   
    /* send the identify command */
-   printf("ata_identify_device: holding...\n");
-   ata_wait_for_ready(channel,  controller);
-   printf("ata_identify_device: sending identify command\n");
    ata_write_register(controller, channel, ATA_REG_COMMAND, ATA_CMD_IDENTIFY);
+   diosix_thread_sleep(1);
+   
+   /* wait until we get a response from the device */
+   printf("waiting...\n");
+   while(1)
+   {
+      unsigned char status = ata_read_register(controller, channel, ATA_REG_STATUS);
+      
+      if(status & ATA_SR_ERR)
+      {
+         /* this may be an ATAPI device, so check it out */
+         check_for_atapi = 1;
+         break;
+      }
+      
+      if(!(status & ATA_SR_BSY) && (status & ATA_SR_DRQ)) break;
+   }
+   
+   /* check if it's an ATAPI drive, if necessary, and fire the correct
+      identify packet at it */
+   if(check_for_atapi)
+   {
+      unsigned char cl = ata_read_register(controller, channel, ATA_REG_LBA1);
+      unsigned char ch = ata_read_register(controller, channel, ATA_REG_LBA2);
+      
+      if((cl == 0x14 && ch == 0xeb) || (cl == 0x69 && ch == 0x96))
+      {
+         printf("ata_identify_device: drive is an ATAPI device\n");
+         ata_write_register(controller, channel, ATA_REG_COMMAND, ATA_CMD_IDENTIFY_PACKET);
+         diosix_thread_sleep(1);
+      }
+   }
    
    printf("ata_identify_device: reading identify data\n");
    

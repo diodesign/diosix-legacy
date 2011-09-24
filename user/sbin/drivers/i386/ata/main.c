@@ -41,16 +41,19 @@ unsigned char discover_controllers(void)
    
    /* try to find mass storage IDE controllers on the PCI bus */
    unsigned short class = PCI_CLASS_CALC(PCI_CLASS_MASSSTORAGE, PCI_SUBCLASS_IDE);
-
+   
    /* run through the available controllers on the PCI sub-system */
    do
    {
       unsigned short bus, slot;
       unsigned int pid;
-      
+
+      printf("trying to find bus %i slot %i class %x\n", bus, slot, class);
       err = pci_find_device(class, pci_loop, &bus, &slot, &pid);
+      printf("err = %i\n", err);
       if(!err && pid == 0)
       {
+         printf("trying to claim bus %i slot %i\n", bus, slot);
          err = pci_claim_device(bus, slot, 0);
          if(!err)
          {
@@ -60,6 +63,7 @@ unsigned char discover_controllers(void)
             while(func < 8)
             {
                /* make sure the PCI card is valid */
+               printf("trying to find bus %i slot %i func %i\n", bus, slot, func);
                pci_read_config(bus, slot, func, PCI_HEADER_TYPE, &header_type);
                if(header_type == PCI_HEADER_GENERIC)
                {                  

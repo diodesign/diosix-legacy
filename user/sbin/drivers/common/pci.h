@@ -31,6 +31,7 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #define PCI_HEADER_GENERIC    (0)
 #define PCI_HEADER_PCI2PCI    (1)
 #define PCI_HEADER_CARDBUS    (2)
+#define PCI_HEADER_TYPEMASK   (0x7f) /* lowest 6 bits */
 
 /* PCI config header values */
 #define PCI_HEADER_VENDORID   (0x00)
