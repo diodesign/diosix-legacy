@@ -106,14 +106,14 @@ typedef struct
    unsigned int value;
    
    /* find_device results */
-   unsigned short bus, slot;
+   unsigned short bus, slot, func;
    unsigned int pid;
 } pci_reply_msg;
 
 /* prototypes */
 kresult pci_read_config(unsigned short bus, unsigned short slot, unsigned short func, unsigned short offset, unsigned short *result);
-kresult pci_claim_device(unsigned short bus, unsigned short slot, unsigned int pid);
-kresult pci_release_device(unsigned short bus, unsigned short slot);
-kresult pci_find_device(unsigned short class, unsigned char count, unsigned short *bus, unsigned short *slot, unsigned int *pid);
+kresult pci_claim_device(unsigned short bus, unsigned short slot, unsigned short func, unsigned int pid);
+kresult pci_release_device(unsigned short bus, unsigned short slot, unsigned func);
+kresult pci_find_device(unsigned short class, unsigned char count, unsigned short *bus, unsigned short *slot, unsigned short *func, unsigned int *pid);
 
 #endif

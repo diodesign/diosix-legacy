@@ -100,11 +100,11 @@ kresult pci_read_config(unsigned short bus, unsigned short slot, unsigned short 
 /* pci_claim_device
    Claim (or release) exclusive ownership of a device to stop other
    device drivers from commandeering the PCI card.
-   => bus, slot = select the PCI device
+   => bus, slot, func = select the PCI device
       pid = PID of the process claiming the device, or 0 to deregister the device
    <= 0 for success, or an error code 
 */
-kresult pci_claim_device(unsigned short bus, unsigned short slot, unsigned int pid)
+kresult pci_claim_device(unsigned short bus, unsigned short slot, unsigned short func, unsigned int pid)
 {
    unsigned char index = PCI_PHYS_INDEX(bus, slot);
    pci_device *device;
@@ -115,7 +115,7 @@ kresult pci_claim_device(unsigned short bus, unsigned short slot, unsigned int p
    
    while(device)
    {
-      if(device->bus == bus && device->slot == slot)
+      if(device->bus == bus && device->slot == slot && device->func == func)
       {
          /* found it - change the pid */
          device->pid = pid;
@@ -135,12 +135,13 @@ kresult pci_claim_device(unsigned short bus, unsigned short slot, unsigned int p
    => class = high byte is the class, low byte is the sub-class
       count = for a machine with multiple cards with the same class+subclass,
               this index selects the required card (starting from 0)
-      bus, slot = pointers to variables to write bus and slot numbers in, if successful
+      bus, slot, func = pointers to variables to write bus, slot and function numbers in, if successful
       pid = pointer to store PID of owning process, or 0 if none, if successful
    <= 0 for success, or an error code
 */
 kresult pci_find_device(unsigned short class, unsigned char count,
-                        unsigned short *bus, unsigned short *slot, unsigned int *pid)
+                        unsigned short *bus, unsigned short *slot, unsigned short *func,
+                        unsigned int *pid)
 {
    unsigned char index = PCI_CLASS_INDEX(class);
    pci_device *search;
@@ -160,6 +161,7 @@ kresult pci_find_device(unsigned short class, unsigned char count,
          {
             *bus = search->bus;
             *slot = search->slot;
+            *func = search->func;
             *pid = search->pid;
             unlock_spin(&pci_lock);
             return success;
@@ -175,10 +177,10 @@ kresult pci_find_device(unsigned short class, unsigned char count,
 
 /* lookup_pid_from_phys
    Look up the PID of a process registered with the given bus and slot
-   => bus, slot = device numbers to search for
+   => bus, slot, func = device numbers to search for
    <= PID of owning process, or 0 for none
 */
-unsigned int lookup_pid_from_phys(unsigned short bus, unsigned short slot)
+unsigned int lookup_pid_from_phys(unsigned short bus, unsigned short slot, unsigned short func)
 {
    unsigned char index = PCI_PHYS_INDEX(bus, slot);
    pci_device *search;
@@ -188,7 +190,7 @@ unsigned int lookup_pid_from_phys(unsigned short bus, unsigned short slot)
    
    while(search)
    {
-      if(search->bus == bus && search->slot == slot)
+      if(search->bus == bus && search->slot == slot && search->func == func)
       {
          unlock_spin(&pci_lock);
          return search->pid; /* found a PID */
@@ -338,7 +340,7 @@ void wait_for_request(void)
          or devices claimed by the sender */
       if(request.req != find_device)
       {
-         owner = lookup_pid_from_phys(request.bus, request.slot);
+         owner = lookup_pid_from_phys(request.bus, request.slot, request.func);
          if(owner != msg.pid && owner != 0)
          {
             reply_to_request(&msg, e_no_rights, &reply);
@@ -359,8 +361,7 @@ void wait_for_request(void)
          case read_config:
          {
             unsigned short value;
-            kresult err = pci_read_config(request.bus, request.slot,
-                                          request.func, request.offset, &value);
+            kresult err = pci_read_config(request.bus, request.slot, request.func, request.offset, &value);
             if(err)
                reply_to_request(&msg, err, &reply);
             else
@@ -377,7 +378,7 @@ void wait_for_request(void)
             if(owner)
                reply_to_request(&msg, e_exists, &reply);
             else
-               reply_to_request(&msg, pci_claim_device(request.bus, request.slot, msg.pid), &reply);
+               reply_to_request(&msg, pci_claim_device(request.bus, request.slot, request.func, msg.pid), &reply);
          }
          break;
          
@@ -385,7 +386,7 @@ void wait_for_request(void)
          {
             /* already claimed? */
             if(owner)
-               reply_to_request(&msg, pci_claim_device(request.bus, request.slot, 0), &reply);
+               reply_to_request(&msg, pci_claim_device(request.bus, request.slot, request.func, 0), &reply);
             else
                reply_to_request(&msg, e_bad_params, &reply);
          }
@@ -394,7 +395,7 @@ void wait_for_request(void)
          case find_device:
          {
             kresult err = pci_find_device(request.class, request.count,
-                                          &(reply.bus), &(reply.slot), &(reply.pid));
+                                          &(reply.bus), &(reply.slot), &(reply.func), &(reply.pid));
             if(err)
                reply_to_request(&msg, err, &reply);
             else

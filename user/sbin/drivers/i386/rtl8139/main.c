@@ -325,12 +325,12 @@ int main(void)
    /* whoever heard of a machine with 256+ network cards? */
    while(loop != 255)
    {
-      unsigned short bus, slot;
+      unsigned short bus, slot, func;
       unsigned int pid;
       
       /* attempt to find the rtl8139 PCI card */
       err = pci_find_device(PCI_CLASS_CALC(PCI_CLASS_NETWORKING, PCI_SUBCLASS_ETHERNET),
-                            loop, &bus, &slot, &pid);
+                            loop, &bus, &slot, &func, &pid);
 
       /* give up now if we hit an error */
       if(err) break;
@@ -338,12 +338,12 @@ int main(void)
       if(pid == 0)
       {
          /* check this is a supported device */
-         pci_read_config(bus, slot, 0, PCI_HEADER_VENDORID, &vendorid);
-         pci_read_config(bus, slot, 0, PCI_HEADER_DEVICEID, &deviceid);
+         pci_read_config(bus, slot, func, PCI_HEADER_VENDORID, &vendorid);
+         pci_read_config(bus, slot, func, PCI_HEADER_DEVICEID, &deviceid);
          
          if(vendorid == RTL8139_VENDORID && deviceid == RTL8139_DEVICEID)
          {
-            if(pci_claim_device(bus, slot, 0) == success)
+            if(pci_claim_device(bus, slot, func, 0) == success)
             {
                /* we've managed to claim a card so fork a worker thread */
                if(diosix_thread_fork() == 0)
@@ -360,6 +360,7 @@ int main(void)
                   memset(nic, 0, sizeof(nic_info));
                   nic->bus = bus;
                   nic->slot = slot;
+                  nic->func = func;
                   nic->id = loop;
                   
                   claimed = 1;
@@ -380,7 +381,7 @@ int main(void)
    
    /* read the PIC IRQ line (lowest 8 bits) and channel IRQs from the network
       card to our process */
-   pci_read_config(nic->bus, nic->slot, 0, PCI_HEADER_INT_LINE, &(nic->irq));
+   pci_read_config(nic->bus, nic->slot, nic->func, PCI_HEADER_INT_LINE, &(nic->irq));
    nic->irq = (nic->irq & 0xff) + X86_PIC_IRQ_BASE;
    diosix_signals_kernel(SIGX_ENABLE(SIGXIRQ));
    diosix_driver_register_irq(nic->irq);
@@ -393,7 +394,7 @@ int main(void)
    if(!nic->iobase)
    {
       printf("rtl8139.%i: no IO access to card's registers??\n", nic->id);
-      pci_release_device(nic->bus, nic->slot);
+      pci_release_device(nic->bus, nic->slot, nic->func);
       diosix_thread_kill(interrupt_thread);
       free(nic);
       diosix_thread_exit(1);
@@ -418,7 +419,7 @@ int main(void)
       if(err)
       {
          printf("rtl8139.%i: unable to claim physical memory for receive buffers\n", nic->id);
-         pci_release_device(nic->bus, nic->slot);
+         pci_release_device(nic->bus, nic->slot, nic->func);
          diosix_thread_kill(interrupt_thread);
          free(nic);
          diosix_thread_exit(1);
@@ -434,7 +435,7 @@ int main(void)
       if(err)
       {
          printf("rtl8139.%i: unable to map physical memory into virtual space\n", nic->id);
-         pci_release_device(nic->bus, nic->slot);
+         pci_release_device(nic->bus, nic->slot, nic->func);
          diosix_thread_kill(interrupt_thread);
          free(nic);
          diosix_thread_exit(1);
@@ -452,7 +453,7 @@ int main(void)
       if(err)
       {
          printf("rtl8139.%i: unable to claim physical memory for send buffer %i\n", nic->id, loop);
-         pci_release_device(nic->bus, nic->slot);
+         pci_release_device(nic->bus, nic->slot, nic->func);
          diosix_thread_kill(interrupt_thread);
          diosix_thread_exit(1); /* physical memory claimed will be released by the kernel */
       }
@@ -467,7 +468,7 @@ int main(void)
       if(err)
       {
          printf("rtl8139.%i: unable to map physical memory for send buffer %i into virtual space\n", nic->id, loop);
-         pci_release_device(nic->bus, nic->slot);
+         pci_release_device(nic->bus, nic->slot, nic->func);
          diosix_thread_kill(interrupt_thread);
          free(nic);
          diosix_thread_exit(1); /* physical memory claimed will be released by the kernel */
@@ -505,9 +506,9 @@ int main(void)
    /* get the card's MAC address */
    read_macaddress(nic->iobase, &(nic->mac[0]));
    
-   printf("rtl8139.%i: initialised 8139 PCI card %x:%x irq %x iobase %x "
+   printf("rtl8139.%i: initialised 8139 PCI card %x:%x.%i irq %x iobase %x "
           "[mac %x %x %x %x %x %x]\n",
-          nic->id, nic->bus, nic->slot, nic->irq, nic->iobase,
+          nic->id, nic->bus, nic->slot, nic->func, nic->irq, nic->iobase,
           nic->mac[0], nic->mac[1], nic->mac[2], nic->mac[3], nic->mac[4], nic->mac[5]);
       
    /* wait for a generic message to come in */

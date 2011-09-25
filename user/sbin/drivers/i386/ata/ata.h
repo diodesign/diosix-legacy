@@ -51,6 +51,11 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #define ATA_ER_TK0NF             (0x02)
 #define ATA_ER_AMNF              (0x01)
 
+/* device control bits */
+#define ATA_DC_NIEN              (1 << 1)
+#define ATA_DC_SRST              (1 << 2)
+#define ATA_DC_HOB               (1 << 7)
+
 /* ATA command list */
 #define ATA_CMD_READ_PIO         (0x20)
 #define ATA_CMD_READ_PIO_EXT     (0x24)

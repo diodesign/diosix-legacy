@@ -98,11 +98,11 @@ kresult pci_read_config(unsigned short bus,
 /* pci_claim_device
    Claim exclusive ownership of a device to stop other device drivers from
    commandeering the PCI card
-   => bus, slot = select the PCI device
+   => bus, slot, func = select the PCI device
       pid = PID of process to register, must be zero to indicate this process
    <= 0 for success, or an error code 
 */
-kresult pci_claim_device(unsigned short bus, unsigned short slot, unsigned int pid)
+kresult pci_claim_device(unsigned short bus, unsigned short slot, unsigned short func, unsigned int pid)
 {
    /* structures to hold the message */
    diosix_msg_info msg;
@@ -124,6 +124,7 @@ kresult pci_claim_device(unsigned short bus, unsigned short slot, unsigned int p
    /* here's the device we want to read */
    pci_msg.bus = bus;
    pci_msg.slot = slot;
+   pci_msg.func = func;
    pci_msg.func = pci_msg.offset = 0;
    
    /* send the message and update the result variable
@@ -136,10 +137,10 @@ kresult pci_claim_device(unsigned short bus, unsigned short slot, unsigned int p
 
 /* pci_release_device
    Give up exclusive ownership of a device
-   => bus, slot = select the PCI device
+   => bus, slot, func = select the PCI device
    <= 0 for success, or an error code 
 */
-kresult pci_release_device(unsigned short bus, unsigned short slot)
+kresult pci_release_device(unsigned short bus, unsigned short slot, unsigned func)
 {
    /* structures to hold the message */
    diosix_msg_info msg;
@@ -158,7 +159,8 @@ kresult pci_release_device(unsigned short bus, unsigned short slot)
    /* here's the device we want to read */
    pci_msg.bus = bus;
    pci_msg.slot = slot;
-   pci_msg.func = pci_msg.offset = 0;
+   pci_msg.func = func;
+   pci_msg.offset = 0;
    
    /* send the message and update the result variable
     if successful */
@@ -173,12 +175,13 @@ kresult pci_release_device(unsigned short bus, unsigned short slot)
    => class = high byte is the class, low byte is the sub-class
       count = for a machine with multiple cards with the same class+subclass,
               this index selects the required card (starting from 0)
-      bus, slot = pointers to variables to write bus and slot numbers in, if successful
+      bus, slot, func = pointers to variables to write bus, slot and func numbers in, if successful
       pid = pointer to store PID of owning process, or 0 if none, if successful
    <= 0 for success, or an error code
 */
 kresult pci_find_device(unsigned short class, unsigned char count,
-                        unsigned short *bus, unsigned short *slot, unsigned int *pid)
+                        unsigned short *bus, unsigned short *slot, unsigned short *func,
+                        unsigned int *pid)
 {
    /* structures to hold the message */
    diosix_msg_info msg;
@@ -211,6 +214,7 @@ kresult pci_find_device(unsigned short class, unsigned char count,
    /* write back the found device's details */
    *bus = reply.bus;
    *slot = reply.slot;
+   *func = reply.func;
    *pid = reply.pid;
    return success;
 }

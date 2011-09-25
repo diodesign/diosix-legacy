@@ -45,81 +45,71 @@ unsigned char discover_controllers(void)
    /* run through the available controllers on the PCI sub-system */
    do
    {
-      unsigned short bus, slot;
+      unsigned short bus, slot, func;
       unsigned int pid;
 
-      printf("trying to find bus %i slot %i class %x\n", bus, slot, class);
-      err = pci_find_device(class, pci_loop, &bus, &slot, &pid);
-      printf("err = %i\n", err);
+      err = pci_find_device(class, pci_loop, &bus, &slot, &func, &pid);
       if(!err && pid == 0)
       {
-         printf("trying to claim bus %i slot %i\n", bus, slot);
-         err = pci_claim_device(bus, slot, 0);
+         err = pci_claim_device(bus, slot, func, 0);
          if(!err)
          {
-            unsigned short header_type, func = 0;
-            
-            /* loop through possible functions */
-            while(func < 8)
-            {
-               /* make sure the PCI card is valid */
-               printf("trying to find bus %i slot %i func %i\n", bus, slot, func);
-               pci_read_config(bus, slot, func, PCI_HEADER_TYPE, &header_type);
-               if(header_type == PCI_HEADER_GENERIC)
-               {                  
-                  /* record the bus+slot */
-                  controllers[ccount].bus = bus;
-                  controllers[ccount].slot = slot;
-                  controllers[ccount].flags = ATA_CONTROLLER_PCI;
-                  
-                  /* discover the controller's IO ports - note that if any
-                     of the IO port values comes back as 0x00 or 0x01 then assume the 
-                     default port values */
-                  pci_read_config(bus, slot, func, PCI_HEADER_BAR0_LOW, &(controllers[ccount].channels[ATA_PRIMARY].ioport));
-                  if(controllers[ccount].channels[ATA_PRIMARY].ioport < 0x02)
-                     controllers[ccount].channels[ATA_PRIMARY].ioport = ATA_IOPORT_PRIMARY;
-                  
-                  pci_read_config(bus, slot, func, PCI_HEADER_BAR1_LOW,
-                                  &(controllers[ccount].channels[ATA_PRIMARY].control_ioport));
-                  if(controllers[ccount].channels[ATA_PRIMARY].control_ioport < 0x02)
-                     controllers[ccount].channels[ATA_PRIMARY].control_ioport = ATA_IOPORT_PRIMARYCTRL;
-                  
-                  pci_read_config(bus, slot, func, PCI_HEADER_BAR2_LOW, &(controllers[ccount].channels[ATA_SECONDARY].ioport));
-                  if(controllers[ccount].channels[ATA_SECONDARY].ioport < 0x02)
-                     controllers[ccount].channels[ATA_SECONDARY].ioport = ATA_IOPORT_SECONDARY;
-                  
-                  pci_read_config(bus, slot, func, PCI_HEADER_BAR3_LOW,
-                                  &(controllers[ccount].channels[ATA_SECONDARY].control_ioport));
-                  if(controllers[ccount].channels[ATA_SECONDARY].control_ioport < 0x02)
-                     controllers[ccount].channels[ATA_SECONDARY].control_ioport = ATA_IOPORT_SECONDARYCTRL;
-                  
-                  pci_read_config(bus, slot, func, PCI_HEADER_BAR4_LOW,
-                                  &(controllers[ccount].channels[ATA_PRIMARY].busmaster_ioport));
-                  controllers[ccount].channels[ATA_SECONDARY].busmaster_ioport = 
-                     controllers[ccount].channels[ATA_PRIMARY].busmaster_ioport + 8;
-                  
-                  /* discover the IRQ lines */
-                  pci_read_config(bus, slot, func, PCI_HEADER_INT_LINE, &(controllers[ccount].irq_line));
-                  pci_read_config(bus, slot, func, PCI_HEADER_INT_PIN, &(controllers[ccount].irq_pin));
-                  controllers[ccount].channels[ATA_PRIMARY].irq = ATA_IRQ_PRIMARY;
-                  controllers[ccount].channels[ATA_SECONDARY].irq = ATA_IRQ_SECONDARY;
-                  
-                  printf("ata: claimed controller in PCI bus %x slot %x irq %x\n",
-                         bus, slot, controllers[ccount].irq_line);
-                  
-                  /* discover connected storage drives */
-                  dcount += ata_detect_drives(&(controllers[ccount]));
-                  
-                  /* move onto next controller.. */
-                  ccount++;
-               }
-               else
-               {
-                  /* hand back the PCI device if it's not suitable */
-                  pci_release_device(bus, slot);
-               }
+            unsigned short header_type;
+
+            /* make sure the PCI card is valid */
+            pci_read_config(bus, slot, func, PCI_HEADER_TYPE, &header_type);
+            if(header_type == PCI_HEADER_GENERIC)
+            {                  
+               /* record the bus+slot */
+               controllers[ccount].bus = bus;
+               controllers[ccount].slot = slot;
+               controllers[ccount].flags = ATA_CONTROLLER_PCI;
                
-               func++;
+               /* discover the controller's IO ports - note that if any
+                  of the IO port values comes back as 0x00 or 0x01 then assume the 
+                  default port values */
+               pci_read_config(bus, slot, func, PCI_HEADER_BAR0_LOW, &(controllers[ccount].channels[ATA_PRIMARY].ioport));
+               if(controllers[ccount].channels[ATA_PRIMARY].ioport < 0x02)
+                  controllers[ccount].channels[ATA_PRIMARY].ioport = ATA_IOPORT_PRIMARY;
+               
+               pci_read_config(bus, slot, func, PCI_HEADER_BAR1_LOW,
+                               &(controllers[ccount].channels[ATA_PRIMARY].control_ioport));
+               if(controllers[ccount].channels[ATA_PRIMARY].control_ioport < 0x02)
+                  controllers[ccount].channels[ATA_PRIMARY].control_ioport = ATA_IOPORT_PRIMARYCTRL;
+               
+               pci_read_config(bus, slot, func, PCI_HEADER_BAR2_LOW, &(controllers[ccount].channels[ATA_SECONDARY].ioport));
+               if(controllers[ccount].channels[ATA_SECONDARY].ioport < 0x02)
+                  controllers[ccount].channels[ATA_SECONDARY].ioport = ATA_IOPORT_SECONDARY;
+               
+               pci_read_config(bus, slot, func, PCI_HEADER_BAR3_LOW,
+                               &(controllers[ccount].channels[ATA_SECONDARY].control_ioport));
+               if(controllers[ccount].channels[ATA_SECONDARY].control_ioport < 0x02)
+                  controllers[ccount].channels[ATA_SECONDARY].control_ioport = ATA_IOPORT_SECONDARYCTRL;
+               
+               pci_read_config(bus, slot, func, PCI_HEADER_BAR4_LOW,
+                               &(controllers[ccount].channels[ATA_PRIMARY].busmaster_ioport));
+               controllers[ccount].channels[ATA_SECONDARY].busmaster_ioport = 
+                  controllers[ccount].channels[ATA_PRIMARY].busmaster_ioport + 8;
+               
+               /* discover the IRQ lines */
+               pci_read_config(bus, slot, func, PCI_HEADER_INT_LINE, &(controllers[ccount].irq_line));
+               pci_read_config(bus, slot, func, PCI_HEADER_INT_PIN, &(controllers[ccount].irq_pin));
+               controllers[ccount].channels[ATA_PRIMARY].irq = ATA_IRQ_PRIMARY;
+               controllers[ccount].channels[ATA_SECONDARY].irq = ATA_IRQ_SECONDARY;
+               
+               printf("ata: claimed controller in PCI bus %x slot %x func %i irq %x\n",
+                      bus, slot, func, controllers[ccount].irq_line);
+               
+               /* discover connected storage drives */
+               dcount += ata_detect_drives(&(controllers[ccount]));
+               
+               /* move onto next controller.. */
+               ccount++;
+            }
+            else
+            {
+               /* hand back the PCI device if it's not suitable */
+               pci_release_device(bus, slot, func);
             }
          }
       }

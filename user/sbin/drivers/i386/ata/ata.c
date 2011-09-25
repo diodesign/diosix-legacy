@@ -124,7 +124,6 @@ void ata_write_register(ata_controller *controller, unsigned char chan, unsigned
 {
    unsigned short ioport;
    
-   printf("ata_write_register: request to write %x to channel %i register %x\n", data, chan, reg);
    ata_channel *channel = &(controller->channels[chan]);
    
    /* translate an internal ATA register number into an offset from the relevant x86 IO port base */
@@ -152,31 +151,18 @@ void ata_write_register(ata_controller *controller, unsigned char chan, unsigned
          return;
    }
    
-   printf("ata_write_register: writing %x to ioport %x\n", data, ioport);
    write_port_byte(ioport, data);
-   printf("ata_write_register: wrote %x to ioport %x\n", data, ioport);
 }
 
 /* ata_wait_for_ready
    Spin until a controller is ready to accept a new command or have one of its registers written to.
-   In the status register, BSY and DRQ must both be cleared to zero and DMACK- is not asserted.
    => channel = channel to select (ATA_PRIMARY or ATA_SECONDARY)
       controller = pointer to drive's controller structure
 */
 void ata_wait_for_ready(unsigned char channel, ata_controller *controller)
-{
-   unsigned char status = 0xff;
-   
-   printf("ata_wait_for_ready: channel = %i controller = %p data = %x\n",
-          channel, controller, ata_read_register(controller, channel, ATA_REG_STATUS));
-   
+{      
    /* assumes sane parameters */
-   while(ata_read_register(controller, channel, ATA_REG_STATUS) & (ATA_SR_BSY | ATA_SR_DRDY))
-   {
-      unsigned char byte = ata_read_register(controller, channel, ATA_REG_STATUS);
-      if(byte != status) printf("ata_wait_for_ready: status = %x\n", byte);
-      status = byte;
-   }
+   while(!(ata_read_register(controller, channel, ATA_REG_STATUS) & ATA_SR_DRDY));
 }
 
 /* ata_select_device
@@ -194,7 +180,6 @@ kresult ata_select_device(unsigned char drive, unsigned char channel, ata_contro
    if(channel != ATA_PRIMARY && channel != ATA_SECONDARY) return e_bad_params;
    
    /* write the select bit in the hdd select register */
-   ata_wait_for_ready(channel, controller);
    ata_write_register(controller, channel, ATA_REG_HDDEVSEL, drive << ATA_SELECT_DRIVE_SHIFT);
    return success;
 }
@@ -211,24 +196,24 @@ kresult ata_identify_device(unsigned char drive, unsigned char channel, ata_cont
 {
    unsigned short loop;
    unsigned char check_for_atapi = 0;
-   
+
    /* sanity checks */
    if(!controller || !data) return e_bad_params;
    
    /* select the correct drive */
-   printf("ata_identify_device: selecting channel %i drive %i\n", channel, drive);
    if(ata_select_device(drive, channel, controller) != success) return e_bad_params;
    diosix_thread_sleep(1);
    
    /* send the identify command */
    ata_write_register(controller, channel, ATA_REG_COMMAND, ATA_CMD_IDENTIFY);
-   diosix_thread_sleep(1);
    
    /* wait until we get a response from the device */
-   printf("waiting...\n");
    while(1)
    {
       unsigned char status = ata_read_register(controller, channel, ATA_REG_STATUS);
+
+      /* status isn't allowed to be zero, according to the specs */
+      if(!status) return e_not_found;
       
       if(status & ATA_SR_ERR)
       {
@@ -239,17 +224,17 @@ kresult ata_identify_device(unsigned char drive, unsigned char channel, ata_cont
       
       if(!(status & ATA_SR_BSY) && (status & ATA_SR_DRQ)) break;
    }
-   
+
    /* check if it's an ATAPI drive, if necessary, and fire the correct
       identify packet at it */
    if(check_for_atapi)
    {
       unsigned char cl = ata_read_register(controller, channel, ATA_REG_LBA1);
       unsigned char ch = ata_read_register(controller, channel, ATA_REG_LBA2);
-      
+            
       if((cl == 0x14 && ch == 0xeb) || (cl == 0x69 && ch == 0x96))
       {
-         printf("ata_identify_device: drive is an ATAPI device\n");
+         printf("ata_identify_device: drive %i in channel %i is an ATAPI device\n", drive, channel);
          ata_write_register(controller, channel, ATA_REG_COMMAND, ATA_CMD_IDENTIFY_PACKET);
          diosix_thread_sleep(1);
       }
@@ -261,7 +246,7 @@ kresult ata_identify_device(unsigned char drive, unsigned char channel, ata_cont
    for(loop = 0; loop < ATA_IDENT_MAXWORDS; loop++)
    {
       data->word[loop] = ata_read_word(controller, channel, ATA_REG_DATA);
-      printf("ata_identify_device: word %i = %x\n", loop, data->word[loop]);
+      // printf("ata_identify_device: word %i = %x\n", loop, data->word[loop]);
    }
    
    return success;
@@ -275,24 +260,27 @@ kresult ata_identify_device(unsigned char drive, unsigned char channel, ata_cont
 */
 unsigned char ata_detect_drives(ata_controller *controller)
 {
-   unsigned char drive, channel;
+   unsigned char drive, channel, found = 0;
    ata_identify_data data;
    
    /* iterate through the possible channels and drives */
    for(channel = 0; channel < ATA_MAX_CHANS_PER_CNTRLR; channel++)
    {
-      /* disable IRQs for the moment */
-      ata_write_register(controller, channel, ATA_REG_CONTROL, 2);
+      /* clear the 48bit HOB bit, disable IRQs for the moment */
+      ata_write_register(controller, channel, ATA_REG_CONTROL, ATA_DC_NIEN);
       
       for(drive = 0; drive < ATA_MAX_DEVS_PER_CHANNEL; drive++)
       {
-         printf("ata_detect_drives: attempting to identify drive\n");
+         printf("ata_detect_drives: attempting to identify drive %i in channel %i\n", drive, channel);
          if(ata_identify_device(drive, channel, controller, &data) == success)
          {
             printf("ata: identified device! sector count = %x %x\n",
                    data.word[ATA_IDENT_MAX_LBA1], data.word[ATA_IDENT_MAX_LBA0]);
+            found++;
          }
       }
    }
+   
+   return found;
 }
 

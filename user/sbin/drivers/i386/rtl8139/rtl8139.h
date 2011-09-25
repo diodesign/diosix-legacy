@@ -159,7 +159,7 @@ typedef struct
    unsigned char id; /* give each card its own id */
    
    /* define the card's hardware resources */
-   unsigned short bus, slot, irq, iobase;
+   unsigned short bus, slot, func, irq, iobase;
 
    /* keep a record of the card's MAC address */
    char mac[NIC_MAC_LENGTH];
