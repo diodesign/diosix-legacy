@@ -165,6 +165,29 @@ void ata_wait_for_ready(unsigned char channel, ata_controller *controller)
    while(!(ata_read_register(controller, channel, ATA_REG_STATUS) & ATA_SR_DRDY));
 }
 
+/* ata_print_string
+   Dump a string of ASCII characters from an ATA identify data block to stdout, omitting
+   a newline and any non-ASCII bytes
+   => data = identify data block structure
+      start = first 16bit word to read
+      end = last 16bit word, inclusive, to read
+*/
+void ata_print_string(ata_identify_data *data, unsigned short start, unsigned short end)
+{
+   unsigned short count = start;
+   
+   while(count <= end)
+   {
+      unsigned char high = data->word[count] & 0xff;
+      unsigned char low = (data->word[count] >> 8) & 0xff;
+
+      if(low > 31 && low < 128) printf("%c", low);
+      if(high > 31 && high < 128) printf("%c", high);
+      
+      count++;
+   }
+}
+
 /* ata_select_device
    Select the given drive as the active drive for subsequent commands and accesses
     => drive = drive to select (ATA_MASTER or ATA_SLAVE)
@@ -234,6 +257,7 @@ kresult ata_identify_packet_device(unsigned char drive, unsigned char channel, a
       channel = channel to select (ATA_PRIMARY or ATA_SECONDARY)
       controller = pointer to drive's controller structure
       data = pointer to 256-byte block to save the identification data into
+             plus any other information about the drive
    <= 0 for success, or an error code
 */
 kresult ata_identify_device(unsigned char drive, unsigned char channel, ata_controller *controller, ata_identify_data *data)
@@ -291,6 +315,8 @@ kresult ata_identify_device(unsigned char drive, unsigned char channel, ata_cont
       if(identify_error)
          if(ata_identify_packet_device(drive, channel, controller) != success)
             return e_failure;
+      
+      data->type = ata_type_patapi;
       goto ata_identify_device_read;
    }
    
@@ -301,6 +327,8 @@ kresult ata_identify_device(unsigned char drive, unsigned char channel, ata_cont
       if(identify_error)
          if(ata_identify_packet_device(drive, channel, controller) != success)
             return e_failure;
+      
+      data->type = ata_type_satapi;
       goto ata_identify_device_read;
    }
 
@@ -308,6 +336,8 @@ kresult ata_identify_device(unsigned char drive, unsigned char channel, ata_cont
    {
       printf("ata: drive %i in channel %i is a PATA device (error flag %i)\n", drive, channel, identify_error);
       if(identify_error) return e_failure;
+      
+      data->type = ata_type_pata;
       goto ata_identify_device_read;
    }
    
@@ -315,21 +345,27 @@ kresult ata_identify_device(unsigned char drive, unsigned char channel, ata_cont
    {
       printf("ata: drive %i in channel %i is a SATA device (error flag %i)\n", drive, channel, identify_error);
       if(identify_error) return e_failure;
+      
+      data->type = ata_type_sata;
       goto ata_identify_device_read;
    }
 
    /* fall through to reject drive */
    printf("ata: drive %i in channel %i is unrecognised [%x %x]\n", drive, channel, low, high);
+   data->type = ata_type_unknown;
    return e_failure;
    
 ata_identify_device_read:
    /* now read in the 256 16-bit words */
    for(loop = 0; loop < ATA_IDENT_MAXWORDS; loop++)
-   {
       data->word[loop] = ata_read_word(controller, channel, ATA_REG_DATA);
-      printf("%x ", data->word[loop]);
-      if((loop % 16) == 15) printf("\n");
-   }
+   
+   /* dump some diagnostic info */
+   printf("ata: serial: ");
+   ata_print_string(data, ATA_IDENT_SERIALSTART, ATA_IDENT_SERIALEND);
+   printf(" model: ");
+   ata_print_string(data, ATA_IDENT_MODELSTART, ATA_IDENT_MODELEND);
+   printf("\n");
    
    return success;
 }
@@ -355,8 +391,6 @@ unsigned char ata_detect_drives(ata_controller *controller)
       {
          if(ata_identify_device(drive, channel, controller, &data) == success)
          {
-            printf("ata: identified device! sector count = %x %x\n",
-                   data.word[ATA_IDENT_MAX_LBA1], data.word[ATA_IDENT_MAX_LBA0]);
             found++;
          }
       }

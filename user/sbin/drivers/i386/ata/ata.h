@@ -99,6 +99,8 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #define ATA_IDENT_MAX_LBA_EXT2   (102)
 #define ATA_IDENT_MAX_LBA_EXT3   (103)
 #define ATA_IDENT_SECTORSIZE     (106)
+#define ATA_IDENT_LOGSECSIZELO   (117)
+#define ATA_IDENT_LOGSECSIZEHI   (118)
 #define ATA_IDENT_MAXWORDS       (256) /* number of 16-bit words in the data block */
 
 /* each channel has a number of registers in IO space. these are the
@@ -175,6 +177,7 @@ typedef struct
 /* how a device will describe itself when IDENTIFY'd */
 typedef struct
 {
+   ata_drive_type type;
    unsigned short word[ATA_IDENT_MAXWORDS];
 } ata_identify_data;
 
