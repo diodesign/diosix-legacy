@@ -19,6 +19,8 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #define _LOWLEVEL_H 1
 
 /* x86-specific stuff */
+unsigned char kernel_ioread_byte(unsigned short port);
+void kernel_iowrite_byte(unsigned short port, unsigned char val);
 unsigned char read_port_byte(unsigned short port);
 unsigned short read_port(unsigned short port);
 unsigned int read_port_word(unsigned short port);
