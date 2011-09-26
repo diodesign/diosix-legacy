@@ -78,7 +78,7 @@ unsigned char ata_read_register(ata_controller *controller, unsigned char chan, 
       reg = the ATA register to read
    <= returns the word from the controller hardware
 */
-unsigned char ata_read_word(ata_controller *controller, unsigned char chan, unsigned char reg)
+unsigned short ata_read_word(ata_controller *controller, unsigned char chan, unsigned char reg)
 {
    unsigned short ioport;
    
@@ -180,8 +180,52 @@ kresult ata_select_device(unsigned char drive, unsigned char channel, ata_contro
    if(channel != ATA_PRIMARY && channel != ATA_SECONDARY) return e_bad_params;
    
    /* write the select bit in the hdd select register */
-   ata_write_register(controller, channel, ATA_REG_HDDEVSEL, drive << ATA_SELECT_DRIVE_SHIFT);
+   ata_write_register(controller, channel, ATA_REG_HDDEVSEL, (drive << ATA_SELECT_DRIVE_SHIFT));
    return success;
+}
+
+/* ata_identify_packet_device
+   Send an identify packet command to an [P/S]ATAPI drive. Note that this function will not
+   transfer the identify data from the drive.
+   => drive = drive to select (ATA_MASTER or ATA_SLAVE)
+      channel = channel to select (ATA_PRIMARY or ATA_SECONDARY)
+      controller = pointer to drive's controller structure
+   <= 0 for success, or an error code
+*/
+kresult ata_identify_packet_device(unsigned char drive, unsigned char channel, ata_controller *controller)
+{
+   unsigned char status;
+   
+   /* select the correct drive */
+   if(ata_select_device(drive, channel, controller) != success) return e_bad_params;
+   
+   /* it's recommended to zero these registers, plus it introduces a delay */
+   ata_write_register(controller, channel, ATA_REG_SECTORCOUNT, 0);
+   ata_write_register(controller, channel, ATA_REG_LBA0, 0);
+   ata_write_register(controller, channel, ATA_REG_LBA1, 0);
+   ata_write_register(controller, channel, ATA_REG_LBA2, 0);
+   
+   /* send the packet command */
+   ata_write_register(controller, channel, ATA_REG_COMMAND, ATA_CMD_IDENTIFY_PACKET);
+   
+   /* only read the status reg once per transfer */
+   status = ata_read_register(controller, channel, ATA_REG_STATUS);
+   
+   /* wait until we get a response from the device */
+   while(1)
+   {
+      /* status isn't allowed to be zero, according to the specs,
+         unless the device simply isn't present */
+      if(!status) return e_not_found;
+      
+      /* record the fact that the drive rejected the identify packet command */
+      if(status & ATA_SR_ERR) return e_failure;
+      
+      if(status & ATA_SR_DRQ) return success; /* device is ready */
+      
+      /* it's safe to read the alternative status register */
+      status = ata_read_register(controller, channel, ATA_REG_ALTSTATUS);
+   }
 }
 
 /* ata_identify_device
@@ -194,59 +238,97 @@ kresult ata_select_device(unsigned char drive, unsigned char channel, ata_contro
 */
 kresult ata_identify_device(unsigned char drive, unsigned char channel, ata_controller *controller, ata_identify_data *data)
 {
+   unsigned char status, low, high, identify_error = 0;
    unsigned short loop;
-   unsigned char check_for_atapi = 0;
 
    /* sanity checks */
    if(!controller || !data) return e_bad_params;
    
    /* select the correct drive */
    if(ata_select_device(drive, channel, controller) != success) return e_bad_params;
-   diosix_thread_sleep(1);
+   
+   /* it's recommended to zero these registers, plus it introduces a delay */
+   ata_write_register(controller, channel, ATA_REG_SECTORCOUNT, 0);
+   ata_write_register(controller, channel, ATA_REG_LBA0, 0);
+   ata_write_register(controller, channel, ATA_REG_LBA1, 0);
+   ata_write_register(controller, channel, ATA_REG_LBA2, 0);
    
    /* send the identify command */
    ata_write_register(controller, channel, ATA_REG_COMMAND, ATA_CMD_IDENTIFY);
    
+   /* read the signature bytes to determine the type of drive */
+   low = ata_read_register(controller, channel, ATA_REG_LBA1);
+   high = ata_read_register(controller, channel, ATA_REG_LBA2);
+   
+   /* only read the status reg once per transfer */
+   status = ata_read_register(controller, channel, ATA_REG_STATUS);
+
    /* wait until we get a response from the device */
    while(1)
-   {
-      unsigned char status = ata_read_register(controller, channel, ATA_REG_STATUS);
-
-      /* status isn't allowed to be zero, according to the specs */
+   {      
+      /* status isn't allowed to be zero, according to the specs,
+         unless the device simply isn't present */
       if(!status) return e_not_found;
-      
+
+      /* record the fact that the drive rejected the identify command
+         this may be because it's an ATAPI drive that will only accept identify packet */
       if(status & ATA_SR_ERR)
       {
-         /* this may be an ATAPI device, so check it out */
-         check_for_atapi = 1;
+         identify_error = 1;
          break;
       }
       
-      if(!(status & ATA_SR_BSY) && (status & ATA_SR_DRQ)) break;
+      if(status & ATA_SR_DRQ) break; /* device is ready */
+      
+      /* it's safe to repeatedly read the alternative status register */
+      status = ata_read_register(controller, channel, ATA_REG_ALTSTATUS);
+   }
+   
+   /* resend the identify command as identify packet if the PATAPI drive complained */
+   if(low == 0x14 && high == 0xeb)
+   {
+      printf("ata: drive %i in channel %i is a PATAPI device\n", drive, channel);
+      if(identify_error)
+         if(ata_identify_packet_device(drive, channel, controller) != success)
+            return e_failure;
+      goto ata_identify_device_read;
+   }
+   
+   /* resend the identify command as identify packet if the SATAPI drive complained */
+   if(low == 0x69 && high == 0x96)
+   {
+      printf("ata: drive %i in channel %i is a SATAPI device\n", drive, channel);
+      if(identify_error)
+         if(ata_identify_packet_device(drive, channel, controller) != success)
+            return e_failure;
+      goto ata_identify_device_read;
    }
 
-   /* check if it's an ATAPI drive, if necessary, and fire the correct
-      identify packet at it */
-   if(check_for_atapi)
+   if(low == 0x00 && high == 0x00)
    {
-      unsigned char cl = ata_read_register(controller, channel, ATA_REG_LBA1);
-      unsigned char ch = ata_read_register(controller, channel, ATA_REG_LBA2);
-            
-      if((cl == 0x14 && ch == 0xeb) || (cl == 0x69 && ch == 0x96))
-      {
-         printf("ata_identify_device: drive %i in channel %i is an ATAPI device\n", drive, channel);
-         ata_write_register(controller, channel, ATA_REG_COMMAND, ATA_CMD_IDENTIFY_PACKET);
-         diosix_thread_sleep(1);
-      }
+      printf("ata: drive %i in channel %i is a PATA device (error flag %i)\n", drive, channel, identify_error);
+      if(identify_error) return e_failure;
+      goto ata_identify_device_read;
    }
    
-   printf("ata_identify_device: reading identify data\n");
+	if(low == 0x3c && high == 0xc3)
+   {
+      printf("ata: drive %i in channel %i is a SATA device (error flag %i)\n", drive, channel, identify_error);
+      if(identify_error) return e_failure;
+      goto ata_identify_device_read;
+   }
+
+   /* fall through to reject drive */
+   printf("ata: drive %i in channel %i is unrecognised [%x %x]\n", drive, channel, low, high);
+   return e_failure;
    
+ata_identify_device_read:
    /* now read in the 256 16-bit words */
    for(loop = 0; loop < ATA_IDENT_MAXWORDS; loop++)
    {
       data->word[loop] = ata_read_word(controller, channel, ATA_REG_DATA);
-      // printf("ata_identify_device: word %i = %x\n", loop, data->word[loop]);
+      printf("%x ", data->word[loop]);
+      if((loop % 16) == 15) printf("\n");
    }
    
    return success;
@@ -271,7 +353,6 @@ unsigned char ata_detect_drives(ata_controller *controller)
       
       for(drive = 0; drive < ATA_MAX_DEVS_PER_CHANNEL; drive++)
       {
-         printf("ata_detect_drives: attempting to identify drive %i in channel %i\n", drive, channel);
          if(ata_identify_device(drive, channel, controller, &data) == success)
          {
             printf("ata: identified device! sector count = %x %x\n",
