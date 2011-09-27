@@ -146,6 +146,17 @@ int main(void)
    memset(&controllers, 0, sizeof(controllers));
    if(discover_controllers() == 0) return 1; /* exit if there's no ATA drives */
    
+   /* register this driver with the vfs */
+   diosix_vfs_register("/dev/ata"); 
+   
+   /* install our primitive IRQ handlers */
+   diosix_signals_kernel(SIGX_ENABLE(SIGXIRQ));
+   diosix_driver_register_irq(ATA_IRQ_PRIMARY);
+   diosix_driver_register_irq(ATA_IRQ_SECONDARY);
+   
+   /* create a new thread to handle the IRQs */
+   if(diosix_thread_fork() == 0) while(1) wait_for_irq();
+   
    /* wait for work to come in */
    while(1) wait_for_request();
 }

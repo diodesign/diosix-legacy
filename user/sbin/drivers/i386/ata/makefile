@@ -20,7 +20,7 @@ OBJSDIR = ../../../../../build/$(ARCH)_$(ARCH_TARGET)/drivers/ata
 FLAGS		= -O2 -std=c99 -Wall -static -I../../../../../user/lib/newlib/libgloss/libnosys -I../common -I ../../common
 CC		= $(PREFIX)gcc $(FLAGS)
 LD		= $(PREFIX)gcc $(FLAGS)
-OBJS	 	= $(OBJSDIR)/main.o $(OBJSDIR)/ata.o $(OBJSDIR)/fs.o $(OBJSDIR)/lowlevel.o $(OBJSDIR)/pci.o
+OBJS	 	= $(OBJSDIR)/main.o $(OBJSDIR)/ata.o $(OBJSDIR)/fs.o $(OBJSDIR)/irq.o $(OBJSDIR)/lowlevel.o $(OBJSDIR)/pci.o
 
 # targets
 all: ata
@@ -35,6 +35,10 @@ $(OBJSDIR)/ata.o:	ata.c	makefile ata.h
 			$(Q)$(CC) -c -o $@ $<
 
 $(OBJSDIR)/fs.o:	fs.c	makefile
+			$(WRITE) '==> COMPILE: $<'
+			$(Q)$(CC) -c -o $@ $<
+
+$(OBJSDIR)/irq.o:	irq.c	makefile
 			$(WRITE) '==> COMPILE: $<'
 			$(Q)$(CC) -c -o $@ $<
 

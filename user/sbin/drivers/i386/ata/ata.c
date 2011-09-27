@@ -1,4 +1,4 @@
-/* user/sbin/drivers/i386/ata/main.c
+/* user/sbin/drivers/i386/ata/ata.c
  * Driver for ATA-connected storage devices 
  * Author : Chris Williams
  * Date   : Sun,16 Jan 2011.22:54:00
@@ -389,11 +389,13 @@ unsigned char ata_detect_drives(ata_controller *controller)
       
       for(drive = 0; drive < ATA_MAX_DEVS_PER_CHANNEL; drive++)
       {
-         if(ata_identify_device(drive, channel, controller, &data) == success)
-         {
+         if(ata_identify_device(drive, channel, controller,
+                                &(controller->channels[channel].drive[drive])) == success)
             found++;
-         }
       }
+      
+      /* reenable interrupts */
+      ata_write_register(controller, channel, ATA_REG_CONTROL, 0);
    }
    
    return found;
