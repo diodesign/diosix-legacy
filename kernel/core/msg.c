@@ -633,6 +633,15 @@ kresult msg_send(thread *sender, diosix_msg_info *msg)
          }
       }
       
+      /* last chance saloon: if the thread is waiting for a named process to appear
+         and has set the QUEUEME flag then put the sending thread to sleep and make a
+         note of it in the role system to wake it up when the named process appears
+         and blocks to receive. the customer is always right, after all... */
+      if((msg->flags & DIOSIX_MSG_QUEUEME) && !(msg->flags & DIOSIX_MSG_REPLY) && msg->role)
+      {
+         return proc_wait_for_role(sender, msg->role);
+      }
+      
       /* fall through to inform the sender */
       return e_no_receiver;
    }
@@ -884,6 +893,9 @@ kresult msg_recv(thread *receiver, diosix_msg_info *msg)
 msg_recv_block:
    unlock_gate(&(receiver->lock), LOCK_WRITE);
 
+   /* wake up any threads that might be waiting on the process */
+   if(receiver->proc->role) proc_role_wakeup(receiver->proc->role);
+   
    /* remove receiver from the queue until a message comes in */
    sched_remove(receiver, waitingformsg);
 

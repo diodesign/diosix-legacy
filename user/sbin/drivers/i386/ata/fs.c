@@ -98,7 +98,7 @@ void wait_for_request(void)
 
          /* open device exclusively for root only */
          case open_req:
-            /* fall through to sending back an error */
+            printf("open request!\n");
             reply_to_request(&msg, e_no_rights);
             break;
 

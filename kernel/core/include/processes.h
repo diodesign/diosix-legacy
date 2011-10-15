@@ -128,6 +128,10 @@ struct thread
    thread *queue_prev, *queue_next; /* the run-queue's double-linked list */
    thread *hash_prev, *hash_next; /* pointers through thread hash table */
    
+   /* normally zero, but set to a role number if waiting for a process to
+      appear with this particular role */
+   unsigned char waiting_for_role;
+   
    /* thread registers */
    unsigned int stackbase; /* where this thread's user stack should start */
    unsigned int kstackbase, kstackblk; /* kernel stack ptrs */
@@ -136,6 +140,14 @@ struct thread
    int_registers_block regs; /* saved general purpose register state of a thread */
    void *fp; /* saved state of the thread's floating-point state */
    tss_descr *tss; /* x86 - pointer to the task-state block */
+};
+
+/* describe a linked list of threads waiting on a role to be assigned to a process */
+typedef struct role_snoozer role_snoozer;
+struct role_snoozer
+{
+   thread *snoozer; /* the thread waiting for the process to wake up */
+   role_snoozer *previous, *next;
 };
 
 /* process status flags (scheduling) */
@@ -291,6 +303,8 @@ kresult thread_kill(process *owner, thread *victim);
 process *proc_role_lookup(unsigned int role);
 kresult proc_role_add(process *target, unsigned int role);
 kresult proc_role_remove(process *target, unsigned int role);
+void proc_role_wakeup(unsigned int role);
+kresult proc_wait_for_role(thread *snoozer, unsigned char role);
 kresult proc_remove_phys_mem_allocation(process *proc, void *addr);
 kresult proc_add_phys_mem_allocation(process *proc, void *addr, unsigned short pages);
 

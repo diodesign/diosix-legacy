@@ -22,6 +22,7 @@ process **proc_table = NULL;
 
 /* table of processes with defined roles within the operating systems */
 process *proc_roles[DIOSIX_ROLES_NR];
+role_snoozer *role_wait_list[DIOSIX_ROLES_NR];
 
 unsigned int next_pid = FIRST_PID;
 unsigned int proc_count = 0;
@@ -30,6 +31,7 @@ unsigned int proc_count = 0;
 rw_gate proc_lock;
 
 
+/* --------------------------------- roles ------------------------------- */
 /* proc_role_remove
    Remove a role from a process
    => target = process to alter
@@ -89,14 +91,86 @@ kresult proc_role_add(process *target, unsigned int role)
 */
 process *proc_role_lookup(unsigned int role)
 {
+   process *proc;
+   
    if(!role || role > DIOSIX_ROLES_NR) return NULL;
    
-   PROC_DEBUG("[proc:%i] looked up process %p for role %i\n",
-              CPU_ID, proc_roles[role - 1], role);
+   lock_gate(&(proc_lock), LOCK_READ);
+   proc = proc_roles[role - 1];
+   unlock_gate(&(proc_lock), LOCK_READ);   
    
-   return proc_roles[role - 1];
+   PROC_DEBUG("[proc:%i] looked up process %p for role %i\n",
+              CPU_ID, proc, role);
+   
+   return proc;
 }
 
+/* proc_wait_for_role
+   Put a thread to sleep until a role is registered by a process
+   => snoozer = thread to send to sleep
+      role = role to sleep against
+   <= 0 for success, or an error code
+*/
+kresult proc_wait_for_role(thread *snoozer, unsigned char role)
+{
+   role_snoozer *new = NULL, *head;
+   
+   /* sanity check */
+   if(!snoozer || !role || role > DIOSIX_ROLES_NR) return e_bad_params;
+
+   /* allocate a head for the linked list */
+   if(vmm_malloc((void **)&new, sizeof(role_snoozer)) != success)
+      return e_failure;
+   
+   new->snoozer = snoozer;
+   new->previous = NULL;
+   
+   lock_gate(&(proc_lock), LOCK_WRITE);
+   
+   /* attach it to the start of the linked list */
+   head = role_wait_list[role - 1];
+   if(head) head->previous = new;
+   new->next = head;
+   role_wait_list[role - 1] = new;
+   
+   unlock_gate(&(proc_lock), LOCK_WRITE);
+   
+   /* tell the scheduler to send the thread to sleep */
+   sched_remove(snoozer, sleeping);
+   
+   PROC_DEBUG("[proc:%i] put thread %p tid %i pid %i into sleep-wait on role %i\n", CPU_ID,
+              snoozer, snoozer->tid, snoozer->proc->pid, role);
+   return success;
+}
+
+/* proc_role_wakeup
+   Wake up any threads that were sleep-waiting for a named process
+   to block waiting for a message
+   => role = role id to wake up
+*/
+void proc_role_wakeup(unsigned char role)
+{
+   /* sanity check */
+   if(role > DIOSIX_ROLES_NR || !role) return;
+   
+   lock_gate(&(proc_lock), LOCK_READ);
+   role_snoozer *entry = role_wait_list[role - 1];
+   
+   while(entry)
+   {
+      /* wake up the sleeping thread and free the memory describing it */
+      role_snoozer *next = entry->next;
+      sched_add(entry->snoozer->cpu, entry->snoozer);
+      PROC_DEBUG("[proc:%i] woke up thread %p tid %i pid %i on role %i\n", CPU_ID,
+                 entry->snoozer, entry->snoozer->tid, entry->snoozer->proc->pid, role);
+      vmm_free(entry);
+      entry = next;
+   }
+   
+   unlock_gate(&(proc_lock), LOCK_READ);
+}
+
+/* --------------------------------- rights ------------------------------- */
 /* proc_layer_up
    Increase a process's privilege layer so that it becomes less privileged
    => proc = pointer to process structure to update
@@ -151,6 +225,7 @@ kresult proc_clear_rights(process *proc, unsigned int bits)
    return success;
 }
 
+/* --------------------------------- process mngmnt ------------------------------- */
 /* proc_find_proc
    <= return a pointer to a process that matches the given pid, or NULL for failure */
 process *proc_find_proc(unsigned int pid)
@@ -793,6 +868,9 @@ kresult proc_initialise(void)
    
    /* initialise the roles table */
    vmm_memset(&proc_roles, 0, DIOSIX_ROLES_NR * sizeof(process *));
+   
+   /* initialise the role snoozer table */
+   vmm_memset(&role_wait_list, 0, DIOSIX_ROLES_NR * sizeof(role_snoozer *));
    
    /* initialise proc hash table */
    err = vmm_malloc((void **)&proc_table, sizeof(process *) * PROC_HASH_BUCKETS);

@@ -17,6 +17,8 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 #include <stdio.h>
 #include <unistd.h>
+#include <sys/stat.h> 
+#include <fcntl.h>
 
 #include "diosix.h"
 #include "functions.h"
@@ -63,6 +65,7 @@ void process_kernel_signals(void)
 int main(void)
 {
    int kernel_signals_thread;
+   int handle;
    
    /* name this process so others can find it */
    diosix_set_role(DIOSIX_ROLE_SYSTEM_EXECUTIVE);
@@ -71,6 +74,9 @@ int main(void)
       
    kernel_signals_thread = diosix_thread_fork();
    if(kernel_signals_thread == 0) process_kernel_signals();
+   
+   handle = open("/dev/ata/0", O_RDONLY);
+   printf("opening ATA drive: %i\n", handle);
    
    while(1); /* idle */
 }

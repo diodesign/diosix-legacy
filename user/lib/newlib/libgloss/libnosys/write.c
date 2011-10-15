@@ -44,7 +44,7 @@ _DEFUN (_write, (file, ptr, len),
    diosix_vfs_reply reply;
    kresult err;
 
-   /* copy stdout to the debug channel */
+   /* direct stdout to the debug channel */
    if(file == 1)
    {
       char *str;
@@ -57,6 +57,8 @@ _DEFUN (_write, (file, ptr, len),
          diosix_debug_write(str);
          free(str);
       }
+      
+      return 0; /* assume success */
    }
    
    /* the pid of the filesystem that will carry out

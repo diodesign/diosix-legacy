@@ -210,6 +210,8 @@ kresult open_file(diosix_msg_info *msg, int flags, int mode, char *path, diosix_
    /* sanity check */
    if(!msg || !path || !reply) return e_bad_params;
    
+   // printf("opening file %s\n", path);
+   
    /* get a filesystem pid for the path */
    fspid = fs_from_path(path);
    if(!fspid) return e_not_found;
