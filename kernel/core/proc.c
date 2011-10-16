@@ -138,8 +138,8 @@ kresult proc_wait_for_role(thread *snoozer, unsigned char role)
    /* tell the scheduler to send the thread to sleep */
    sched_remove(snoozer, sleeping);
    
-   PROC_DEBUG("[proc:%i] put thread %p tid %i pid %i into sleep-wait on role %i\n", CPU_ID,
-              snoozer, snoozer->tid, snoozer->proc->pid, role);
+   PROC_DEBUG("[proc:%i] put thread %p tid %i pid %i into sleep-wait on role %i [entry %p thread %p]\n", CPU_ID,
+              snoozer, snoozer->tid, snoozer->proc->pid, role, new, new->snoozer);
    return success;
 }
 
@@ -153,21 +153,26 @@ void proc_role_wakeup(unsigned char role)
    /* sanity check */
    if(role > DIOSIX_ROLES_NR || !role) return;
    
-   lock_gate(&(proc_lock), LOCK_READ);
+   lock_gate(&(proc_lock), LOCK_WRITE);
    role_snoozer *entry = role_wait_list[role - 1];
    
    while(entry)
    {
-      /* wake up the sleeping thread and free the memory describing it */
+      /* wake up the sleeping thread */
       role_snoozer *next = entry->next;
+      PROC_DEBUG("[proc:%i] waking up thread %p (tid %i pid %i) [entry %p] on role %i\n", CPU_ID,
+                 entry->snoozer, entry->snoozer->tid, entry->snoozer->proc->pid, entry, role);
       sched_add(entry->snoozer->cpu, entry->snoozer);
-      PROC_DEBUG("[proc:%i] woke up thread %p tid %i pid %i on role %i\n", CPU_ID,
-                 entry->snoozer, entry->snoozer->tid, entry->snoozer->proc->pid, role);
+      
+      /* unlink it from the chain and free the memory describing it */
+      if(entry->previous) entry->previous->next = next;
+      if(next) next->previous = entry->previous;
+      if(role_wait_list[role - 1] == entry) role_wait_list[role - 1] = next;
       vmm_free(entry);
       entry = next;
    }
    
-   unlock_gate(&(proc_lock), LOCK_READ);
+   unlock_gate(&(proc_lock), LOCK_WRITE);
 }
 
 /* --------------------------------- rights ------------------------------- */
