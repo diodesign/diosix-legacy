@@ -262,7 +262,7 @@ msg_test_receiver_success:
 
 /* msg_find_receiver
    Identify a potential receiver of a message sent by a thread.
-   => sender = thread trying to send the message
+   => sender = thread trying to send the message, or NULL if sent by the kernel
       msg = message block trying to be sent
    <= pointer to thread to send the message to, or NULL for none
 */
@@ -272,8 +272,13 @@ thread *msg_find_receiver(thread *sender, diosix_msg_info *msg)
    thread *recv;
 
    /* start with basic checks */
-   if(!msg) return NULL;
-   
+   if(!msg)
+   {
+      KOOPS_DEBUG("[msg:%i] OMGWTF msg_find_receiver() called with nonsense params (msg %p sender %p)\n",
+                  CPU_ID, msg, sender);
+      return NULL;
+   }
+
    /* if a specific role is suggested, then try that */
    if(msg->role)
       proc = proc_role_lookup(msg->role);
@@ -281,8 +286,18 @@ thread *msg_find_receiver(thread *sender, diosix_msg_info *msg)
       proc = proc_find_proc(msg->pid);
    if(!proc) return NULL;
    
-   MSG_DEBUG("[msg:%i] trying to find a receiver, sender %p msg %p target=[tid %i pid %i role %i]\n",
-             CPU_ID, sender, msg, msg->tid, msg->pid, msg->role);
+#ifdef MSG_DEBUG
+   if(sender)
+   {
+      MSG_DEBUG("[msg:%i] trying to find a receiver, sender tid %i pid %i msg %p target=[tid %i pid %i role %i]\n",
+                CPU_ID, sender->tid, sender->proc->pid, msg, msg->tid, msg->pid, msg->role);
+   }
+   else
+   {
+      MSG_DEBUG("[msg:%i] trying to find a receiver, sender is *kernel* msg %p target=[tid %i pid %i role %i]\n",
+                CPU_ID, msg, msg->tid, msg->pid, msg->role);
+   }
+#endif
    
    /* if a specific tid is given, then try that one */ 
    if(msg->tid != DIOSIX_MSG_ANY_THREAD)
@@ -639,7 +654,24 @@ kresult msg_send(thread *sender, diosix_msg_info *msg)
          and blocks to receive. the customer is always right, after all... */
       if((msg->flags & DIOSIX_MSG_QUEUEME) && !(msg->flags & DIOSIX_MSG_REPLY) && msg->role)
       {
-         return proc_wait_for_role(sender, msg->role);
+         kresult proc_err = proc_wait_for_role(sender, msg->role);
+         if(proc_err == success)
+         {
+            lock_gate(&(sender->lock), LOCK_WRITE);
+            
+            /* stash a copy of the message block */
+            vmm_memcpy(&(sender->msg), msg, sizeof(diosix_msg_info));
+            sender->msg_src = msg;
+            
+            unlock_gate(&(sender->lock), LOCK_WRITE);
+            
+            /* tell the scheduler to send the thread to sleep */
+            sched_remove(sender, sleeping);
+            return success;
+         }
+         
+         /* fall through to report a failure */
+         return proc_err;
       }
       
       /* fall through to inform the sender */
@@ -721,6 +753,10 @@ kresult msg_send(thread *sender, diosix_msg_info *msg)
 */
 kresult msg_recv(thread *receiver, diosix_msg_info *msg)
 {
+   /* set to 1 to indicate a thread was waiting on a role
+      that was registered by the receiver */
+   unsigned char found_role_waiting_sender = 0;
+   
    /* basic sanity checks */
    if(!receiver || !msg) return e_bad_address;
    if((unsigned int)msg + MEM_CLIP(msg, sizeof(diosix_msg_info)) >= KERNEL_SPACE_BASE)
@@ -830,13 +866,26 @@ kresult msg_recv(thread *receiver, diosix_msg_info *msg)
          } else break; /* exit loop if vmm_next_in_pool() returns NULL */
       }
       
+      /* if nothing is queued then maybe a thread is waiting on a role */
+      if(!queued && receiver->proc->role)
+      {
+         sender = proc_role_wakeup(receiver->proc->role);
+         if(sender)
+         {
+            MSG_DEBUG("[msg:%i] tid %i pid %i called recv, found tid %i pid %i waiting on its role\n",
+                      CPU_ID, receiver->tid, receiver->proc->pid, sender->tid, sender->proc->pid);
+            
+            found_role_waiting_sender = 1;
+         }
+      }
+      
       /* queued is either NULL for no queued message found or a suitable pointer */
-      if(queued)
+      if(queued || found_role_waiting_sender)
       {
          kresult err;
 
          /* don't forget to free the queued_sender block */
-         vmm_free_pool(queued, receiver->proc->msg_queue);
+         if(queued) vmm_free_pool(queued, receiver->proc->msg_queue);
          
          /* we've found the sending thread but the message hasn't been
             delivered yet. we need to send the message but from the 
@@ -889,12 +938,9 @@ kresult msg_recv(thread *receiver, diosix_msg_info *msg)
    }
    
    /* if we're still here then block and wait for a message to arrive */
-   
+
 msg_recv_block:
    unlock_gate(&(receiver->lock), LOCK_WRITE);
-
-   /* wake up any threads that might be waiting on the process */
-   if(receiver->proc->role) proc_role_wakeup(receiver->proc->role);
    
    /* remove receiver from the queue until a message comes in */
    sched_remove(receiver, waitingformsg);

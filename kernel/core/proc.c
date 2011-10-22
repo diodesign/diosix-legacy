@@ -106,7 +106,7 @@ process *proc_role_lookup(unsigned int role)
 }
 
 /* proc_wait_for_role
-   Put a thread to sleep until a role is registered by a process
+   Put a thread on a queue against a registered process
    => snoozer = thread to send to sleep
       role = role to sleep against
    <= 0 for success, or an error code
@@ -135,44 +135,45 @@ kresult proc_wait_for_role(thread *snoozer, unsigned char role)
    
    unlock_gate(&(proc_lock), LOCK_WRITE);
    
-   /* tell the scheduler to send the thread to sleep */
-   sched_remove(snoozer, sleeping);
-   
-   PROC_DEBUG("[proc:%i] put thread %p tid %i pid %i into sleep-wait on role %i [entry %p thread %p]\n", CPU_ID,
+   PROC_DEBUG("[proc:%i] queued thread %p tid %i pid %i to sleep-wait on role %i [entry %p thread %p]\n", CPU_ID,
               snoozer, snoozer->tid, snoozer->proc->pid, role, new, new->snoozer);
    return success;
 }
 
 /* proc_role_wakeup
-   Wake up any threads that were sleep-waiting for a named process
+   Return a thread sleep-waiting for a named process, and remove it from the queue
    to block waiting for a message
    => role = role id to wake up
+   <= pointer to a thread queued against the role, or NULL for none
 */
-void proc_role_wakeup(unsigned char role)
+thread *proc_role_wakeup(unsigned char role)
 {
+   thread *queued = NULL;
+   
    /* sanity check */
-   if(role > DIOSIX_ROLES_NR || !role) return;
+   if(role > DIOSIX_ROLES_NR || !role) return NULL;
    
    lock_gate(&(proc_lock), LOCK_WRITE);
    role_snoozer *entry = role_wait_list[role - 1];
    
-   while(entry)
+   if(entry)
    {
       /* wake up the sleeping thread */
-      role_snoozer *next = entry->next;
-      PROC_DEBUG("[proc:%i] waking up thread %p (tid %i pid %i) [entry %p] on role %i\n", CPU_ID,
+      PROC_DEBUG("[proc:%i] found thread %p (tid %i pid %i) [entry %p] queued on role %i\n", CPU_ID,
                  entry->snoozer, entry->snoozer->tid, entry->snoozer->proc->pid, entry, role);
-      sched_add(entry->snoozer->cpu, entry->snoozer);
       
       /* unlink it from the chain and free the memory describing it */
-      if(entry->previous) entry->previous->next = next;
-      if(next) next->previous = entry->previous;
-      if(role_wait_list[role - 1] == entry) role_wait_list[role - 1] = next;
+      if(entry->previous) entry->previous->next = entry->next;
+      if(entry->next) entry->next->previous = entry->previous;
+      if(role_wait_list[role - 1] == entry) role_wait_list[role - 1] = entry->next;
+
+      queued = entry->snoozer;
       vmm_free(entry);
-      entry = next;
    }
    
    unlock_gate(&(proc_lock), LOCK_WRITE);
+   
+   return queued;
 }
 
 /* --------------------------------- rights ------------------------------- */
@@ -748,7 +749,8 @@ do_proc_kill:
       don't fret if the parent shuns its moment of mourning */
    msg_send_signal(parent, NULL, SIGCHLD, 0);
    
-   PROC_DEBUG("[proc:%i] killed process %i (%p)\n", CPU_ID, victim->pid, victim);
+   PROC_DEBUG("[proc:%i] killed process %i (%p) [current tid %i pid %i]\n", CPU_ID, victim->pid, victim,
+              cpu_table[CPU_ID].current->tid, cpu_table[CPU_ID].current->proc->pid);
    
    return success;
 }

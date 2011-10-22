@@ -107,14 +107,14 @@ kresult diosix_vfs_send_req(unsigned int target_pid, diosix_msg_info *msg,
    if(target_pid)
    {
       /* create a message for a FS process */
-      msg->pid   = target_pid;
-      msg->role  = DIOSIX_ROLE_NONE;
+      msg->pid  = target_pid;
+      msg->role = DIOSIX_ROLE_NONE;
    }
    else
    {
       /* fill out all the details to send a message to the vfs */
-      msg->pid   = DIOSIX_MSG_ANY_PROCESS;
-      msg->role  = DIOSIX_ROLE_VFS;
+      msg->pid  = DIOSIX_MSG_ANY_PROCESS;
+      msg->role = DIOSIX_ROLE_VFS;
    }
     
    /* fill out the rest of the message structure */

@@ -40,7 +40,7 @@ _DEFUN (_read, (file, ptr, len),
    diosix_vfs_request_head head;
    diosix_vfs_request_read descr;
    kresult err;
-
+   
    /* the pid of the filesystem that will carry out
       the read() for us */
    unsigned int fspid = diosix_vfs_get_fs(file);

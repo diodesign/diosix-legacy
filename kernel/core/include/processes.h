@@ -303,7 +303,7 @@ kresult thread_kill(process *owner, thread *victim);
 process *proc_role_lookup(unsigned int role);
 kresult proc_role_add(process *target, unsigned int role);
 kresult proc_role_remove(process *target, unsigned int role);
-void proc_role_wakeup(unsigned char role);
+thread *proc_role_wakeup(unsigned char role);
 kresult proc_wait_for_role(thread *snoozer, unsigned char role);
 kresult proc_remove_phys_mem_allocation(process *proc, void *addr);
 kresult proc_add_phys_mem_allocation(process *proc, void *addr, unsigned short pages);

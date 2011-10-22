@@ -364,7 +364,7 @@ kresult vmm_free(void *addr)
 
    if(kheap_allocated == block)
       kheap_allocated = block->next;
-
+   
    /* add to head of free list */
    vmm_heap_add_to_free(block);
 

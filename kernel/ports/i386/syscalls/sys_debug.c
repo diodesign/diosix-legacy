@@ -17,6 +17,15 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 #include <portdefs.h>
 
+unsigned char *debug_roles[DIOSIX_ROLES_NR] = {
+   "system executive",
+   "vfs",
+   "pager",
+   "networkstack",
+   "video console",
+   "keyboard console",
+   "pcimanager"
+};
 
 /* syscall:usrdebug - use the kernel to aid debugging of a userland process.
    => eax = DIOSIX_DEBUG_WRITE: write string to the kernel's debug channel
@@ -45,8 +54,16 @@ void syscall_do_debug(int_registers_block *regs)
          if(current->proc->uid.effective != DIOSIX_SUPERUSER_ID)
             SYSCALL_RETURN(e_no_rights);
        
-         dprintf("[debug:%i] *** pid %i tid %i role %i: ",
-                 CPU_ID, current->proc->pid, current->tid, current->proc->role);
+         if(current->proc->role)
+         {
+            dprintf("[debug:%i] [%s]: ",
+                    CPU_ID, debug_roles[current->proc->role - 1]);
+         }
+         else
+         {
+            dprintf("[debug:%i] pid %i tid %i: ",
+                    CPU_ID, current->proc->pid, current->tid);
+         }
          
          /* output one byte at a time, checking not to collide with kernel space */
          while((unsigned int)str < KERNEL_SPACE_BASE && *str)

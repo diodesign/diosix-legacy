@@ -41,6 +41,7 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 void reply_to_request(diosix_msg_info *msg, kresult result)
 {
    diosix_vfs_reply reply;
+   kresult err;
    
    /* sanity check */
    if(!msg) return;
@@ -113,31 +114,36 @@ void wait_for_request(void)
          {
             kresult result;
             diosix_vfs_pid_reply reply;
-            
+
             /* extract the request data from the message payload */
             diosix_vfs_request_open *req_info = VFS_MSG_EXTRACT(req_head, 0);
             char *path = VFS_MSG_EXTRACT(req_head, sizeof(diosix_vfs_request_open));
-            
+
             /* the payload might not be big enough to contain the request details */
             if(VFS_MSG_SIZE_CHECK(msg, 0, sizeof(diosix_vfs_request_open)))
             {
+               diosix_debug_write("open request: returning e_too_big 1\n");
                reply_to_request(&msg, e_too_big);
                return;
             }
-            
+
             /* we cannot trust the string length parameter in the payload, so check it */
             if(VFS_MSG_SIZE_CHECK(msg, sizeof(diosix_vfs_request_open), req_info->length))
             {
+               diosix_debug_write("open request: returning e_too_big 2\n");
                reply_to_request(&msg, e_too_big);
                return;
             }
-            
+
             /* is the path zero-terminated? */
             if(path[req_info->length - 1])
             {
+               diosix_debug_write("open request: returning e_bad_params\n");
                reply_to_request(&msg, e_bad_params);
                return;
             }
+            
+            diosix_debug_write("open request: calling open_file\n");
             
             /* all seems clear */
             result = open_file(&msg, req_info->flags, req_info->mode, path, &reply);
@@ -147,13 +153,6 @@ void wait_for_request(void)
                reply_to_request(&msg, result);
          }
          break;
-
-         case read_req:
-         case readlink_req:
-         case stat_req:
-         case symlink_req:
-         case unlink_req:
-         case write_req:
 
          /* request to register a filesystem/device in the vfs filespace */
          case register_req:
@@ -224,6 +223,20 @@ void wait_for_request(void)
             reply_to_request(&msg, result);
          }
          break;
+            
+         case read_req:
+         {
+            kresult result = success;
+            printf("read requested!\n");
+            reply_to_request(&msg, result);
+         }
+         break;
+            
+         case readlink_req:
+         case stat_req:
+         case symlink_req:
+         case unlink_req:
+         case write_req:
             
          /* if the type is unknown then fail it */
          default:

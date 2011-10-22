@@ -65,7 +65,8 @@ void process_kernel_signals(void)
 int main(void)
 {
    int kernel_signals_thread;
-   int handle;
+   int handle, count;
+   unsigned char data[100];
    
    /* name this process so others can find it */
    diosix_set_role(DIOSIX_ROLE_SYSTEM_EXECUTIVE);
@@ -76,7 +77,22 @@ int main(void)
    if(kernel_signals_thread == 0) process_kernel_signals();
    
    handle = open("/dev/ata/0", O_RDONLY);
-   printf("opening ATA drive: %i\n", handle);
+   while(handle < 0)
+   {
+      diosix_thread_sleep(100);
+      handle = open("/dev/ata/0", O_RDONLY);
+   }
+   
+   printf("opened ATA drive: %i\n", handle);
+   count = read(handle, data, 100);
+   while(count < 0)
+   {
+      diosix_thread_sleep(100);
+      count = read(handle, data, 100);
+   }
+   
+   printf("reading... count = %i data = %x %x %x %x\n",
+          count, data[0], data[1], data[2], data[3]);
    
    while(1); /* idle */
 }

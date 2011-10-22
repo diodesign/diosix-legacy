@@ -21,6 +21,7 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #include <_syslist.h>
 #include <string.h>
 #include <errno.h>
+#include <stdio.h>
 #undef errno
 extern int errno;
 
@@ -58,7 +59,7 @@ _DEFUN (_open, (file, flags, mode),
       the path of the file to open */
    DIOSIX_WRITE_MULTIPART(req, VFS_MSG_OPEN_PATH, file,
                           descr.length);
-
+   
    /* create the rest of the message and send */
    err = diosix_vfs_send_req(0, &msg, req, VFS_OPEN_PARTS,
                              &reply, sizeof(diosix_vfs_pid_reply));
