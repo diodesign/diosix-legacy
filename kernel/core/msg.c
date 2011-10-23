@@ -354,14 +354,14 @@ kresult msg_copy(thread *receiver, void *data, unsigned int size, unsigned int *
    diosix_msg_info *rmsg;
    unsigned int recv;
    unsigned int recv_base;
-   
+
    /* sanity checks - no NULL pointers or zero-byte copies */
    if(!receiver || !data || !sender) return e_bad_params;
    if(!size) return success; /* copying zero bytes also succeeds */
    
    /* protect us from metadata changes */
    if(lock_gate(&(receiver->lock), LOCK_READ)) return e_failure;
-   
+
    rmsg = &(receiver->msg);
    recv = (unsigned int)rmsg->recv;
    
@@ -371,7 +371,7 @@ kresult msg_copy(thread *receiver, void *data, unsigned int size, unsigned int *
       unlock_gate(&(receiver->lock), LOCK_READ);
       return e_bad_target_address;
    }
-   
+
    /* calculate the base address in the receiver's buffer */
    recv_base = recv + *offset;
    
@@ -382,7 +382,7 @@ kresult msg_copy(thread *receiver, void *data, unsigned int size, unsigned int *
       unlock_gate(&(receiver->lock), LOCK_READ);
       return e_too_big;
    }
-   
+
    lock_gate(&(sender->lock), LOCK_READ);
 
    /* hand it over to the vmm to copy process-to-process - it'll sanity check the addresses */
@@ -395,7 +395,7 @@ kresult msg_copy(thread *receiver, void *data, unsigned int size, unsigned int *
 
    /* update offset */
    *(offset) += size;
-   
+
    unlock_gate(&(sender->lock), LOCK_READ);
    unlock_gate(&(receiver->lock), LOCK_READ);
    return success;
@@ -507,7 +507,30 @@ kresult msg_deliver(thread *receiver, diosix_msg_info *rmsg, thread *sender, dio
       /* do the multipart copy */
       for(loop = 0; loop < smsg->send_size; loop++)
       {
-         err = msg_copy(receiver, parts[loop].data, parts[loop].size, &bytes_copied, sender);
+         /* msg_copy() operates on data source addresses that are within the sender's context.
+            thus: while it's OK to pass a single-part data pointer that refers into the sender's
+            address space, in multipart messages we must access the sender's multipart block.
+            this is non-trivial if we're in the receiver's context while delivering a queued message.
+            The answer is to copy the sender's multipart block into a temp area that the kernel can
+            access from the receiver's context */
+         if(cpu_table[CPU_ID].current->proc != sender->proc)
+         {
+            diosix_msg_multipart local_part;
+            
+            /* we're not in the sender's address space context! so using the sender's pointers
+               to fetch the message part data pointer will end up reading a bit of another
+               process's address space (probably the receiver's) */
+            MSG_DEBUG("[msg:%i] copying sender's multipart message: parts %p loop %i: %p -> %p\n",
+                      CPU_ID, parts, loop, &(parts[loop]), &local_part);
+            err = vmm_memcpyuser(&local_part, NULL, &(parts[loop]), sender->proc, sizeof(diosix_msg_multipart));
+            
+            if(!err)
+               err = msg_copy(receiver, local_part.data, local_part.size, &bytes_copied, sender);
+         }
+         else
+            err = msg_copy(receiver, parts[loop].data, parts[loop].size, &bytes_copied, sender);
+         
+         /* check to see if anything went wrong */
          if(err || (bytes_copied > DIOSIX_MSG_MAX_SIZE)) break;
       }
    }

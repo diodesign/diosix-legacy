@@ -653,6 +653,13 @@ do_proc_kill:
    if(victim == proc_role_lookup(DIOSIX_ROLE_SYSTEM_EXECUTIVE))
       debug_panic("system executive just died D:");
    
+   /* warn the user if a named process is dying */
+   if(victim->role)
+   {
+      BOOT_DEBUG("[proc:%i] killing process %i with role %i\n",
+                 CPU_ID, victimpid, victim->role);
+   }
+   
    /* reverse the process creation routines in proc_new() */
    parent = proc_find_proc(victim->parentpid);
    
