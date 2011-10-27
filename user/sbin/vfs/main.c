@@ -41,7 +41,6 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 void reply_to_request(diosix_msg_info *msg, kresult result)
 {
    diosix_vfs_reply reply;
-   kresult err;
    
    /* sanity check */
    if(!msg) return;
@@ -91,24 +90,24 @@ void wait_for_request(void)
    if(diosix_msg_receive(&msg) == success)
    {
       diosix_vfs_request_head *req_head = (diosix_vfs_request_head *)recv_buffer;
-      
+
       /* we cannot trust anything in the message payload */
-      if(VFS_MSG_SIZE_CHECK(msg, 0, 0))
+      if(VFS_MSG_MIN_SIZE_CHECK(msg, 0))
       {
          /* malformed request, it's too small */
          reply_to_request(&msg, e_too_small);
          return;
       }
+
+      {
+         char buff[256];
+         sprintf(buff, "message source: tid %i pid %i type %i\n", msg.tid, msg.pid, req_head->type);
+         diosix_debug_write(buff);
+      }
       
       /* decode the request type */
       switch(req_head->type)
       {
-         case chown_req:
-         case close_req:
-         case fstat_req:
-         case link_req:
-         case lseek_req:
-         
          /* request to open a file */
          case open_req:
          {
@@ -118,9 +117,9 @@ void wait_for_request(void)
             /* extract the request data from the message payload */
             diosix_vfs_request_open *req_info = VFS_MSG_EXTRACT(req_head, 0);
             char *path = VFS_MSG_EXTRACT(req_head, sizeof(diosix_vfs_request_open));
-
+            
             /* the payload might not be big enough to contain the request details */
-            if(VFS_MSG_SIZE_CHECK(msg, 0, sizeof(diosix_vfs_request_open)))
+            if(VFS_MSG_MIN_SIZE_CHECK(msg, sizeof(diosix_vfs_request_open)))
             {
                diosix_debug_write("open request: returning e_too_big 1\n");
                reply_to_request(&msg, e_too_big);
@@ -128,7 +127,7 @@ void wait_for_request(void)
             }
 
             /* we cannot trust the string length parameter in the payload, so check it */
-            if(VFS_MSG_SIZE_CHECK(msg, sizeof(diosix_vfs_request_open), req_info->length))
+            if(VFS_MSG_MAX_SIZE_CHECK(msg, sizeof(diosix_vfs_request_open), req_info->length))
             {
                diosix_debug_write("open request: returning e_too_big 2\n");
                reply_to_request(&msg, e_too_big);
@@ -164,14 +163,14 @@ void wait_for_request(void)
             char *path = VFS_MSG_EXTRACT(req_head, sizeof(diosix_vfs_request_register));
             
             /* the payload might not be big enough to contain the request details */
-            if(VFS_MSG_SIZE_CHECK(msg, 0, sizeof(diosix_vfs_request_register)))
+            if(VFS_MSG_MIN_SIZE_CHECK(msg, sizeof(diosix_vfs_request_register)))
             {
                reply_to_request(&msg, e_too_big);
                return;
             }
 
             /* we cannot trust the string length parameter in the payload, so check it */
-            if(VFS_MSG_SIZE_CHECK(msg, sizeof(diosix_vfs_request_register), req_info->length))
+            if(VFS_MSG_MAX_SIZE_CHECK(msg, sizeof(diosix_vfs_request_register), req_info->length))
             {
                reply_to_request(&msg, e_too_big);
                return;
@@ -199,14 +198,14 @@ void wait_for_request(void)
             char *path = (char *)VFS_MSG_EXTRACT(req_head, sizeof(diosix_vfs_request_register));
             
             /* the payload might not be big enough to contain the request details */
-            if(VFS_MSG_SIZE_CHECK(msg, 0, sizeof(diosix_vfs_request_register)))
+            if(VFS_MSG_MIN_SIZE_CHECK(msg, sizeof(diosix_vfs_request_register)))
             {
                reply_to_request(&msg, e_too_big);
                return;
             }
             
             /* we cannot trust the string length parameter in the payload, so check it */
-            if(VFS_MSG_SIZE_CHECK(msg, sizeof(diosix_vfs_request_register), req_info->length))
+            if(VFS_MSG_MAX_SIZE_CHECK(msg, sizeof(diosix_vfs_request_register), req_info->length))
             {
                reply_to_request(&msg, e_too_big);
                return;
@@ -227,11 +226,16 @@ void wait_for_request(void)
          case read_req:
          {
             kresult result = success;
-            printf("read requested!\n");
+            diosix_debug_write("read requested!\n");
             reply_to_request(&msg, result);
          }
          break;
             
+         case chown_req:
+         case close_req:
+         case fstat_req:
+         case link_req:
+         case lseek_req:
          case readlink_req:
          case stat_req:
          case symlink_req:
@@ -256,6 +260,10 @@ int main(void)
 
    /* step into the correct layer - layer 3 */
    diosix_priv_layer_up(3);
+   
+   /* create some worker threads */
+   diosix_thread_fork();
+   diosix_thread_fork();
    
    /* get some work to do */
    while(1) wait_for_request();

@@ -928,7 +928,7 @@ kresult proc_initialise(void)
          if(!first_proc) first_proc = new;
          
          /* build page tables for this module */
-         BOOT_DEBUG("[proc:%i] preparing system process '%s'...\n", CPU_ID, payload.name);
+         BOOT_DEBUG("[proc:%i] preparing system process '%s' pid %i\n", CPU_ID, payload.name, new->pid);
          
          if(payload.areas[PAYLOAD_CODE].flags & (PAYLOAD_READ | PAYLOAD_EXECUTE))
          {

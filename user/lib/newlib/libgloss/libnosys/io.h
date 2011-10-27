@@ -123,8 +123,16 @@ struct diosix_vfs_handle_assoc
    l = length to check against
    <= 1 for overrun or 0 for safe
 */
-#define VFS_MSG_SIZE_CHECK(m, o, l) ( (m).recv_size < sizeof(diosix_vfs_request_head) + (unsigned int)(o) + (unsigned int)(l) || \
-                                      (unsigned int)((m).recv) + sizeof(diosix_vfs_request_head) + (unsigned int)(o) > (unsigned int)((m).recv) + sizeof(diosix_vfs_request_head) + (unsigned int)(o) + (unsigned int)(l) ? 1 : 0 )
+#define VFS_MSG_MAX_SIZE_CHECK(m, o, l) ( ((m).recv_size < sizeof(diosix_vfs_request_head) + (unsigned int)(o) + (unsigned int)(l)) ? 1 : 0 )
+
+
+/* check that a request message is a minimum length
+   m = received message block
+   l = length to check against
+   <= 1 for underrun or 0 for safe
+*/
+#define VFS_MSG_MIN_SIZE_CHECK(m, l) ( VFS_MSG_MAX_SIZE_CHECK(m, 0, l) )
+
 
 /* define vfs request message types */
 typedef enum

@@ -63,7 +63,7 @@ _DEFUN (_open, (file, flags, mode),
    /* create the rest of the message and send */
    err = diosix_vfs_send_req(0, &msg, req, VFS_OPEN_PARTS,
                              &reply, sizeof(diosix_vfs_pid_reply));
-   
+
    if(err || reply.result)
    {
       errno = ENOSYS;
