@@ -98,12 +98,6 @@ void wait_for_request(void)
          reply_to_request(&msg, e_too_small);
          return;
       }
-
-      {
-         char buff[256];
-         sprintf(buff, "message source: tid %i pid %i type %i\n", msg.tid, msg.pid, req_head->type);
-         diosix_debug_write(buff);
-      }
       
       /* decode the request type */
       switch(req_head->type)
@@ -121,7 +115,6 @@ void wait_for_request(void)
             /* the payload might not be big enough to contain the request details */
             if(VFS_MSG_MIN_SIZE_CHECK(msg, sizeof(diosix_vfs_request_open)))
             {
-               diosix_debug_write("open request: returning e_too_big 1\n");
                reply_to_request(&msg, e_too_big);
                return;
             }
@@ -129,7 +122,6 @@ void wait_for_request(void)
             /* we cannot trust the string length parameter in the payload, so check it */
             if(VFS_MSG_MAX_SIZE_CHECK(msg, sizeof(diosix_vfs_request_open), req_info->length))
             {
-               diosix_debug_write("open request: returning e_too_big 2\n");
                reply_to_request(&msg, e_too_big);
                return;
             }
@@ -137,13 +129,10 @@ void wait_for_request(void)
             /* is the path zero-terminated? */
             if(path[req_info->length - 1])
             {
-               diosix_debug_write("open request: returning e_bad_params\n");
                reply_to_request(&msg, e_bad_params);
                return;
             }
-            
-            diosix_debug_write("open request: calling open_file\n");
-            
+
             /* all seems clear */
             result = open_file(&msg, req_info->flags, req_info->mode, path, &reply);
             if(result == success)

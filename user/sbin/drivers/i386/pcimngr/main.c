@@ -232,7 +232,7 @@ void discover_devices(void)
                new = malloc(sizeof(pci_device));
                if(!new)
                {
-                  printf("pcimngr: malloc() failed during device discovery\n");
+                  printf("malloc() failed during device discovery\n");
                   return; /* bail out if memory is a problem */
                }
                
@@ -276,7 +276,7 @@ void discover_devices(void)
             }
          }
    
-   printf("pcimngr: found %i PCI device(s)\n", count);
+   printf("found %i PCI device(s)\n", count);
 }
 
 /* ----------------------------------------------------------------------
@@ -293,8 +293,7 @@ void reply_to_request(diosix_msg_info *msg, kresult result, pci_reply_msg *reply
    msg->send = reply;
    msg->send_size = sizeof(pci_reply_msg);
    
-   printf("replying to pid %i tid %i with result %i, sending error code %i\n",
-          msg->pid, msg->tid, result, diosix_msg_reply(msg));
+   diosix_msg_reply(msg);
 }
 
 void wait_for_request(void)
@@ -311,13 +310,9 @@ void wait_for_request(void)
    msg.flags = DIOSIX_MSG_GENERIC;
    msg.recv = &request;
    msg.recv_max_size = sizeof(pci_request_msg);
-   
-   printf("waiting to pick up a message\n");
-   
+
    if(diosix_msg_receive(&msg) == success)
-   {
-      printf("got a message from tid %i pid %i\n", msg.tid, msg.pid);
-      
+   {      
       if(msg.recv_size < sizeof(pci_request_msg))
       {
          /* malformed request, it's too small to even hold a request type */
