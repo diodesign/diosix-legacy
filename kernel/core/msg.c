@@ -243,7 +243,6 @@ kresult msg_test_receiver(thread *sender, thread *target, diosix_msg_info *msg)
             (target->state == running && msg->flags & DIOSIX_MSG_QUEUEME))
             if((target->msg.flags & DIOSIX_MSG_TYPEMASK) == DIOSIX_MSG_GENERIC)
                goto msg_test_receiver_success;
-         
    }
    
    /* give up */
@@ -689,7 +688,8 @@ kresult msg_send(thread *sender, diosix_msg_info *msg)
             unlock_gate(&(sender->lock), LOCK_WRITE);
             
             /* tell the scheduler to send the thread to sleep */
-            sched_remove(sender, sleeping);
+            sched_remove(sender, waitingforreply);
+            sender->replysource = NULL; /* replier not known at this point */
             return success;
          }
          
@@ -899,6 +899,11 @@ kresult msg_recv(thread *receiver, diosix_msg_info *msg)
                       CPU_ID, receiver->tid, receiver->proc->pid, sender->tid, sender->proc->pid);
             
             found_role_waiting_sender = 1;
+            
+            /* update the sender now that we've discovered a receiver for it */
+            lock_gate(&(sender->lock), LOCK_WRITE);
+            sender->replysource = receiver;
+            unlock_gate(&(sender->lock), LOCK_WRITE);
          }
       }
       

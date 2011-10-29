@@ -293,7 +293,8 @@ void reply_to_request(diosix_msg_info *msg, kresult result, pci_reply_msg *reply
    msg->send = reply;
    msg->send_size = sizeof(pci_reply_msg);
    
-   diosix_msg_reply(msg);
+   printf("replying to pid %i tid %i with result %i, sending error code %i\n",
+          msg->pid, msg->tid, result, diosix_msg_reply(msg));
 }
 
 void wait_for_request(void)
@@ -311,8 +312,12 @@ void wait_for_request(void)
    msg.recv = &request;
    msg.recv_max_size = sizeof(pci_request_msg);
    
+   printf("waiting to pick up a message\n");
+   
    if(diosix_msg_receive(&msg) == success)
    {
+      printf("got a message from tid %i pid %i\n", msg.tid, msg.pid);
+      
       if(msg.recv_size < sizeof(pci_request_msg))
       {
          /* malformed request, it's too small to even hold a request type */
@@ -354,7 +359,7 @@ void wait_for_request(void)
          reply_to_request(&msg, e_bad_arch, &reply);
          return;
       }
-      
+   
       /* decode the request type */
       switch(request.req)
       {
@@ -373,7 +378,7 @@ void wait_for_request(void)
          break;
          
          case claim_device:
-         {
+         {            
             /* already claimed? */
             if(owner)
                reply_to_request(&msg, e_exists, &reply);
@@ -383,7 +388,7 @@ void wait_for_request(void)
          break;
          
          case release_device:
-         {
+         {            
             /* already claimed? */
             if(owner)
                reply_to_request(&msg, pci_claim_device(request.bus, request.slot, request.func, 0), &reply);

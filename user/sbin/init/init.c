@@ -79,7 +79,8 @@ int main(void)
    handle = open("/dev/ata/0", O_RDONLY);
    while(handle < 0)
    {
-      diosix_thread_sleep(200);
+      printf("tried to open /dev/ata, got error code %i\n", handle);
+      diosix_thread_sleep(100);
       handle = open("/dev/ata/0", O_RDONLY);
    }
    
