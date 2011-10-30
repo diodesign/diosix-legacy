@@ -150,7 +150,7 @@ void wait_for_request(void)
             /* extract the request's data from the message payload */
             diosix_vfs_request_register *req_info = VFS_MSG_EXTRACT(req_head, 0);
             char *path = VFS_MSG_EXTRACT(req_head, sizeof(diosix_vfs_request_register));
-            
+
             /* the payload might not be big enough to contain the request details */
             if(VFS_MSG_MIN_SIZE_CHECK(msg, sizeof(diosix_vfs_request_register)))
             {
@@ -175,7 +175,6 @@ void wait_for_request(void)
             /* all seems clear */
             result = register_process(&msg, path);
             reply_to_request(&msg, result);
-
          }
          break;
 

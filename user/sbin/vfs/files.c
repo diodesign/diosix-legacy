@@ -206,18 +206,18 @@ kresult open_file(diosix_msg_info *msg, int flags, int mode, char *path, diosix_
    unsigned int fspid;
    int filedesc;
    kresult err;
-   
+      
    /* sanity check */
    if(!msg || !path || !reply) return e_bad_params;
 
    /* get a filesystem pid for the path */
    fspid = fs_from_path(path);
    if(!fspid) return e_not_found;
-   
+      
    /* generate a new file handle for this process */
    filedesc = new_filedesc(msg->pid, fspid);
    if(!filedesc) return e_failure;
-   
+      
    /* send message to fs/driver process */
    descr.flags = flags;
    descr.mode = mode;

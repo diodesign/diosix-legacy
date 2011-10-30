@@ -143,13 +143,13 @@ int main(void)
    diosix_priv_layer_up(1);
    if(diosix_driver_register()) diosix_exit(1); /* or exit on failure */
    
-   printf("trying to detect ata devices\n");
+   printf("ata: trying to detect ata devices\n");
    
    /* zero the controllers data structure and then populate it */
    memset(&controllers, 0, sizeof(controllers));
    if(discover_controllers() == 0) return 1; /* exit if there's no ATA drives */
    
-   printf("trying to register /dev/ata\n");
+   printf("ata: registering /dev/ata\n");
    
    /* register this driver with the vfs and become a named process */
    diosix_vfs_register("/dev/ata");

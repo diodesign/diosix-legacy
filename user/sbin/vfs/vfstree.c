@@ -38,12 +38,43 @@ vfs_tree_node *vfs_tree_root;
 volatile unsigned int vfs_tree_lock = 0;
 
 /* ------------------------------------------
+   debug the filespace
+   ------------------------------------------ */
+
+/* walk_vfs_tree
+   Dump the contents of the VFS tree from the given
+   entry point to stdout
+   => start = node to recursively start the dump from
+      depth = tree depth, set to 0 for first call
+*/
+void walk_vfs_tree(vfs_tree_node *start)
+{
+   unsigned int child_loop;
+   
+   if(!start) return;
+   
+   printf("--------------------------------------------------------\n");
+   printf(" node %p pid: %i path: '%s'\n", start, start->pid, start->path);
+   printf(" - - - - - - - - - - - - - - - - - - - - - - - - - - - -\n");
+   printf(" child count: %i children: %p\n", start->child_count, start->children);
+   printf(" - - - - - - - - - - - - - - - - - - - - - - - - - - - -\n");
+   
+   for(child_loop = 0; child_loop < start->child_count; child_loop++)
+   {
+      printf(" * child %i...\n", child_loop);
+      walk_vfs_tree(&(start->children[child_loop]));
+   }
+   
+   printf("--------------------------------------------------------\n");
+}
+
+/* ------------------------------------------
    manage the filespace
    ------------------------------------------ */
 
 /* fs_from_path
    Lookup the process managing the given path 
-   => path = path to examine
+   => path = absolute path to examine
    <= pid of FS process, or 0 for none
 */
 unsigned int fs_from_path(char *path)
@@ -55,7 +86,14 @@ unsigned int fs_from_path(char *path)
       component in the path */
    unsigned char at_final_leafnode = 0;
    
+   /* check this is an absolute path and then 
+      skip past the root / */
+   if(*path != '/') return 0;
+   path++;
+   
+   /* duplicate the path string and keep a copy of the base address */
    char *str = strdup(path);
+   char *str_base = str;
    if(!str) return 0;
    
    /* make this thread-safe */
@@ -64,7 +102,7 @@ unsigned int fs_from_path(char *path)
    /* start with the tree root */
    search = vfs_tree_root;
    if(!search) goto fs_from_path_exit; /* return 0 */
-   
+
    /* break down the path */
    while(!at_final_leafnode)
    {
@@ -78,7 +116,7 @@ unsigned int fs_from_path(char *path)
       
       /* search forward to a null or a '/' terminator */
       while(*str != '\0' && *str != '/') str++;
-      
+            
       /* ascertain whether or not we're at the last leafname */
       if(*str == '\0')
       {
@@ -94,14 +132,14 @@ unsigned int fs_from_path(char *path)
           standalone string */
          *str = '\0';
       }
-      
+            
       /* try to find a match in the current node's children */
       if(search->child_count)
       {
          unsigned int child_loop;
-         
+
          for(child_loop = 0; child_loop < search->child_count; child_loop++)
-         {
+         {            
             if(strcmp(leafname, search->children[child_loop].path) == 0)
             {
                /* got a match */
@@ -116,14 +154,14 @@ unsigned int fs_from_path(char *path)
          /* we've run out of nodes to search, so return the last seen
             FS PID */
          goto fs_from_path_exit;
-      
+            
       /* prepare for next iteration */
       search = next_node;
       str++;
    }
    
 fs_from_path_exit:
-   free(str);
+   free(str_base);
    DIOSIX_SPINLOCK_RELEASE(&vfs_tree_lock);
    return result;
 }
@@ -151,8 +189,8 @@ kresult register_process(diosix_msg_info *msg, char *path)
    vfs_tree_node *tree_node;
    kresult result;
 
-   /* set this to 1 when we're process the last
-    component in the path */
+   /* set this to 1 when we're processing the last
+      component in the path */
    unsigned char at_final_leafnode = 0;
    
    /* sanity check - no null pointers nor empty paths */
@@ -162,7 +200,7 @@ kresult register_process(diosix_msg_info *msg, char *path)
    /* if the first character isn't / (and thus this isn't a
       full pathname) then give up */
    if(*path != '/') return e_bad_params;
-      
+
    /* identify the process managing the point in the
       filespace where this new filesystem or device
       would like to start */
@@ -238,11 +276,14 @@ kresult register_process(diosix_msg_info *msg, char *path)
       tree_node->pid = 0;
       tree_node->child_count = 0;
       tree_node->children = NULL;
+      
+      /* save a copy of the root node */
+      vfs_tree_root = tree_node;
    }
    
    /* skip over the initial / character */
    path++;
-   
+
    /* add the path to the filesystem by breaking the path
       down into component leafnames */
    while(!at_final_leafnode)
@@ -331,7 +372,7 @@ kresult register_process(diosix_msg_info *msg, char *path)
             result = e_failure;
             goto register_process_exit;
          }
-         
+
          /* have we finished building the tree? */
          if(at_final_leafnode)
          {
