@@ -206,7 +206,7 @@ kresult open_file(diosix_msg_info *msg, int flags, int mode, char *path, diosix_
    unsigned int fspid;
    int filedesc;
    kresult err;
-      
+
    /* sanity check */
    if(!msg || !path || !reply) return e_bad_params;
 
@@ -236,7 +236,7 @@ kresult open_file(diosix_msg_info *msg, int flags, int mode, char *path, diosix_
    
    /* send the message and await a response */
    err = diosix_vfs_send_req(fspid, &req_msg, req, VFS_MOUNT_PARTS,
-                             &reply, sizeof(diosix_vfs_reply));
+                             reply, sizeof(diosix_vfs_reply));
    
    /* either return an error code from the fs/driver or send back
       the pid and file handle */
