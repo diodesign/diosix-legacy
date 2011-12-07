@@ -99,7 +99,7 @@ void wait_for_request(void)
          /* open device exclusively for root only */
          case open_req:
             printf("open request!\n");
-            reply_to_request(&msg, e_no_rights);
+            reply_to_request(&msg, success);
             break;
 
          case close_req:

@@ -17,7 +17,7 @@ PATHTOROOT = ../../../../../release/$(ARCH)_$(ARCH_TARGET)/root
 OBJSDIR = ../../../../../build/$(ARCH)_$(ARCH_TARGET)/drivers/serial
 
 # defines
-FLAGS		= -O2 -std=c99 -Wall -static -I../../../../../user/lib/newlib/libgloss/libnosys -I../common
+FLAGS		= -g -O2 -std=c99 -Wall -static -I../../../../../user/lib/newlib/libgloss/libnosys -I../common
 CC		= $(PREFIX)gcc $(FLAGS)
 LD		= $(PREFIX)gcc $(FLAGS)
 OBJS	 	= $(OBJSDIR)/main.o $(OBJSDIR)/lowlevel.o

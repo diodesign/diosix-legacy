@@ -18,7 +18,7 @@ PATHTOMKFS = ../../../release/$(ARCH)_$(ARCH_TARGET)/makeiso.sh
 OBJSDIR = ../../../build/$(ARCH)_$(ARCH_TARGET)/testsuite
 
 # defines
-FLAGS		= -O2 -std=c99 -Wall -static -I../../lib/newlib/libgloss/libnosys
+FLAGS		= -g -O2 -std=c99 -Wall -static -I../../lib/newlib/libgloss/libnosys
 CC		= $(PREFIX)gcc $(FLAGS)
 LD		= $(PREFIX)gcc $(FLAGS)
 OBJS	 	= $(OBJSDIR)/main.o $(OBJSDIR)/posix.o $(OBJSDIR)/fp.o $(OBJSDIR)/msg.o

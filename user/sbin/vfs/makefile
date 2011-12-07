@@ -18,7 +18,7 @@ PATHTOROOT = ../../../release/$(ARCH)_$(ARCH_TARGET)/root
 PATHTOMKFS = ../../../release/$(ARCH)_$(ARCH_TARGET)/makeiso.sh
 
 # defines
-FLAGS		= -O2 -std=c99 -Wall -static -I../../lib/newlib/libgloss/libnosys
+FLAGS		= -g -O2 -std=c99 -Wall -static -I../../lib/newlib/libgloss/libnosys
 CC		= $(PREFIX)gcc $(FLAGS)
 LD		= $(PREFIX)gcc $(FLAGS)
 OBJS	 	= $(OBJSDIR)/main.o $(OBJSDIR)/vfstree.o $(OBJSDIR)/files.o
