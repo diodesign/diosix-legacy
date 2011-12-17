@@ -233,7 +233,7 @@ kresult open_file(diosix_msg_info *msg, int flags, int mode, char *path, diosix_
    /* pass the path to the fs process */
    DIOSIX_WRITE_MULTIPART(req, VFS_MSG_OPEN_PATH, path,
                           descr.length);
-   
+
    /* send the message and await a response */
    err = diosix_vfs_send_req(fspid, &req_msg, req, VFS_MOUNT_PARTS,
                              reply, sizeof(diosix_vfs_reply));
@@ -245,10 +245,8 @@ kresult open_file(diosix_msg_info *msg, int flags, int mode, char *path, diosix_
       destroy_filedesc(msg->pid, filedesc);
       return err;
    }
-   else
-   {
-      reply->fspid = fspid;
-      reply->filedesc = filedesc;
-      return success;
-   }
+   
+   reply->fspid = fspid;
+   reply->filedesc = filedesc;
+   return success;
 }

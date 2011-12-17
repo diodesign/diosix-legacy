@@ -98,7 +98,7 @@ void wait_for_request(void)
 
          /* open device exclusively for root only */
          case open_req:
-            printf("open request!\n");
+            printf("open request from pid %i!\n", msg.pid);
             reply_to_request(&msg, success);
             break;
 

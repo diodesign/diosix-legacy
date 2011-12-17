@@ -383,7 +383,7 @@ kresult msg_copy(thread *receiver, void *data, unsigned int size, unsigned int *
    }
 
    lock_gate(&(sender->lock), LOCK_READ);
-
+   
    /* hand it over to the vmm to copy process-to-process - it'll sanity check the addresses */
    if(vmm_memcpyuser((void *)recv_base, receiver->proc, data, sender->proc, size))
    {      

@@ -63,13 +63,13 @@ _DEFUN (_open, (file, flags, mode),
    /* create the rest of the message and send */
    err = diosix_vfs_send_req(0, &msg, req, VFS_OPEN_PARTS,
                              &reply, sizeof(diosix_vfs_pid_reply));
-
+   
    if(err || reply.result)
    {
       errno = ENOSYS;
       return -1;
    }
-   
+      
    /* check for an error from the vfs first */
    if(reply.filedesc != -1)
       /* a filesystem process will have handled this request

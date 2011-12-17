@@ -55,7 +55,7 @@ void reply_to_request(diosix_msg_info *msg, kresult result)
 
 /* reply_to_pid_request
    Send a reply to a vfs request that requires a PID and/or
-   file handle in its reply.
+   file handle in its reply. Assumes successful request.
    => msg = message block to use, will contain
             the results from a diosix_msg_receive()
             that picked up the request.
@@ -67,7 +67,8 @@ void reply_to_pid_request(diosix_msg_info *msg, diosix_vfs_pid_reply *reply)
    if(!msg || !reply) return;
    
    /* ping a pid + file reply back to unlock the requesting thread */
-   msg->send = &reply;
+   reply->result = success;
+   msg->send = reply;
    msg->send_size = sizeof(diosix_vfs_pid_reply);
    
    diosix_msg_reply(msg);
@@ -135,6 +136,7 @@ void wait_for_request(void)
 
             /* all seems clear */
             result = open_file(&msg, req_info->flags, req_info->mode, path, &reply);
+            
             if(result == success)
                reply_to_pid_request(&msg, &reply);
             else

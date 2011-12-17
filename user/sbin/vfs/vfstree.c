@@ -139,7 +139,7 @@ unsigned int fs_from_path(char *path)
          unsigned int child_loop;
 
          for(child_loop = 0; child_loop < search->child_count; child_loop++)
-         {            
+         {
             if(strcmp(leafname, search->children[child_loop].path) == 0)
             {
                /* got a match */

@@ -124,7 +124,7 @@ kresult diosix_vfs_send_req(unsigned int target_pid, diosix_msg_info *msg,
    msg->send_size = parts_count;
    msg->recv  = reply;
    msg->recv_max_size = reply_size;
-   
+
    /* send the message */
    return diosix_msg_send(msg);
 }
