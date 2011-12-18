@@ -57,11 +57,11 @@ void wait_for_request(void)
    msg.flags = DIOSIX_MSG_GENERIC;
    msg.recv = recv_buffer;
    msg.recv_max_size = RECEIVE_BUFFER_SIZE;
-   
+      
    if(diosix_msg_receive(&msg) == success)
    {
       diosix_vfs_request_head *req_head = (diosix_vfs_request_head *)recv_buffer;
-      
+            
       if(msg.recv_size < sizeof(diosix_vfs_request_head))
       {
          /* malformed request, it's too small to even hold a request type */
@@ -76,7 +76,7 @@ void wait_for_request(void)
          reply_to_request(&msg, e_bad_magic);
          return;
       }
-      
+            
       /* decode the request type */
       switch(req_head->type)
       {
@@ -102,8 +102,12 @@ void wait_for_request(void)
             reply_to_request(&msg, success);
             break;
 
-         case close_req:
          case read_req:
+            printf("read request from pid %i!\n", msg.pid);
+            reply_to_request(&msg, e_failure);
+            break;
+            
+         case close_req:
          case write_req:
             
          /* if the type is unknown then fail it */

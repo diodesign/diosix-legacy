@@ -100,7 +100,7 @@ struct diosix_vfs_handle_assoc
 #define VFS_LINK_PARTS        (4)
 #define VFS_LSEEK_PARTS       (2)
 #define VFS_OPEN_PARTS        (3)
-#define VFS_READ_PARTS        (3)
+#define VFS_READ_PARTS        (2)
 #define VFS_READLINK_PARTS    (3)
 #define VFS_STAT_PARTS        (3)
 #define VFS_UNLINK_PARTS      (3)

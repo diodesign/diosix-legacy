@@ -55,7 +55,7 @@ _DEFUN (_read, (file, ptr, len),
    descr.filedes = file;
    diosix_vfs_new_req(req, read_req, &head, &descr,
                       sizeof(diosix_vfs_request_read));
-
+   
    /* create the rest of the message and send */
    err = diosix_vfs_send_req(fspid, &msg, req, VFS_READ_PARTS,
                              ptr, len);

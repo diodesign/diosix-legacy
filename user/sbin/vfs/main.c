@@ -214,13 +214,6 @@ void wait_for_request(void)
          break;
             
          case read_req:
-         {
-            kresult result = success;
-            diosix_debug_write("read requested!\n");
-            reply_to_request(&msg, result);
-         }
-         break;
-            
          case chown_req:
          case close_req:
          case fstat_req:

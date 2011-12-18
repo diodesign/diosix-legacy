@@ -79,21 +79,17 @@ int main(void)
    handle = open("/dev/ata/0", O_RDONLY);
    while(handle < 0)
    {
-      printf("tried to open /dev/ata, got error code %i\n", handle);
       diosix_thread_sleep(100);
       handle = open("/dev/ata/0", O_RDONLY);
    }
    
    printf("opened ATA drive: %i\n", handle);
+   printf("sending read request...\n");
    count = read(handle, data, 100);
-   while(count < 0)
-   {
-      diosix_thread_sleep(100);
-      count = read(handle, data, 100);
-   }
-   
-   printf("reading... count = %i data = %x %x %x %x\n",
-          count, data[0], data[1], data[2], data[3]);
+
+   if(count > 0)
+      printf("reading... count = %i data = %x %x %x %x\n",
+             count, data[0], data[1], data[2], data[3]);
    
    while(1); /* idle */
 }
