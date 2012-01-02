@@ -76,19 +76,17 @@ int main(void)
    kernel_signals_thread = diosix_thread_fork();
    if(kernel_signals_thread == 0) process_kernel_signals();
    
-   handle = open("/dev/ata/0", O_RDONLY);
+   handle = open("/dev/ata/0/0/0", O_RDONLY);
    while(handle < 0)
    {
       diosix_thread_sleep(100);
-      handle = open("/dev/ata/0", O_RDONLY);
+      handle = open("/dev/ata/0/0/0", O_RDONLY);
    }
    
-   printf("opened ATA drive: %i\n", handle);
-   printf("sending read request...\n");
    count = read(handle, data, 100);
 
    if(count > 0)
-      printf("reading... count = %i data = %x %x %x %x\n",
+      printf("reading data from boot drive... count = %i data = %x %x %x %x\n",
              count, data[0], data[1], data[2], data[3]);
    
    while(1); /* idle */

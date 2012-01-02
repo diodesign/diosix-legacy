@@ -163,6 +163,10 @@ typedef struct
 {
    unsigned char flags; /* set status */
    
+   /* PID and file descriptor for the process holding the device open */
+   unsigned int pid;
+   int filedesc;
+   
    ata_identify_data identity; /* identify data from the drive */
 } ata_device;
 
@@ -197,6 +201,7 @@ typedef struct
 } ata_controller;
 
 extern ata_controller controllers[ATA_MAX_CONTROLLERS];
+extern volatile unsigned char ata_lock;
 
 /* prototypes for functions in ata.c */
 unsigned char ata_detect_drives(ata_controller *controller);

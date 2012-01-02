@@ -32,6 +32,9 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 /* table of controllers */
 ata_controller controllers[ATA_MAX_CONTROLLERS];
 
+/* for thread locking mechanism */
+volatile unsigned char ata_lock = 0;
+
 /* discover_controllers
    Detect and setup ATA controllers and drives, and return number of drives */
 unsigned char discover_controllers(void)

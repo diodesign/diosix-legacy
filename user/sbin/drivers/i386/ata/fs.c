@@ -25,8 +25,45 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #include "io.h"
 
 #include "ata.h"
+#include "lowlevel.h"
 
 #define RECEIVE_BUFFER_SIZE   (2048)
+
+/* link_device_to_pid
+   Associate an ATA device with a given PID and filehandle, so this
+   can be used to auth requests in future
+   => pid = ID of process allowed to access the device
+      filedesc = filehandle assigned by the VFS for this PID and device
+      controller, channel, device = select the device to link
+   <= 0 for success, or an error code
+*/
+kresult link_device_to_pid(unsigned int pid, int filedesc, unsigned char controller, unsigned char channel, unsigned char device)
+{
+   /* sanity checks */
+   if(!pid || filedesc < 0) return e_bad_params;
+   if(controller >= ATA_MAX_CONTROLLERS || device >= ATA_MAX_DEVS_PER_CHANNEL || channel >= ATA_MAX_CHANS_PER_CNTRLR)
+      return e_bad_params;
+      
+   /* acquire lock */
+   lock_spin(&ata_lock);
+   
+   /* check that the device isn't claimed */
+   if(controllers[controller].channels[channel].drive[device].pid == 0)
+   {
+      controllers[controller].channels[channel].drive[device].pid = pid;
+      controllers[controller].channels[channel].drive[device].filedesc = filedesc;
+   }
+   else
+   {
+      /* don't forget to release lock */
+      unlock_spin(&ata_lock);
+      return e_no_rights;
+   }
+   
+   /* unlock critical lock */
+   unlock_spin(&ata_lock);
+   return success;
+}
 
 /* ----------------------------------------------------------------------
                         main loop of the driver 
@@ -76,7 +113,7 @@ void wait_for_request(void)
          reply_to_request(&msg, e_bad_magic);
          return;
       }
-            
+                  
       /* decode the request type */
       switch(req_head->type)
       {
@@ -96,14 +133,67 @@ void wait_for_request(void)
             reply_to_request(&msg, e_no_handler);
             break;
 
-         /* open device exclusively for root only */
+         /* open device if the request came from the VFS running as root */
          case open_req:
-            printf("open request from pid %i!\n", msg.pid);
-            reply_to_request(&msg, success);
+            if(msg.role == DIOSIX_ROLE_VFS && msg.uid == DIOSIX_SUPERUSER_ID)
+            {
+               unsigned char controller, channel, device;
+               
+               /* gather data from the vfs */
+               diosix_vfs_request_head *req_head = (diosix_vfs_request_head *)recv_buffer;
+               diosix_vfs_request_open *req = VFS_MSG_EXTRACT(req_head, 0);
+               char *path = VFS_MSG_EXTRACT(req_head, sizeof(diosix_vfs_request_open));
+               
+               /* record the file handle against the PID and drive number by searching
+                  through the ata path and move the pointer to the end of the base pathname */
+               path = (char *)((unsigned int)strstr(path, ATA_PATHNAME_BASE) + strlen(ATA_PATHNAME_BASE));
+               
+               /* The format should be /controller/channel/device where each selector is a digit 0-9
+                  skip the leading / and get the channel number */
+               if(strlen("/0/0/0") == strlen(path) && *path == '/')
+               {
+                  path++;
+                  
+                  /* grab the controller number */
+                  if(*path >= '0' && *path <= '9')
+                  {
+                     controller = *path++ - '0';
+                  
+                     if(*path == '/')
+                     {
+                        /* skip the next / and get the channel number */
+                        path++;
+                        
+                        if(*path >= '0' && *path <= '9')
+                        {
+                           channel = *path++ - '0';
+                           
+                           /* skip the next / and get the device number */
+                           path++;
+                           
+                           if(*path >= '0' && *path <= '9')
+                           {
+                              device = *path - '0';
+                              reply_to_request(&msg, link_device_to_pid(req->pid,
+                                                                        req->filedesc,
+                                                                        controller, channel, device));
+                              break;
+                           }
+                        }
+                     }
+                  }
+               }
+               
+               /* fall through to failure */
+               reply_to_request(&msg, e_bad_params);
+            }
+            else
+               reply_to_request(&msg, e_no_rights);
             break;
 
          case read_req:
             printf("read request from pid %i!\n", msg.pid);
+            
             reply_to_request(&msg, e_failure);
             break;
             
