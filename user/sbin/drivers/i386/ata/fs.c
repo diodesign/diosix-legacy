@@ -70,9 +70,6 @@ kresult add_to_device_hash(unsigned int pid, int filedesc, ata_device *device)
    new->next = head;
    pid_to_device_hash[DEVICE_HASH_CALC(pid, filedesc)] = new;
    
-   printf("add_to_device_hash: success: pid %i filedesc %i device %p hash %i\n",
-          pid, filedesc, device, DEVICE_HASH_CALC(pid, filedesc));
-   
    return success;
 }
 
@@ -252,15 +249,18 @@ void wait_for_request(void)
                            channel = *path++ - '0';
                            
                            /* skip the next / and get the device number */
-                           path++;
-                           
-                           if(*path >= '0' && *path <= '9')
+                           if(*path == '/')
                            {
-                              device = *path - '0';
-                              reply_to_request(&msg, link_device_to_pid(req->pid,
-                                                                        req->filedesc,
-                                                                        controller, channel, device));
-                              return;
+                              path++;
+                           
+                              if(*path >= '0' && *path <= '9')
+                              {
+                                 device = *path - '0';
+                                 reply_to_request(&msg, link_device_to_pid(req->pid,
+                                                                           req->filedesc,
+                                                                           controller, channel, device));
+                                 return;
+                              }
                            }
                         }
                      }
