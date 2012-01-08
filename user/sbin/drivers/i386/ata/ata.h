@@ -213,4 +213,7 @@ void wait_for_request(void);
 void wait_for_irq(void);
 void clear_irq(unsigned char flags);
 
+/* prototypes for the filesystem-facing code in fs.c */
+void fs_init(void);
+
 #endif

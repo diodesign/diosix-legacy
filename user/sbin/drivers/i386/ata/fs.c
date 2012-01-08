@@ -16,6 +16,7 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "diosix.h"
@@ -27,7 +28,76 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #include "ata.h"
 #include "lowlevel.h"
 
-#define RECEIVE_BUFFER_SIZE   (2048)
+#define RECEIVE_BUFFER_SIZE      (2048)
+
+/* define the number of hash buckets and the formula.
+   DEVICE_HASH_CALC(pid, filehandle) attempts to calculate a
+   hash table entry from the pid and filehandle */
+#define DEVICE_HASH_MAX          256
+#define DEVICE_HASH_CALC(p, f)   ((((p) * 5) + (f)) % DEVICE_HASH_MAX)
+
+/* hash table of PID+filehandle to device pointer */
+typedef struct device_hash_entry device_hash_entry;
+struct device_hash_entry
+{
+   ata_device *device;
+   
+   /* link to other entries in this hash bucket */
+   device_hash_entry *prev, *next;
+};
+
+device_hash_entry *pid_to_device_hash[DEVICE_HASH_MAX];
+
+/* add_to_device_hash
+   Add a device to a pid-to-device hash table. Assumes it is
+   safe to manipulate the data structures - ie: a lock is being held
+   => pid, filedesc = pid and filehandle to associate
+      device = pointer to device structure
+   <= 0 for success, or an error code
+*/
+kresult add_to_device_hash(unsigned int pid, int filedesc, ata_device *device)
+{
+   device_hash_entry *head = pid_to_device_hash[DEVICE_HASH_CALC(pid, filedesc)];
+   
+   device_hash_entry *new = malloc(sizeof(device_hash_entry));
+   if(!new) return e_failure;
+   
+   new->device = device;
+   new->prev = NULL;
+   
+   /* insert it at the head */
+   if(head) head->prev = new;
+   new->next = head;
+   pid_to_device_hash[DEVICE_HASH_CALC(pid, filedesc)] = new;
+   
+   printf("add_to_device_hash: success: pid %i filedesc %i device %p hash %i\n",
+          pid, filedesc, device, DEVICE_HASH_CALC(pid, filedesc));
+   
+   return success;
+}
+
+/* get_device_from_pid
+   Lookup a device from the PID and file handle that's should
+   be registered to it
+   => pid, filedesc = pid and filehandle associated with the device to find
+   <= pointer to device structure, or NULL for not found
+*/
+ata_device *get_device_from_pid(unsigned int pid, int filedesc)
+{
+   device_hash_entry *head = pid_to_device_hash[DEVICE_HASH_CALC(pid, filedesc)];
+   
+   /* search through the hash table entries looking for our device */
+   while(head)
+   {
+      ata_device *device = head->device;
+      
+      if(device->pid == pid && device->filedesc == filedesc) return device;
+      head = head->next;
+   }
+   
+   /* fall through to returning a not-found NULL */
+   return NULL;
+}
 
 /* link_device_to_pid
    Associate an ATA device with a given PID and filehandle, so this
@@ -50,19 +120,32 @@ kresult link_device_to_pid(unsigned int pid, int filedesc, unsigned char control
    /* check that the device isn't claimed */
    if(controllers[controller].channels[channel].drive[device].pid == 0)
    {
+      kresult err;
+      
+      /* record the PID and filehandle in the device's structure */
       controllers[controller].channels[channel].drive[device].pid = pid;
       controllers[controller].channels[channel].drive[device].filedesc = filedesc;
-   }
-   else
-   {
-      /* don't forget to release lock */
+      
+      /* add it to the hash table */
+      err = add_to_device_hash(pid, filedesc,
+                               &(controllers[controller].channels[channel].drive[device]));
+
+      /* unlock critical lock and pass back success/error code */
       unlock_spin(&ata_lock);
-      return e_no_rights;
+      return err;
    }
-   
-   /* unlock critical lock */
+
+   /* fall through to releasing lock and returning error message */
    unlock_spin(&ata_lock);
-   return success;
+   return e_no_rights;
+}
+
+/* fs_init
+   Initialise the filesystem-facing side of the process */
+void fs_init(void)
+{
+   /* clear the hash table */
+   memset(pid_to_device_hash, 0, sizeof(device_hash_entry *) * DEVICE_HASH_MAX);
 }
 
 /* ----------------------------------------------------------------------
@@ -177,7 +260,7 @@ void wait_for_request(void)
                               reply_to_request(&msg, link_device_to_pid(req->pid,
                                                                         req->filedesc,
                                                                         controller, channel, device));
-                              break;
+                              return;
                            }
                         }
                      }
@@ -192,11 +275,16 @@ void wait_for_request(void)
             break;
 
          case read_req:
-            printf("read request from pid %i!\n", msg.pid);
+         {
+            diosix_vfs_request_read *req = VFS_MSG_EXTRACT(req_head, 0);
+            
+            printf("read request from pid %i filehandle %i device %p!\n", msg.pid, req->filedes,
+                   get_device_from_pid(msg.pid, req->filedes));
             
             reply_to_request(&msg, e_failure);
             break;
-            
+         }
+
          case close_req:
          case write_req:
             

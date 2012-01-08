@@ -165,6 +165,9 @@ int main(void)
    /* create a new thread to handle the IRQs */
    if(diosix_thread_fork() == 0) while(1) wait_for_irq();
    
+   /* initialise other parts of the process */
+   fs_init();
+   
    /* wait for work to come in */
    diosix_thread_fork();
    while(1) wait_for_request();
