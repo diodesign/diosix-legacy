@@ -87,7 +87,7 @@ unsigned short ata_read_word(ata_controller *controller, unsigned char chan, uns
    /* translate an internal ATA register number into an offset from the relevant x86 IO port base */
    switch(reg)
    {
-      /* registers accessable from BAR0 (or BAR2 for secondary) aka the base IO port */
+      /* registers accessible from BAR0 (or BAR2 for secondary) aka the base IO port */
       case ATA_REG_DATA:
       case ATA_REG_ERROR:
       case ATA_REG_SECTORCOUNT:
@@ -99,7 +99,7 @@ unsigned short ata_read_word(ata_controller *controller, unsigned char chan, uns
          ioport = reg + channel->ioport;
          break;
          
-         /* registers accessable from BAR1 (or BAR3 for secondary) aka the base control IO port */
+      /* registers accessible from BAR1 (or BAR3 for secondary) aka the base control IO port */
       case ATA_REG_ALTSTATUS:
          ioport = (reg - ATA_REG_OFFSET) + channel->control_ioport;
          break;
@@ -110,6 +110,48 @@ unsigned short ata_read_word(ata_controller *controller, unsigned char chan, uns
    }
    
    return read_port(ioport);
+}
+
+/* ata_write_word
+   Write a 16-bit word to a register in a controller for a given channel
+   => controller = pointer to structure defining the controller to probe
+      chan = channel to access (ATA_PRIMARY or ATA_SECONDARY)
+      reg = the ATA register to write to
+      data = 16-bit value to write
+   <= returns the word from the controller hardware
+*/
+void ata_write_word(ata_controller *controller, unsigned char chan, unsigned char reg, unsigned short data)
+{
+   unsigned short ioport;
+   
+   ata_channel *channel = &(controller->channels[chan]);
+   
+   /* translate an internal ATA register number into an offset from the relevant x86 IO port base */
+   switch(reg)
+   {
+         /* registers accessible from BAR0 (or BAR2 for secondary) aka the base IO port */
+      case ATA_REG_DATA:
+      case ATA_REG_ERROR:
+      case ATA_REG_SECTORCOUNT:
+      case ATA_REG_LBA0:
+      case ATA_REG_LBA1:
+      case ATA_REG_LBA2:
+      case ATA_REG_HDDEVSEL:
+      case ATA_REG_STATUS:
+         ioport = reg + channel->ioport;
+         break;
+         
+         /* registers accessible from BAR1 (or BAR3 for secondary) aka the base control IO port */
+      case ATA_REG_ALTSTATUS:
+         ioport = (reg - ATA_REG_OFFSET) + channel->control_ioport;
+         break;
+         
+      default:
+         printf("ata: ata_write_word(): bad register %x\n", reg);
+         return;
+   }
+   
+   write_port(ioport, data);
 }
 
 /* ata_write_register
@@ -205,6 +247,100 @@ kresult ata_select_device(unsigned char drive, unsigned char channel, ata_contro
    /* write the select bit in the hdd select register */
    ata_write_register(controller, channel, ATA_REG_HDDEVSEL, (drive << ATA_SELECT_DRIVE_SHIFT));
    return success;
+}
+
+/* ata_read_media
+   Read a block of data from an ATAPI device
+   => device = pointer to device to access
+      ptr = base address from which to write data pulled from the disk/disc
+      count = number of bytes to copy
+      pos = media address to read from
+   <= number of bytes read, or -1 for failure to read
+*/
+int atapi_read_media(ata_device *device, void *ptr, int count, unsigned int pos)
+{
+   /* assumes parameters are sane because it's called from ata_read_media() */
+   unsigned char drive = device->drive, channel = device->channel;
+   ata_controller *controller = device->controller;
+   unsigned int lba = pos;
+   
+   /* 0xa8 requests a read from an ATAPI device */
+   unsigned int read_command[12] = { ATAPI_CMD_READ, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+   unsigned char loop;
+   
+   printf("selecting drive...\n");
+   
+   if(ata_select_device(drive, channel, controller) != success) return -1;
+   
+   printf("writing command data out...\n");
+   
+   /* introduce a delay */
+   ata_write_register(controller, channel, ATA_REG_SECTORCOUNT, 0);
+   ata_write_register(controller, channel, ATA_REG_LBA0, 0);
+   ata_write_register(controller, channel, ATA_REG_LBA1, 0);
+   ata_write_register(controller, channel, ATA_REG_LBA2, 0);
+   
+   /* select PIO mode */
+   ata_write_register(controller, channel, ATA_REG_FEATURES, 0);
+   
+   /* push the ATAPI sector size to the controller, one byte at a time */
+   ata_write_register(controller, channel, ATA_REG_LBA1, ATAPI_SECTOR_SIZE & 0xff);
+   ata_write_register(controller, channel, ATA_REG_LBA2, (ATAPI_SECTOR_SIZE >> 8) & 0xff);
+   
+   /* tell the controller to accept a packet command */
+   ata_write_register(controller, channel, ATA_REG_COMMAND, ATA_CMD_PACKET);
+   ata_wait_for_ready(channel, controller);
+   
+   /* send over the address */
+   read_command[9] = 1;
+   read_command[2] = (lba >> 0x18) & 0xFF;   /* most sig. byte of LBA */
+   read_command[3] = (lba >> 0x10) & 0xFF;
+   read_command[4] = (lba >> 0x08) & 0xFF;
+   read_command[5] = (lba >> 0x00) & 0xFF;   /* least sig. byte of LBA */
+   
+   for(loop = 0; loop < sizeof(read_command); loop += sizeof(unsigned short))
+      ata_write_word(controller, channel, ATA_REG_DATA, read_command[loop] & (read_command[loop + 1] << 8));
+   
+   printf("sleeping on IRQ...\n");
+   sleep_on_irq(ATA_IRQ_PRIMARY);
+   
+   /* read in the data */
+   for(loop = 0; loop < ATAPI_SECTOR_SIZE; loop += sizeof(unsigned short))
+   {
+      if(loop < count)
+      {
+         ((unsigned short *)ptr)[loop >> 1] = ata_read_word(controller, channel, ATA_REG_DATA);
+         printf("reading data: loop = %i data = %x\n", loop, ((unsigned short *)ptr)[loop >> 1]);
+      }
+      else
+         ata_read_word(controller, channel, ATA_REG_DATA);
+   }
+   
+   ata_wait_for_ready(channel, controller);
+   
+   return count;
+}
+
+/* ata_read_media
+   Read a block of data from an ATA device
+   => device = pointer to device to access
+      ptr = base address from which to write data pulled from the disk/disc
+      count = number of bytes to copy
+      pos = media address to read from
+   <= number of bytes read, or -1 for failure to read
+*/
+int ata_read_media(ata_device *device, void *ptr, int count, unsigned int pos)
+{
+   /* quick sanity checks */
+   if(!device || !ptr || count < 1) return -1;
+   
+   /* determine the drive type */
+   if(!(device->flags & ATA_DEVICE_PRESENT)) return -1;
+   if(device->identity.type == ata_type_patapi)
+      return atapi_read_media(device, ptr, count, pos);
+   
+   /* fall through to failure */
+   return -1;
 }
 
 /* ata_identify_packet_device
@@ -390,8 +526,19 @@ unsigned char ata_detect_drives(ata_controller *controller)
       for(drive = 0; drive < ATA_MAX_DEVS_PER_CHANNEL; drive++)
       {
          if(ata_identify_device(drive, channel, controller,
-                                &(controller->channels[channel].drive[drive])) == success)
+                                &(controller->channels[channel].drive[drive].identity)) == success)
+         {
+            /* also record the controller, channel and drive number in the device structure.
+               this is needed later by the fs-facing code to refer to the hardware */
+            ata_device *device = &(controller->channels[channel].drive[drive]);
+            device->controller = controller;
+            device->channel = channel;
+            device->drive = drive;
+            device->flags |= ATA_DEVICE_PRESENT;
+            
             found++;
+         }
+
       }
       
       /* reenable interrupts */

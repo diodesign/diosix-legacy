@@ -41,6 +41,7 @@ typedef struct device_hash_entry device_hash_entry;
 struct device_hash_entry
 {
    ata_device *device;
+   unsigned int pos; /* current position in the media for this pid+handle pair */
    
    /* link to other entries in this hash bucket */
    device_hash_entry *prev, *next;
@@ -63,8 +64,9 @@ kresult add_to_device_hash(unsigned int pid, int filedesc, ata_device *device)
    if(!new) return e_failure;
    
    new->device = device;
+   new->pos = 0;
    new->prev = NULL;
-   
+
    /* insert it at the head */
    if(head) head->prev = new;
    new->next = head;
@@ -77,9 +79,10 @@ kresult add_to_device_hash(unsigned int pid, int filedesc, ata_device *device)
    Lookup a device from the PID and file handle that's should
    be registered to it
    => pid, filedesc = pid and filehandle associated with the device to find
+      pos = pointer to word to store current media read/write position in
    <= pointer to device structure, or NULL for not found
 */
-ata_device *get_device_from_pid(unsigned int pid, int filedesc)
+ata_device *get_device_from_pid(unsigned int pid, int filedesc, unsigned int *pos)
 {
    device_hash_entry *head = pid_to_device_hash[DEVICE_HASH_CALC(pid, filedesc)];
    
@@ -88,7 +91,14 @@ ata_device *get_device_from_pid(unsigned int pid, int filedesc)
    {
       ata_device *device = head->device;
       
-      if(device->pid == pid && device->filedesc == filedesc) return device;
+      if(device->pid == pid && device->filedesc == filedesc)
+      {
+         /* save the position into the word provided by the caller */
+         *pos = head->pos;
+         return device;
+      }
+      
+      /* search continues */
       head = head->next;
    }
    
@@ -253,9 +263,14 @@ void wait_for_request(void)
                            {
                               path++;
                            
+                              /* grab the device number and attempt to associate
+                                 the pid + filehandle with the device */
                               if(*path >= '0' && *path <= '9')
                               {
                                  device = *path - '0';
+                                 
+                                 /* associate the client PID and filehandle with the selected
+                                    device and fire a reply to the client */
                                  reply_to_request(&msg, link_device_to_pid(req->pid,
                                                                            req->filedesc,
                                                                            controller, channel, device));
@@ -276,11 +291,31 @@ void wait_for_request(void)
 
          case read_req:
          {
+            unsigned int pos;
             diosix_vfs_request_read *req = VFS_MSG_EXTRACT(req_head, 0);
             
-            printf("read request from pid %i filehandle %i device %p!\n", msg.pid, req->filedes,
-                   get_device_from_pid(msg.pid, req->filedes));
+            /* turn the file handle and client PID into a device that's been linked
+               against these resources - saving the current file position into pos */
+            ata_device *device = get_device_from_pid(msg.pid, req->filedes, &pos);
             
+            /* allow zero-sized requests to succeed quietly */
+            if(msg.recv_max_size == 0)
+            {
+               msg.recv_size = 0;
+               reply_to_request(&msg, success);
+               return;
+            }
+            
+            int bytes = ata_read_media(device, msg.recv, (signed int)msg.recv_max_size, pos);
+            if(bytes > 0)
+            {
+               /* successful read */
+               msg.recv_size = (unsigned int)bytes;
+               reply_to_request(&msg, success);
+               return;
+            }
+            
+            /* XXX should handle the error code properly */
             reply_to_request(&msg, e_failure);
             break;
          }

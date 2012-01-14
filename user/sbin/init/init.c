@@ -65,7 +65,7 @@ void process_kernel_signals(void)
 int main(void)
 {
    int kernel_signals_thread;
-   int handle, count;
+   int handle = 0, count;
    unsigned char data[100];
    
    /* name this process so others can find it */
@@ -76,11 +76,12 @@ int main(void)
    kernel_signals_thread = diosix_thread_fork();
    if(kernel_signals_thread == 0) process_kernel_signals();
    
-   handle = open("/dev/ata/0/0/0", O_RDONLY);
-   while(handle < 0)
+   printf("searching for boot drive");
+   handle = open("/dev/ata/0/1/0", O_RDONLY);
+   while(handle < 1)
    {
       diosix_thread_sleep(100);
-      handle = open("/dev/ata/0/0/0", O_RDONLY);
+      handle = open("/dev/ata/0/1/0", O_RDONLY);
    }
    
    count = read(handle, data, 100);

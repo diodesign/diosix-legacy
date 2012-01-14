@@ -42,6 +42,27 @@ void clear_irq(unsigned char flags)
    unlock_spin(&irqs_lock);
 }
 
+/* sleep_on_irq
+   Block the thread until the selected IRQ fires
+*/
+void sleep_on_irq(unsigned char flags)
+{
+   while(1)
+   {
+      lock_spin(&irqs_lock);
+      
+      if(irqs_pending & flags)
+      {
+         unlock_spin(&irqs_lock);
+         return;
+      }
+      
+      /* sleep for a bit */
+      unlock_spin(&irqs_lock);
+      diosix_thread_yield();
+   }
+}
+
 void wait_for_irq(void)
 {
    diosix_msg_info msg;

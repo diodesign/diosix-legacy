@@ -77,8 +77,11 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #define ATA_CMD_IDENTIFY          (0xec)
 
 /* ATAPI-specific commands */
-#define ATAPI_CMD_READ            (0xA8)
+#define ATAPI_CMD_READ            (0xa8)
 #define ATAPI_CMD_EJECT           (0x1b)
+
+/* Assume ATAPI sectors are this many bytes */
+#define ATAPI_SECTOR_SIZE         (2048)
 
 /* ATA_CMD_IDENTIFY_PACKET and ATA_CMD_IDENTIFY return
    a 256 x 16-bit block of information; these are the
@@ -148,8 +151,6 @@ typedef enum
 
 /* drive status flags */
 #define ATA_DEVICE_PRESENT       (1 << 0)
-#define ATA_DEVICE_IS_ATA        (1 << 1)
-#define ATA_DEVICE_IS_ATAPI      (1 << 2)
 
 /* how a device will describe itself when IDENTIFY'd */
 typedef struct
@@ -157,6 +158,9 @@ typedef struct
    ata_drive_type type;
    unsigned short word[ATA_IDENT_MAXWORDS];
 } ata_identify_data;
+
+/* definition needed for ata_device */
+typedef struct ata_controller ata_controller;
 
 /* define a drive connected to a channel */
 typedef struct
@@ -168,6 +172,10 @@ typedef struct
    int filedesc;
    
    ata_identify_data identity; /* identify data from the drive */
+   
+   /* allow us to find the controller and channel from this struture */
+   ata_controller *controller;
+   unsigned char channel, drive;
 } ata_device;
 
 /* define a controller channel */
@@ -186,7 +194,7 @@ typedef struct
 #define ATA_CONTROLLER_BUILTIN   (1 << 1)  /* controller is an ISA/chipset device */
 
 /* define an ATA controller */
-typedef struct
+struct ata_controller
 {
    unsigned char flags; /* set the type and status */
 
@@ -198,7 +206,7 @@ typedef struct
    
    /* hardware interfaces, max two per controller */
    ata_channel channels[ATA_MAX_CHANS_PER_CNTRLR];
-} ata_controller;
+};
 
 extern ata_controller controllers[ATA_MAX_CONTROLLERS];
 extern volatile unsigned char ata_lock;
@@ -207,11 +215,13 @@ extern volatile unsigned char ata_lock;
 unsigned char ata_detect_drives(ata_controller *controller);
 unsigned char ata_read_register(ata_controller *controller, unsigned char channel, unsigned char reg);
 void ata_write_register(ata_controller *controller, unsigned char chan, unsigned char reg, unsigned char data);
+int ata_read_media(ata_device *device, void *ptr, int count, unsigned int pos);
 
 /* prototype functions in fs.c and irq.c */
 void wait_for_request(void);
 void wait_for_irq(void);
 void clear_irq(unsigned char flags);
+void sleep_on_irq(unsigned char flags);
 
 /* prototypes for the filesystem-facing code in fs.c */
 void fs_init(void);
