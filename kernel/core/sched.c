@@ -783,6 +783,7 @@ void sched_add(unsigned char cpu, thread *torun)
 
    /* pick the right queue and add it to the start */
    priority = sched_determine_priority(torun);
+
    cpu_queue = &(cpu_table[cpu].queues[priority]);
    if(cpu_queue->queue_head)
    {

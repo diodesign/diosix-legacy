@@ -137,8 +137,11 @@ kresult msg_send_signal(process *target, thread *sender, unsigned int signum, un
       towake->msg.signal.number = signum;
       towake->msg.signal.extra = sigcode;
       
-      /* wake the receiver */
+      /* wake the receiver - reseting its priority if
+         it's a driver thread */
       syscall_post_msg_recv(towake, success);
+      if(towake->flags & THREAD_FLAG_ISDRIVER)
+         sched_priority_calc(towake, priority_reset);
       sched_add(towake->cpu, towake);
 
       MSG_DEBUG("[msg:%i] woke thread %p (tid %i pid %i) to receive signal %i\n",
