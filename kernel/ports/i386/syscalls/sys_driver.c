@@ -59,7 +59,7 @@ void syscall_do_driver(int_registers_block *regs)
             if(err) SYSCALL_RETURN(err);
             
             current->flags |= THREAD_FLAG_ISDRIVER;
-            
+
             /* update the thread's priority now */
             sched_move_to_end(current->cpu, current);
             

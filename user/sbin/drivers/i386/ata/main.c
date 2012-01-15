@@ -161,9 +161,12 @@ int main(void)
    diosix_signals_kernel(SIGX_ENABLE(SIGXIRQ));
    diosix_driver_register_irq(ATA_IRQ_PRIMARY);
    diosix_driver_register_irq(ATA_IRQ_SECONDARY);
+
+   printf("ata: registered IRQs %i and %i\n", ATA_IRQ_PRIMARY, ATA_IRQ_SECONDARY);
    
    /* create a new thread to handle the IRQs */
-   if(diosix_thread_fork() == 0) while(1) wait_for_irq();
+   if(diosix_thread_fork() == 0)
+      while(1) wait_for_irq();
    
    /* initialise other parts of the process */
    fs_init();

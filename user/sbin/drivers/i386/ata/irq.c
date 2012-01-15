@@ -43,7 +43,7 @@ void clear_irq(unsigned char flags)
 }
 
 /* sleep_on_irq
-   Block the thread until the selected IRQ fires
+   Block the thread until the selected IRQ fires, clearing the IRQ before returning
 */
 void sleep_on_irq(unsigned char flags)
 {
@@ -53,6 +53,8 @@ void sleep_on_irq(unsigned char flags)
       
       if(irqs_pending & flags)
       {
+         /* clear the pending flag and return */
+         irqs_pending &= ~flags;
          unlock_spin(&irqs_lock);
          return;
       }
@@ -86,7 +88,7 @@ void wait_for_irq(void)
                
                unlock_spin(&irqs_lock);
                break;
-               
+          
             case ATA_IRQ_SECONDARY:
                lock_spin(&irqs_lock);
 

@@ -265,22 +265,29 @@ int atapi_read_media(ata_device *device, void *ptr, int count, unsigned int pos)
    unsigned int lba = pos;
    
    /* 0xa8 requests a read from an ATAPI device */
-   unsigned int read_command[12] = { ATAPI_CMD_READ, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-   unsigned char loop;
+   unsigned char read_command[12] = { ATAPI_CMD_READ, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+   unsigned short *atapi_packet = (unsigned short *)read_command;
+   unsigned int loop;
+
+   lba = 0x10;
    
-   printf("selecting drive...\n");
+   /* construct the request */
+   read_command[9] = 1;                      /* number of sectors */
+   read_command[2] = (lba >> 0x18) & 0xff;   /* most sig. byte of LBA */
+   read_command[3] = (lba >> 0x10) & 0xff;
+   read_command[4] = (lba >> 0x08) & 0xff;
+   read_command[5] = (lba >> 0x00) & 0xff;   /* least sig. byte of LBA */
    
+   /* get the right drive on our side */
    if(ata_select_device(drive, channel, controller) != success) return -1;
+      
+   /* introduce a delay  - shouldn't this be in the select code? XXX */
+   ata_read_register(controller, channel, ATA_REG_ALTSTATUS);
+   ata_read_register(controller, channel, ATA_REG_ALTSTATUS);
+   ata_read_register(controller, channel, ATA_REG_ALTSTATUS);
+   ata_read_register(controller, channel, ATA_REG_ALTSTATUS);
    
-   printf("writing command data out...\n");
-   
-   /* introduce a delay */
-   ata_write_register(controller, channel, ATA_REG_SECTORCOUNT, 0);
-   ata_write_register(controller, channel, ATA_REG_LBA0, 0);
-   ata_write_register(controller, channel, ATA_REG_LBA1, 0);
-   ata_write_register(controller, channel, ATA_REG_LBA2, 0);
-   
-   /* select PIO mode */
+   /* select PIO mode :-( */
    ata_write_register(controller, channel, ATA_REG_FEATURES, 0);
    
    /* push the ATAPI sector size to the controller, one byte at a time */
@@ -291,33 +298,36 @@ int atapi_read_media(ata_device *device, void *ptr, int count, unsigned int pos)
    ata_write_register(controller, channel, ATA_REG_COMMAND, ATA_CMD_PACKET);
    ata_wait_for_ready(channel, controller);
    
-   /* send over the address */
-   read_command[9] = 1;
-   read_command[2] = (lba >> 0x18) & 0xFF;   /* most sig. byte of LBA */
-   read_command[3] = (lba >> 0x10) & 0xFF;
-   read_command[4] = (lba >> 0x08) & 0xFF;
-   read_command[5] = (lba >> 0x00) & 0xFF;   /* least sig. byte of LBA */
+   /* write out the command */
+   for(loop = 0; loop < 6; loop++)
+      ata_write_word(controller, channel, ATA_REG_DATA, atapi_packet[loop]);
    
-   for(loop = 0; loop < sizeof(read_command); loop += sizeof(unsigned short))
-      ata_write_word(controller, channel, ATA_REG_DATA, read_command[loop] & (read_command[loop + 1] << 8));
-   
-   printf("sleeping on IRQ...\n");
+   /* waiting for the drive to acknowledge */
    sleep_on_irq(ATA_IRQ_PRIMARY);
+   ata_wait_for_ready(channel, controller);
+
+   printf("reading data (device %p buffer %p bytes %i position %i)\n", device, ptr, count, pos);
    
    /* read in the data */
-   for(loop = 0; loop < ATAPI_SECTOR_SIZE; loop += sizeof(unsigned short))
+   for(loop = 0; loop < (ATAPI_SECTOR_SIZE >> 1); loop++)
    {
-      if(loop < count)
-      {
-         ((unsigned short *)ptr)[loop >> 1] = ata_read_word(controller, channel, ATA_REG_DATA);
-         printf("reading data: loop = %i data = %x\n", loop, ((unsigned short *)ptr)[loop >> 1]);
-      }
-      else
-         ata_read_word(controller, channel, ATA_REG_DATA);
+      volatile unsigned short data = ata_read_word(controller, channel, ATA_REG_DATA);      
+      
+      if((loop << 1) < count)
+         ((unsigned short *)ptr)[loop] = data;
    }
    
+   /* wait for the drive to ackowledge the completed transaction */
+   sleep_on_irq(ATA_IRQ_PRIMARY);
    ata_wait_for_ready(channel, controller);
+
+   printf("data: %x %x %x %x\n",
+          ((unsigned short *)ptr)[0],
+          ((unsigned short *)ptr)[1],
+          ((unsigned short *)ptr)[2],
+          ((unsigned short *)ptr)[3]);
    
+   printf("atapi_read_media(): returning %i bytes\n", count);
    return count;
 }
 

@@ -76,7 +76,7 @@ int main(void)
    kernel_signals_thread = diosix_thread_fork();
    if(kernel_signals_thread == 0) process_kernel_signals();
    
-   printf("searching for boot drive");
+   printf("searching for boot drive...\n");
    handle = open("/dev/ata/0/1/0", O_RDONLY);
    while(handle < 1)
    {

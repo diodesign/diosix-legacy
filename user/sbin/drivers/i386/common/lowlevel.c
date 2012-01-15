@@ -55,7 +55,7 @@ unsigned short read_port(unsigned short port)
 {
    unsigned short ret_val;
    
-   __asm__ __volatile__("in %1,%0"
+   __asm__ __volatile__("inw %1,%0"
                         : "=a"(ret_val)
                         : "dN"(port));
    return ret_val;

@@ -35,4 +35,8 @@ void unlock_spin(volatile unsigned char *byte);
 /* PIC IRQ lines are mapped into the system IDT from this base number */
 #define X86_PIC_IRQ_BASE   (32)
 
+/* IOPIC IRQ lines are mapped into the system IDT from this base number */
+#define X86_IOPIC_IRQ_BASE (64)
+
+
 #endif

@@ -29,8 +29,8 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #define ATA_IOPORT_SECONDARYCTRL  (0x374)
 
 /* default ISA IRQ lines */
-#define ATA_IRQ_PRIMARY           (X86_PIC_IRQ_BASE + 14)
-#define ATA_IRQ_SECONDARY         (X86_PIC_IRQ_BASE + 15)
+#define ATA_IRQ_PRIMARY           (X86_IOPIC_IRQ_BASE + 14)
+#define ATA_IRQ_SECONDARY         (X86_IOPIC_IRQ_BASE + 15)
 
 /* bits for the IRQ pending flag in te driver */
 #define ATA_IRQ_PRIMARY_PENDING   (1 << 0)
@@ -62,6 +62,7 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #define ATA_DC_HOB                (1 << 7)
 
 /* ATA command list */
+#define ATA_CMD_NOP               (0x00)
 #define ATA_CMD_READ_PIO          (0x20)
 #define ATA_CMD_READ_PIO_EXT      (0x24)
 #define ATA_CMD_READ_DMA          (0xc8)
