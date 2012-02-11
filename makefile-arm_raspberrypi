@@ -1,0 +1,203 @@
+#
+# diosix hyatt - ARM raspberrypi  port
+#
+# makefile for the kernel and libdiosix
+#
+#
+
+# ------------------------------------------------------------
+
+# set the architecture and any architecture flags
+ARCH = arm
+ARCH_TARGET = versatilepb
+ARCH_FLAGS = -mcpu=arm1176jzf-s -mfloat-abi=soft
+
+# ------------------------------------------------------------
+
+# define the build version
+VERSION		= -DKERNEL_IDENTIFIER="\"diosix-hyatt $(ARCH)_$(ARCH_TARGET) pre-Release1.0\"" \
+-DKERNEL_RELEASE_MAJOR=0 -DKERNEL_RELEASE_MINOR=1 \
+-DKERNEL_API_REVISION=1
+
+# prettify the output
+Q=@
+WRITE = $(Q)echo 
+
+# set where the root fs to store the kernel + OS
+RELEASEDIR  = release/$(ARCH)_$(ARCH_TARGET)
+PATHTOROOT  = $(RELEASEDIR)/root
+
+.SUFFIXES: .s .c
+
+CCbin =      $(Q)$(PREFIX)gcc
+LDbin =      $(Q)$(PREFIX)ld
+ASbin =      $(Q)$(PREFIX)as
+OBJDUMPbin = $(Q)$(PREFIX)objdump
+OBJCOPYbin = $(Q)$(PREFIX)objcopy
+STRIPbin =   $(Q)$(PREFIX)strip 
+READELFbin = $(Q)readelf
+
+# defines
+PORTDIR  = kernel/ports/$(ARCH)
+COREDIR  = kernel/core
+OBJSDIR  = build/$(ARCH)_$(ARCH_TARGET)/kernel
+LIBDIOSIXDIR = user/lib/newlib/libgloss/libnosys
+SVNDEF := -D'SVN_REV="$(shell svnversion -n .)"'
+
+MAKEFILE	= makefile-$(ARCH)_$(ARCH_TARGET)
+MAKEDEP		= $(MAKEFILE)
+
+INCDIR		= $(PORTDIR)/include
+LDSCRIPT	= $(PORTDIR)/diosix.ld
+
+FLAGS		= -g -std=c99 -Wall -nostdlib -nostartfiles \
+		  -nostdinc -fno-builtin -nodefaultlibs \
+		  -fomit-frame-pointer $(ARCH_FLAGS)
+
+OBJS		= $(OBJSDIR)/startup.o $(OBJSDIR)/preboot.o $(OBJSDIR)/debug.o $(OBJSDIR)/serial.o \
+		  $(OBJSDIR)/lowlevel.o $(OBJSDIR)/arm926ej-s.o $(OBJSDIR)/atag.o $(OBJSDIR)/boot.o \
+	       	  $(OBJSDIR)/payload.o $(OBJSDIR)/arm9pg.o $(OBJSDIR)/arm9int.o $(OBJSDIR)/irqs.o \
+		  $(OBJSDIR)/vmm.o $(OBJSDIR)/msg.o $(OBJSDIR)/sched.o $(OBJSDIR)/proc.o $(OBJSDIR)/thread.o \
+		  $(OBJSDIR)/sys_debug.o $(OBJSDIR)/sys_driver.o $(OBJSDIR)/sys_info.o $(OBJSDIR)/sys_memory.o \
+		  $(OBJSDIR)/sys_msg.o $(OBJSDIR)/sys_privs.o $(OBJSDIR)/sys_proc.o $(OBJSDIR)/sys_thread.o
+
+MAKEDEP		= $(MAKEFILE) $(PORTDIR)/include/portdefs.h $(COREDIR)/include/processes.h $(COREDIR)/include/boot.h $(PORTDIR)/include/cpu.h $(COREDIR)/include/debug.h $(COREDIR)/include/elf.h $(PORTDIR)/include/interrupts.h $(COREDIR)/include/ipc.h $(COREDIR)/include/locks.h $(PORTDIR)/include/lowlevel.h $(PORTDIR)/include/memory.h $(COREDIR)/include/multiboot.h $(COREDIR)/include/sched.h $(COREDIR)/include/sglib.h $(PORTDIR)/include/registers.h $(LIBDIOSIXDIR)/diosix.h $(LIBDIOSIXDIR)/async.h $(PORTDIR)/include/syscalls.h
+
+# all debugging flags possible
+# DEBUGFLAGS	= -DDEBUG -DMSG_DEBUG -DBUS_DEBUG -DPROC_DEBUG -DSCHED_DEBUG -DTHREAD_DEBUG -DVMM_DEBUG -DXPT_DEBUG -DINT_DEBUG -DIRQ_DEBUG -DMP_DEBUG -DPAGE_DEBUG -DKSYM_DEBUG -DIOAPIC_DEBUG -DLAPIC_DEBUG -DLOCK_DEBUG -DLOLVL_DEBUG -DPIC_DEBUG -DSYSCALL_DEBUG -DPERFORMANCE_DEBUG -DLOCK_TIME_CHECK
+
+# basic debugging
+DEBUGFLAGS	= -DDEBUG -DMSG_DEBUG -DBUS_DEBUG -DPROC_DEBUG -DSCHED_DEBUG -DTHREAD_DEBUG -DVMM_DEBUG -DXPT_DEBUG -DINT_DEBUG -DIRQ_DEBUG -DMP_DEBUG -DPAGE_DEBUG -DKSYM_DEBUG -DIOAPIC_DEBUG -DLAPIC_DEBUG -DLOCK_DEBUG -DLOLVL_DEBUG -DPIC_DEBUG -DSYSCALL_DEBUG
+
+CC		= $(CCbin) $(SVNDEF) $(FLAGS) -I$(INCDIR) -I$(COREDIR)/include -I$(LIBDIOSIXDIR) $(DEBUGFLAGS) $(VERSION)
+LD		= $(CCbin) $(FLAGS) -Xlinker --script=$(LDSCRIPT) -Xlinker
+ASM		= $(ASbin) -g $(ARCH_FLAGS)
+
+# targets
+all: kernel
+
+COMPILE.c 	= $(CC) -c -o $@ $<
+COMPILE.s 	= $(ASM) $< -o $@
+
+# explicit rules for platform-specific code
+$(OBJSDIR)/preboot.o:	$(PORTDIR)/versatilepb/preboot.c	$(MAKEDEP)
+			$(WRITE) '==> COMPILE: $<'
+			$(COMPILE.c)
+
+$(OBJSDIR)/startup.o:	$(PORTDIR)/versatilepb/startup.s	$(MAKEDEP)
+			$(WRITE) '==> ASSEMBLE: $<'
+			$(COMPILE.s)
+
+$(OBJSDIR)/serial.o:	$(PORTDIR)/versatilepb/serial.c		$(MAKEDEP)
+			$(WRITE) '==> COMPILE: $<'
+			$(COMPILE.c)
+
+$(OBJSDIR)/lowlevel.o:	$(PORTDIR)/lowlevel.c	$(MAKEDEP)
+			$(WRITE) '==> COMPILE: $<'
+			$(COMPILE.c)
+
+$(OBJSDIR)/arm926ej-s.o:	$(PORTDIR)/arm926ej-s.c	$(MAKEDEP)
+				$(WRITE) '==> COMPILE: $<'
+				$(COMPILE.c)
+
+$(OBJSDIR)/arm9pg.o:	$(PORTDIR)/arm9pg.c	$(MAKEDEP)
+			$(WRITE) '==> COMPILE: $<'
+			$(COMPILE.c)
+
+$(OBJSDIR)/arm9int.o:	$(PORTDIR)/arm9int.c	$(MAKEDEP)
+			$(WRITE) '==> COMPILE: $<'
+			$(COMPILE.c)
+
+$(OBJSDIR)/irqs.o:	$(PORTDIR)/irqs.c	$(MAKEDEP)
+			$(WRITE) '==> COMPILE: $<'
+			$(COMPILE.c)
+
+$(OBJSDIR)/sys_debug.o:		$(PORTDIR)/syscalls/sys_debug.c		$(MAKEDEP)
+				$(WRITE) '==> COMPILE: $<'
+				$(COMPILE.c)
+
+$(OBJSDIR)/sys_driver.o:	$(PORTDIR)/syscalls/sys_driver.c	$(MAKEDEP)
+				$(WRITE) '==> COMPILE: $<'
+				$(COMPILE.c)
+
+$(OBJSDIR)/sys_info.o:		$(PORTDIR)/syscalls/sys_info.c		$(MAKEDEP)
+				$(WRITE) '==> COMPILE: $<'
+				$(COMPILE.c)
+
+$(OBJSDIR)/sys_memory.o:	$(PORTDIR)/syscalls/sys_memory.c	$(MAKEDEP)
+				$(WRITE) '==> COMPILE: $<'
+				$(COMPILE.c)
+
+$(OBJSDIR)/sys_msg.o:		$(PORTDIR)/syscalls/sys_msg.c		$(MAKEDEP)
+				$(WRITE) '==> COMPILE: $<'
+				$(COMPILE.c)
+
+$(OBJSDIR)/sys_privs.o:		$(PORTDIR)/syscalls/sys_privs.c		$(MAKEDEP)
+				$(WRITE) '==> COMPILE: $<'
+				$(COMPILE.c)
+
+$(OBJSDIR)/sys_proc.o:		$(PORTDIR)/syscalls/sys_proc.c		$(MAKEDEP)
+				$(WRITE) '==> COMPILE: $<'
+				$(COMPILE.c)
+
+$(OBJSDIR)/sys_thread.o:	$(PORTDIR)/syscalls/sys_thread.c	$(MAKEDEP)
+				$(WRITE) '==> COMPILE: $<'
+				$(COMPILE.c)
+
+
+# explicit rules for portable code
+$(OBJSDIR)/atag.o:	$(COREDIR)/atag.c	$(MAKEDEP)
+			$(WRITE) '==> COMPILE: $<'
+			$(COMPILE.c)
+
+$(OBJSDIR)/debug.o:	$(COREDIR)/debug.c	$(MAKEDEP)
+			$(WRITE) '==> COMPILE: $<'
+			$(COMPILE.c)
+
+$(OBJSDIR)/boot.o:	$(COREDIR)/boot.c	$(MAKEDEP)
+			$(WRITE) '==> COMPILE: $<'
+			$(COMPILE.c)
+
+$(OBJSDIR)/payload.o:	$(COREDIR)/payload.c	$(MAKEDEP)
+			$(WRITE) '==> COMPILE: $<'
+			$(COMPILE.c)
+
+$(OBJSDIR)/vmm.o:	$(COREDIR)/vmm.c	$(MAKEDEP)
+			$(WRITE) '==> COMPILE: $<'
+			$(COMPILE.c)
+
+$(OBJSDIR)/thread.o:	$(COREDIR)/thread.c	$(MAKEDEP)
+			$(WRITE) '==> COMPILE: $<'
+			$(COMPILE.c)
+
+$(OBJSDIR)/sched.o:	$(COREDIR)/sched.c	$(MAKEDEP)
+			$(WRITE) '==> COMPILE: $<'
+			$(COMPILE.c)
+
+$(OBJSDIR)/proc.o:	$(COREDIR)/proc.c	$(MAKEDEP)
+			$(WRITE) '==> COMPILE: $<'
+			$(COMPILE.c)
+
+$(OBJSDIR)/msg.o:	$(COREDIR)/msg.c	$(MAKEDEP)
+			$(WRITE) '==> COMPILE: $<'
+			$(COMPILE.c)
+
+# pass all variables down to sub-makes
+.EXPORT_ALL_VARIABLES: ;
+
+# link the kernel
+kernel:		$(OBJS) $(LDSCRIPT)
+		$(WRITE) '[+] linking kernel'
+		$(LD) $^ -o $(OBJSDIR)/$@ -L $(LD_INCLUDE_LIBGCC) -lgcc
+		$(WRITE) '[+] generating files for boot'
+		$(OBJDUMPbin) --source $(OBJSDIR)/$@ >$(OBJSDIR)/kernel.lst
+		$(Q)echo 'KSYM' > $(PATHTOROOT)/kernel.sym
+		$(READELFbin) -Ws $(OBJSDIR)/$@ >$(OBJSDIR)/kernel.ksym
+		$(Q)cat $(OBJSDIR)/kernel.ksym | awk '/FUNC/ { print $$2 " " $$3 " " $$8 }' >> $(PATHTOROOT)/kernel.sym
+		$(STRIPbin) -s $(OBJSDIR)/$@
+		$(OBJCOPYbin) -O binary $(OBJSDIR)/$@ $(PATHTOROOT)/kernel
+		$(WRITE) '[+] building arch-specific drivers'
+		$(Q)make -C user/sbin/drivers/$(ARCH)
+		$(WRITE) '[+] building boot payload'
+		$(Q)$(RELEASEDIR)/mkpayload -o $(RELEASEDIR)/initrd $(PATHTOROOT)/kernel.sym
+
