@@ -1,5 +1,5 @@
 /* kernel/ports/arm/arm9page.c
- * manipulate page tables for the ARM9 processor
+ * manipulate page tables for ARM9-compatible processors
  * Author : Chris Williams
  * Date   : Sun,17 Apr 2011.02:06.00
 
@@ -15,7 +15,7 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 */
 
-/* the management of the paging system is slightly different to more convential 
+/* the management of the paging system is slightly different to more conventional 
    setups (ie: the i386_pc tree). the ARMv5 level 1 page directory is 16K in 
    size as it contains 4096 entries, each entry is 32bit wide and represents
    a 1M section of virtual memory, totalling a 4G address space. This page directory
@@ -41,28 +41,88 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 #include <portdefs.h>
 
-/* pg_pgdir_entry_to_vaddr
-   Look up the kernel virtual address of a given entry in a lvl 1 page directory
-   => pgdir = pgdir struct to access
-      entry = entry number to lookup (0-4095)
-   <= virtual address of the entry or 0 for failure
+/* ----------------------------------------------------------
+                  level 1 page directory handling
+   ---------------------------------------------------------- */
+
+/* pg_lvl1_entry_address
+   Calculate the kernel virtual address for the entry in the process's
+   level 1 page directory for the given virtual address
+   => proc = process to inspect
+      virtual = address to look up
+   <= kernel virtual address, or NULL for failure
 */
-unsigned int *pg_pgdir_entry_to_vaddr(unsigned int **pgdir, unsigned int entry)
+unsigned int *pg_lvl1_entry_address(process *proc, unsigned int virtual)
 {
-   unsigned char index;
-   unsigned int *dir;
-   pg_lvl1_dir *descr = (pg_lvl1_dir *)pgdir;
+   /* assumes proc and virtual are sane */
    
-   /* sanity checks */
-   if(!descr || entry >= PG_1M_ENTRIES) return NULL;
+   pg_process *pg_dir = (pg_process *)proc->pgdir;
+   unsigned int *phys_addr = pg_dir->phys_frames[PG_LVL1_FRAME(virtual)];
    
-   /* bits 11 and 10 select which of the 4K pages to use */
-   index = entry >> 10;
-   dir = KERNEL_PHYS2LOG(descr->frames[index]);
-   
-   /* use a mask to keep the lower 10 bits (0-9) */ 
-   return dir[entry & (1024 - 1)];
+   return KERNEL_PHYS2LOG(phys_addr + PG_LVL1_FRAME_ENTRY(virtual));
 }
+
+/* pg_lvl1_read
+   Read the level 1 page directory entry for the given process and virtual address
+   => proc = process to inspect
+      virtual = address to look up
+      result = pointer to word in which to write the contents of the level
+               1 entry for the supplied virtual address
+   <= 0 for success, or an error code
+*/
+kresult pg_lvl1_read(process *proc, unsigned int virtual, unsigned int *result)
+{
+   /* sanity checks */
+   if(!proc || !virtual || !result) return e_bad_params;
+   
+   /* calculate the virtual address of the required level 1 page table entry,
+      and then read the contents and return */
+   unsigned int *addr = pg_lvl1_entry_address(proc, virtual);
+   if(addr)
+   {
+      *result = *addr;
+      return success;
+   }
+   
+   /* fall through to return an error code */
+   return e_failure;
+}
+
+/* pg_lvl1_read
+   Write a value into the level 1 page directory entry for the given process and virtual address
+   => proc = process to inspect
+      virtual = address to look up
+      data = value to write
+   <= 0 for success, or an error code
+*/
+kresult pg_lvl1_write(process *proc, unsigned int virtual, unsigned int data)
+{
+   /* sanity checks */
+   if(!proc || !virtual) return e_bad_params;
+   
+   /* calculate the virtual address of the required level 1 page table entry,
+      and then write the contents and return */
+   unsigned int *addr = pg_lvl1_entry_address(proc, virtual);
+   if(addr)
+   {
+      pg_process *pg_dir = (pg_process *)proc->pgdir;
+      
+      /* write into the process's entry */
+      *addr = data;
+      
+      /* mark the process's level 1 page directory as updated */
+      pg_dir->frames_flags |= PG_LVL1_FRAME_UPDATE(virtual);
+      
+      return success;
+   }
+   
+   /* fall through to return an error code */
+   return e_failure;
+}
+
+/* ----------------------------------------------------------
+                       page fault handling
+   ---------------------------------------------------------- */
 
 unsigned int pg_fault_addr(void)
 {
@@ -71,6 +131,8 @@ unsigned int pg_fault_addr(void)
 }
 
 unsigned char page_fatal_flag = 0; /* set to 1 when handling a fatal kernel fault, to avoid infinite loops */
+
+#if 0
 
 /* pg_do_fault
    Do the actual hard work of fixing up a thread after a page fault, or is about to cause a page fault
@@ -83,8 +145,8 @@ kresult pg_do_fault(thread *target, unsigned int faultaddr, arm_vector_num vecto
 {
    vmm_decision decision;
    unsigned int *pgtable, pgentry, errflags;
-   unsigned int pgdir_index = (faultaddr >> PG_DIR_BASE) & PG_INDEX_MASK;
-   unsigned int pgtable_index = (faultaddr >> PG_TBL_BASE) & PG_INDEX_MASK;
+   unsigned int pgtable_entry = faultaddr >> PG_1M_SHIFT;
+   unsigned int pgtable_index = faultaddr >> PG_4K_SHIFT
    unsigned char rw_flag = 0;
    unsigned int cpuflags;
    
@@ -95,10 +157,9 @@ kresult pg_do_fault(thread *target, unsigned int faultaddr, arm_vector_num vecto
       return e_bad_address;
 
    /* look up the entry for this faulting address in the user page tables */
-   pgtable = (unsigned int *)((unsigned int)proc->pgdir[pgdir_index] & PG_4K_MASK);
+   pgtable = pg_pgdir_entry_to_vaddr(proc->pg_dir, pgtable_entry);
    if(pgtable)
    {
-      pgtable = KERNEL_PHYS2LOG(pgtable);
       pgentry = pgtable[pgtable_index];
    }
    else
@@ -781,6 +842,8 @@ void pg_map_phys_to_kernel_space(unsigned int *base, unsigned int *top)
    }
 }
 
+#endif
+
 /* pg_init
    Start up the underlying pagination system for the vmm. This includes
    mapping as much physical ram into the kernel's virtual space as possible.
@@ -794,20 +857,26 @@ void pg_init(void)
    unsigned int *high_base = phys_pg_stack_high_base;
    unsigned int *high_ptr = phys_pg_stack_high_ptr;
    
+   unsigned int *boot_pg_dir = (unsigned int *)KernelPageDirectory;
+   
    unsigned int loop;
-   unsigned int **kernel_dir = (unsigned int **)KernelPageDirectory;
       
-   PAGE_DEBUG("[page:%i] initialising.. kernel page dir %x\n", CPU_ID, KernelPageDirectory);
+   PAGE_DEBUG("[page:%i] initialising... zeroing %i entries\n", CPU_ID, KERNEL_SPACE_BASE >> PG_1M_SHIFT);
    
    /* clear out all non-kernel space entries to start again - the kernel
       boot page directory is made up of 4096 x 1M entries */
    for(loop = 0; loop < (KERNEL_SPACE_BASE >> PG_1M_SHIFT); loop++)
-      kernel_dir[loop] = NULL;
+      boot_pg_dir[loop] = NULL;
    
    /* ensure all of physical RAM is mapped into the kernel */
    pg_map_phys_to_kernel_space(high_base, high_ptr)
    pg_map_phys_to_kernel_space(low_base, low_ptr);
 
+   /* now point the boot CPU's level one page directory at the kernel boot page dirctory.
+      the 16K contig space for the table is in the kernel's critical section so it won't
+      be reallocated. multiprocessor systems can clone theirs when needed */
+   cpu_table[CPU_ID].pgdir = boot_pg_dir;
+   
    BOOT_DEBUG("[page:%i] paging initialised\n", CPU_ID);
 }
 

@@ -52,6 +52,9 @@ typedef struct
    thread *current;  /* must point to the thread being run */
    rw_gate lock;     /* lock for the cpu metadata */
    
+   /* per-cpu level 1 page directory, 16K contig table of 4 x 4K phys page frames */
+   unsigned int **pgdir;
+   
    /* prioritised run queues */
    mp_thread_queue queues[SCHED_PRIORITY_LEVELS];
    unsigned int lowest_queue_filled; /* index into queues of the lowest priority

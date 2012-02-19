@@ -245,7 +245,6 @@ extern unsigned int *phys_pg_stack_high_ptr;
 #define PG_4K_AP3_SHIFT    (10)   /* access bits start at bit 4 in 4KB page entries */
 #define PG_4K_CB_SHIFT     (2)    /* cache and buffering bits start at bit 2 in 4K page entries */
 
-
 /* set the type of page directory entry */
 #define PG_L1TYPE_MASK     (PG_L1TYPE_1M | PG_L1TYPE_4KTBL) 
 #define PG_L1TYPE_4KTBL    (1 << 0)  /* entry is to a lvl2 page table of 4K pages */ 
@@ -255,16 +254,32 @@ extern unsigned int *phys_pg_stack_high_ptr;
 #define PG_L2TYPE_64K      (1 << 0)  /* entry points to a 64K physical page frame */
 #define PG_L2TYPE_4K       (1 << 1)  /* entry points to a 4K physical page frame */
 
+/* manipulate a process's level 1 page directory, which is a non-contig table split over 4 pages */
+#define PG_LVL1_FRAMES          (4)
+#define PG_LVL1_FRAME_SHIFT     (30)
+#define PG_LVL1_FRAME(a)        (((a) >> PG_LVL1_FRAME_SHIFT) & (PG_LVL1_FRAMES - 1))
+#define PG_LVL1_FRAME_ENTRY(a)  (((a) >> PG_1M_SHIFT) & (PG_1M_ENTRIES - 1))
+#define PG_LVL1_FRAME_UPDATE(a) (1 << PG_LVL1_FRAME(a))
+
 /* describe process's paging setup  */
 typedef struct
 {
    /* the 16K page directory is split over 4 x 4K pages that 
-      are not necessarily contiguous. these are the physical base addresses
-      of the 4 page frames */
-   unsigned int *frames[4];
+      are not necessarily contiguous. these are the PHYSICAL base addresses
+      of the 4 page frames. these frames are copied lazily into the
+      processor's lvl 1 page directory as required */
+   unsigned int *phys_frames[PG_LVL1_FRAMES];
    
-   
+   /* bits 0-3 represent frames 0 to 3, if set then the frame has
+      been updated and should be copied into the processor's lvl 1 page dir */
+   unsigned char frames_flags;
 } pg_process;
+
+/* describe a 16K (4096 entries x 4 bytes) level 1 paging table */
+typedef struct
+{
+   unsigned int **entries;
+} pg_lvl1_dir;
 
 unsigned int pg_fault_addr(void);
 void pg_init(void);
