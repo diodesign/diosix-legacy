@@ -171,7 +171,9 @@ struct vmm_tree
 
 kresult vmm_initialise(multiboot_info_t *mbd);
 kresult vmm_req_phys_pg(void **addr, int pref);
+kresult vmm_req_phys_pages(unsigned short pages, void **ptr, unsigned int pref);
 kresult vmm_return_phys_pg(void *addr);
+kresult vmm_return_phys_pages(void *addr, unsigned int pages);
 kresult vmm_enough_pgs(unsigned int size);
 kresult vmm_ensure_pgs(unsigned int size, int type);
 kresult vmm_free(void *addr);
@@ -216,10 +218,14 @@ extern unsigned int *phys_pg_stack_high_ptr;
 #define PG_FAULT_R    (0)  /* 1 = reserved bits set in dir entry */
 #define PG_FAULT_I    (0)  /* 0 = not instruction fetch, 1 = instr fetch */
 
-/* ARM-specific page flags */
+/* ARM-specific page access flags */
 #define PG_ACCESS_KERNEL   (1) /* kernel r/w access */
 #define PG_ACCESS_USER_RO  (2) /* kernel r/w, user read-only access */
 #define PG_ACCESS_USER_RW  (3) /* all r/w access */
+
+/* sub-page access permissions: AP0 is bits 4-5, AP1 is bits 6-7, up to AP3 */
+#define PG_AP_SHIFT(a)     (((a) * 2) + 4)
+#define PG_AP_SET(a, b)    ((b) << PG_AP_SHIFT(a)) /* a = AP number, b = bits to set */
 
 /* set C and B bits to enable cache+buffering of data */
 #define PG_CACHE_PAGE      (1 << 1 | 1 << 0)
@@ -228,6 +234,17 @@ extern unsigned int *phys_pg_stack_high_ptr;
 #define PG_EXTERNAL        (1 << 31)  /* set to bump the page manager on fault, unset to use the vma's setting */
 #define PG_PRIVATE         (1 << 30)  /* set to indicate this page is private to the process and can be released */
 #define PG_EXTRA_SHIFT     (30)       /* extra bits start at bit 30 */
+
+/* the portable boot code expects PG_RW to set the bits for all R/W access for a page */
+#define PG_RW              (PG_AP_SET(0, PG_ACCESS_USER_RW) | PG_AP_SET(1, PG_ACCESS_USER_RW) | \
+                            PG_AP_SET(2, PG_ACCESS_USER_RW) | PG_AP_SET(3, PG_ACCESS_USER_RW))
+
+/* set default for boot pages to be read-only for user, rw for kernel */
+#define PG_RO              (PG_AP_SET(0, PG_ACCESS_USER_RO) | PG_AP_SET(1, PG_ACCESS_USER_RO) | \
+                            PG_AP_SET(2, PG_ACCESS_USER_RO) | PG_AP_SET(3, PG_ACCESS_USER_RO))
+
+/* XXX define the default page bit settings for the payload */
+#define PG_PAYLOAD_DEFAULT_FLAGS (PG_RO | PG_CACHE_PAGE)
 
 #define PG_1M_ENTRIES      (4096) /* number of 32bit word entries in the page directory */
 #define PG_1M_SHIFT        (20)   /* physical addr in bits 20-31 for 1M page entries */
@@ -295,5 +312,6 @@ void pg_postmortem(int_registers_block *regs);
 kresult pg_user2phys(unsigned int *paddr, unsigned int **pgdir, unsigned int vaddr);
 kresult pg_user2kernel(unsigned int *kaddr, unsigned int uaddr, process *proc);
 kresult pg_remove_4K_mapping(unsigned int **pgdir, unsigned int virtual, unsigned int release_flag);
+kresult pg_load_pgdir(unsigned int **pgdir);
 
 #endif

@@ -116,9 +116,9 @@ void syscall_do_driver(int_registers_block *regs)
             }
             
             /* build page flags */
-            pgflags = PG_PRESENT | PG_PRIVLVL;
+            pgflags = PG_RO;
             if(flags & VMA_WRITEABLE) pgflags |= PG_RW;
-            if(flags & VMA_NOCACHE) pgflags |= PG_CACHEDIS;
+            if(flags & VMA_NOCACHE) pgflags |= PG_CACHE_PAGE;
             
             /* loop through the pages to map in, adding page table entries */
             for(pgloop = 0; pgloop < req->size; pgloop += MEM_PGSIZE)

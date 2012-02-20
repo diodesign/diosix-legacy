@@ -238,6 +238,9 @@ extern unsigned int *phys_pg_stack_high_ptr;
 #define PG_4M_MASK    (~((4 * 1024 * 1024) - 1))
 #define PG_4K_MASK    (~((4 * 1024       ) - 1))
 
+/* define the default page bit settings for the payload */
+#define PG_PAYLOAD_DEFAULT_FLAGS (PG_PRESENT | PG_PRIVLVL)
+
 void pg_init(void);
 void pg_dump_pagedir(unsigned int *pgdir);
 kresult pg_new_process(process *new, process *current);

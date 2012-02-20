@@ -132,8 +132,6 @@ unsigned int pg_fault_addr(void)
 
 unsigned char page_fatal_flag = 0; /* set to 1 when handling a fatal kernel fault, to avoid infinite loops */
 
-#if 0
-
 /* pg_do_fault
    Do the actual hard work of fixing up a thread after a page fault, or is about to cause a page fault
    => target = thread that caused the fault
@@ -143,10 +141,14 @@ unsigned char page_fatal_flag = 0; /* set to 1 when handling a fatal kernel faul
 */
 kresult pg_do_fault(thread *target, unsigned int faultaddr, arm_vector_num vector)
 {
+   dprintf("pg_do_fault: not implemented\n");
+   return success;
+   
+#if 0
    vmm_decision decision;
    unsigned int *pgtable, pgentry, errflags;
    unsigned int pgtable_entry = faultaddr >> PG_1M_SHIFT;
-   unsigned int pgtable_index = faultaddr >> PG_4K_SHIFT
+   unsigned int pgtable_index = faultaddr >> PG_4K_SHIFT;
    unsigned char rw_flag = 0;
    unsigned int cpuflags;
    
@@ -176,7 +178,7 @@ kresult pg_do_fault(thread *target, unsigned int faultaddr, arm_vector_num vecto
       errflags = VMA_READABLE;
    
    /* hint to the vmm that the page already has physical memory */
-   if(pgentry & PG_PRESENT)
+   if(pgentry & PG_RO)
       errflags |= VMA_HASPHYS;
    
    /* ask the vmm for a decision */
@@ -227,7 +229,7 @@ kresult pg_do_fault(thread *target, unsigned int faultaddr, arm_vector_num vecto
                {
                   /* ...and map the physical page in for them all right now */
                   pg_add_4K_mapping(search->proc->pgdir, (search->base + offset) & PG_4K_MASK,
-                                    physical, PG_PRESENT | rw_flag | PG_PRIVLVL | PG_PRIVATE);
+                                    physical, PG_RO | rw_flag | PG_PRIVATE);
                   
                   if(search->proc == proc)
                      /* tell this processor to reload the page tables */
@@ -243,7 +245,7 @@ kresult pg_do_fault(thread *target, unsigned int faultaddr, arm_vector_num vecto
          {
             /* found an existing physical page from another process so map it in */
             pg_add_4K_mapping(proc->pgdir, faultaddr & PG_4K_MASK,
-                              physical, PG_PRESENT | rw_flag | PG_PRIVLVL);
+                              physical, PG_RO | rw_flag);
             
             /* tell the processor to reload the page tables */
             pg_load_pgdir(KERNEL_LOG2PHYS(proc->pgdir));
@@ -262,7 +264,7 @@ kresult pg_do_fault(thread *target, unsigned int faultaddr, arm_vector_num vecto
          
          /* map this new physical page in, remembering to set write access */
          pg_add_4K_mapping(proc->pgdir, faultaddr & PG_4K_MASK,
-                           new_phys, PG_PRESENT | rw_flag | PG_PRIVLVL | PG_PRIVATE);
+                           new_phys, PG_RO | rw_flag | PG_PRIVATE);
          
          /* tell the processor to reload the page tables */
          pg_load_pgdir(KERNEL_LOG2PHYS(proc->pgdir));
@@ -288,7 +290,7 @@ kresult pg_do_fault(thread *target, unsigned int faultaddr, arm_vector_num vecto
          
          /* map this new physical page in, remembering to set write access */
          pg_add_4K_mapping(proc->pgdir, faultaddr & PG_4K_MASK,
-                           new_phys, PG_PRESENT | rw_flag | PG_PRIVLVL | PG_PRIVATE);
+                           new_phys, PG_RO | rw_flag | PG_PRIVATE);
          
          /* tell the processor to reload the page tables */
          pg_load_pgdir(KERNEL_LOG2PHYS(proc->pgdir));
@@ -303,7 +305,7 @@ kresult pg_do_fault(thread *target, unsigned int faultaddr, arm_vector_num vecto
       {            
          /* it's safe to just set write access on this page */
          pg_add_4K_mapping(proc->pgdir, faultaddr & PG_4K_MASK,
-                           pgentry & PG_4K_MASK, PG_PRESENT | rw_flag | PG_PRIVLVL | PG_PRIVATE);
+                           pgentry & PG_4K_MASK, PG_RO | rw_flag | PG_PRIVATE);
          
          /* tell the processor to reload the page tables */
          pg_load_pgdir(KERNEL_LOG2PHYS(proc->pgdir));
@@ -329,6 +331,7 @@ pg_fault_external:
    PAGE_DEBUG("[page:%i] delegating fault at %x for process %i to userspace page manager\n",
               CPU_ID, faultaddr, proc->pid);
    return e_failure;
+#endif
 }
 
 /* pg_fault
@@ -338,6 +341,10 @@ pg_fault_external:
 */
 kresult pg_fault(int_registers_block *regs)
 {
+   dprintf("pg_fault: not implemented\n");
+   return success;
+   
+#if 0
    unsigned int faultaddr = pg_fault_addr();
    
    /* give up if we're in early system initialisation */
@@ -366,6 +373,7 @@ pf_fault_bad:
    
    /* fall through to indicating that the process has made a run-time error */
    return e_failure;
+#endif
 }
 
 /* pg_preempt_fault
@@ -379,6 +387,10 @@ pf_fault_bad:
 */
 kresult pg_preempt_fault(thread *test, unsigned int virtualaddr, unsigned int size, unsigned int flags)
 {
+   dprintf("pg_preempt_fault: not implemented\n");
+   return success;
+   
+#if 0
    unsigned int virtualloop, virtual_aligned_min, virtual_aligned_max;
    unsigned int pgdir_index, pgtable_index, *pgtbl;
    unsigned int **pgdir;
@@ -411,7 +423,7 @@ kresult pg_preempt_fault(thread *test, unsigned int virtualaddr, unsigned int si
          pgtbl = KERNEL_PHYS2LOG(pgtbl);
          
          /* is the page present? */
-         if(!(pgtbl[pgtable_index] & PG_PRESENT))
+         if(!(pgtbl[pgtable_index] & PG_RO))
             if(pg_do_fault(test, virtualloop, PG_FAULT_U | page_write_flag))
                return e_bad_address;
          
@@ -424,6 +436,7 @@ kresult pg_preempt_fault(thread *test, unsigned int virtualaddr, unsigned int si
    
    /* fall through to returning success */
    return success;
+#endif
 }
 
 /* pg_clone_pgdir
@@ -434,6 +447,10 @@ kresult pg_preempt_fault(thread *test, unsigned int virtualaddr, unsigned int si
  */
 unsigned int **pg_clone_pgdir(unsigned int **source)
 {
+   dprintf("pg_clone_pgdir: not implemented\n");
+   return NULL;
+   
+#if 0
    unsigned int loop;
    unsigned int source_touched = 0;
    unsigned int **new = NULL;
@@ -497,6 +514,7 @@ unsigned int **pg_clone_pgdir(unsigned int **source)
    }
    
    return new;
+#endif
 }
 
 /* pg_new_process
@@ -508,6 +526,10 @@ unsigned int **pg_clone_pgdir(unsigned int **source)
 */
 kresult pg_new_process(process *new, process *current)
 {
+   dprintf("pg_new_process: not implemented\n");
+   return success;
+   
+#if 0
    unsigned int **pgdir;
 
    lock_gate(&(new->lock), LOCK_WRITE);
@@ -553,6 +575,7 @@ kresult pg_new_process(process *new, process *current)
            CPU_ID, new->pgdir, new->pid);
 
    return success;
+#endif
 }
 
 /* pg_destroy_process
@@ -563,6 +586,10 @@ kresult pg_new_process(process *new, process *current)
 */
 kresult pg_destroy_process(process *victim)
 {
+   dprintf("pg_destroy_process: not implemented\n");
+   return success;
+   
+#if 0
    unsigned int loop;
    
    lock_gate(&(victim->lock), LOCK_WRITE);
@@ -587,6 +614,7 @@ kresult pg_destroy_process(process *victim)
    unlock_gate(&(victim->lock), LOCK_WRITE);
                      
    return success;
+#endif
 }
 
 /* pg_user2phys
@@ -600,6 +628,10 @@ kresult pg_destroy_process(process *victim)
 */
 kresult pg_user2phys(unsigned int *paddr, unsigned int **pgdir, unsigned int virtual)
 {
+   dprintf("pg_user2phys: not implemented\n");
+   return success;
+   
+#if 0
    unsigned int pgdir_index = virtual >> PG_1M_SHIFT;
    unsigned int pgtable_index = (virtual >> PG_4K_SHIFT) & PG_4K_INDEX_MASK;
    unsigned int *pgtbl;
@@ -620,6 +652,7 @@ kresult pg_user2phys(unsigned int *paddr, unsigned int **pgdir, unsigned int vir
    }
 
    return e_not_found;
+#endif
 }
 
 /* pg_user2kernel
@@ -634,6 +667,10 @@ kresult pg_user2phys(unsigned int *paddr, unsigned int **pgdir, unsigned int vir
 */
 kresult pg_user2kernel(unsigned int *kaddr, unsigned int uaddr, process *proc)
 {
+   dprintf("pg_user2kernel: not implemented\n");
+   return success;
+   
+#if 0
    if((!proc) || (!kaddr)) return e_failure;
    
    if(pg_user2phys(kaddr, proc->pgdir, uaddr))
@@ -643,6 +680,7 @@ kresult pg_user2kernel(unsigned int *kaddr, unsigned int uaddr, process *proc)
    *(kaddr) = (unsigned int)KERNEL_PHYS2LOG((unsigned int *)(*(kaddr)));
    
    return success;
+#endif
 }
 
 /* pg_remove_4K_mapping
@@ -655,6 +693,10 @@ kresult pg_user2kernel(unsigned int *kaddr, unsigned int uaddr, process *proc)
 */
 kresult pg_remove_4K_mapping(unsigned int **pgdir, unsigned int virtual, unsigned int release_flag)
 {
+   dprintf("pg_remove_4K_mapping: not implemented\n");
+   return success;
+   
+#if 0
    unsigned int *pgtable, physical;
    unsigned int pgdir_index = virtual >> PG_1M_SHIFT;
    unsigned int pgtbl_index = (virtual >> PG_4K_SHIFT) & PG_4K_INDEX_MASK;
@@ -682,6 +724,7 @@ kresult pg_remove_4K_mapping(unsigned int **pgdir, unsigned int virtual, unsigne
    }
    
    return success;
+#endif
 }
 
 /* pg_add_4K_mapping
@@ -696,6 +739,10 @@ kresult pg_remove_4K_mapping(unsigned int **pgdir, unsigned int virtual, unsigne
 kresult pg_add_4K_mapping(unsigned int **pgdir, unsigned int virtual, unsigned int physical, 
                           unsigned int flags)
 {
+   dprintf("pg_add_4K_mapping: not implemented\n");
+   return success;
+   
+#if 0
    unsigned int *pgtable, ap;
    unsigned int pgdir_index = virtual >> PG_1M_SHIFT;
    unsigned int pgtbl_index = (virtual >> PG_4K_SHIFT) & PG_4K_INDEX_MASK;
@@ -732,6 +779,7 @@ kresult pg_add_4K_mapping(unsigned int **pgdir, unsigned int virtual, unsigned i
    pgtable[pgtbl_index] = (physical & PG_4K_MASK) | (flags & ~PG_4K_MASK) | PG_L2TYPE_4K;
    
    return success;
+#endif
 }
 
 /* pg_add_1M_mapping
@@ -744,7 +792,11 @@ kresult pg_add_4K_mapping(unsigned int **pgdir, unsigned int virtual, unsigned i
 */
 kresult pg_add_1M_mapping(unsigned int **pgdir, unsigned int virtual, unsigned int physical, 
                           unsigned int flags)
-{   
+{
+   dprintf("pg_add_1M_mapping: not implemented\n");
+   return success;
+   
+#if 0
    PAGE_DEBUG("[page:%i] mapping 1M: %x -> %x (%x) dir index %x\n", 
            CPU_ID, virtual, physical, flags, virtual >> PG_1M_SHIFT);
    
@@ -768,6 +820,7 @@ kresult pg_add_1M_mapping(unsigned int **pgdir, unsigned int virtual, unsigned i
    
    /* fall through to failure */
    return e_failure;
+#endif
 }
 
 /* pg_remove_1M_mapping
@@ -777,7 +830,11 @@ kresult pg_add_1M_mapping(unsigned int **pgdir, unsigned int virtual, unsigned i
    <= 0 for success, anything else is a fail
 */
 kresult pg_remove_1M_mapping(unsigned int **pgdir, unsigned int virtual)
-{   
+{
+   dprintf("pg_remove_1M_mapping: not implemented\n");
+   return success;
+   
+#if 0
    PAGE_DEBUG("[page:%i] unmapping 1M: %x dir index %x\n", 
               CPU_ID, virtual, virtual >> PG_DIR_BASE);
    
@@ -800,6 +857,7 @@ kresult pg_remove_1M_mapping(unsigned int **pgdir, unsigned int virtual)
    
    /* fall through to failure */
    return e_failure;
+#endif
 }
 
 /* pg_map_phys_to_kernel_space
@@ -810,6 +868,10 @@ kresult pg_remove_1M_mapping(unsigned int **pgdir, unsigned int virtual)
 */
 void pg_map_phys_to_kernel_space(unsigned int *base, unsigned int *top)
 {
+   dprintf("pg_map_phys_to_kernel_space: not implemented\n");
+   return;
+   
+#if 0
    /* from kernel/ports/arm/include/memory.h */
    unsigned int **pg_dir = (unsigned int **)KernelPageDirectory;
 
@@ -840,9 +902,19 @@ void pg_map_phys_to_kernel_space(unsigned int *base, unsigned int *top)
          if((*base & PG_1M_MASK) != addr) break;
       }
    }
+#endif
 }
 
-#endif
+/* pg_load_pgdir
+   Sync the current process's level 1 page directory with the processor's
+   => pgdir = page directory to load
+   <= 0 for success, or an error code
+*/
+kresult pg_load_pgdir(unsigned int **pgdir)
+{
+   dprintf("pg_load_pgdir: not implemented\n");
+   return success;
+}
 
 /* pg_init
    Start up the underlying pagination system for the vmm. This includes
@@ -869,7 +941,7 @@ void pg_init(void)
       boot_pg_dir[loop] = NULL;
    
    /* ensure all of physical RAM is mapped into the kernel */
-   pg_map_phys_to_kernel_space(high_base, high_ptr)
+   pg_map_phys_to_kernel_space(high_base, high_ptr);
    pg_map_phys_to_kernel_space(low_base, low_ptr);
 
    /* now point the boot CPU's level one page directory at the kernel boot page dirctory.
