@@ -196,8 +196,10 @@ kernel:		$(OBJS) $(LDSCRIPT)
 		$(Q)cat $(OBJSDIR)/kernel.ksym | awk '/FUNC/ { print $$2 " " $$3 " " $$8 }' >> $(PATHTOROOT)/kernel.sym
 		$(STRIPbin) -s $(OBJSDIR)/$@
 		$(OBJCOPYbin) -O binary $(OBJSDIR)/$@ $(PATHTOROOT)/kernel
+		$(WRITE) '[+] building init'
+		$(Q)make -C user/sbin/init
 		$(WRITE) '[+] building arch-specific drivers'
 		$(Q)make -C user/sbin/drivers/$(ARCH)
 		$(WRITE) '[+] building boot payload'
-		$(Q)$(RELEASEDIR)/mkpayload -o $(RELEASEDIR)/initrd $(PATHTOROOT)/kernel.sym $(PATHTOROOT)/sbin/drivers/arm/realview_clcd
+		$(Q)$(RELEASEDIR)/mkpayload -o $(RELEASEDIR)/initrd $(PATHTOROOT)/kernel.sym $(PATHTOROOT)/sbin/init $(PATHTOROOT)/sbin/drivers/arm/realview_clcd
 
