@@ -28,17 +28,14 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 */
 unsigned int atag_fixup_initrd(unsigned int phys_addr)
 {
-   mb_module_t *module;
    unsigned int mod_loop;
    unsigned int virt_addr = (unsigned int)KERNEL_PHYS2LOG(phys_addr);
+   mb_module_t *module = (mb_module_t *)(virt_addr + sizeof(payload_blob_header));
 
    payload_blob_header *hdr = (payload_blob_header *)virt_addr;
-   
+      
    /* bail out if we've been given an empty blob */
    if(hdr->present == 0) return 0;
-      
-   /* move addr beyond the header metadata */
-   module = (mb_module_t *)(virt_addr + sizeof(payload_blob_header));
 
    for(mod_loop = 0; mod_loop < hdr->present; mod_loop++)
    {      
@@ -174,7 +171,7 @@ multiboot_info_t *atag_process(atag_item *item)
                be valid, hence the fixup proc call */
             mb_base->mods_addr = (unsigned int)item->data.initrd2.physaddr + sizeof(payload_blob_header);
             mb_base->mods_count = atag_fixup_initrd(item->data.initrd2.physaddr);
-
+            
             mb_base->flags |= MULTIBOOT_FLAGS_MODS;
             break;
             

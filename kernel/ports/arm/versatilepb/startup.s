@@ -131,6 +131,18 @@ MOV   r8, #0xc00
 ADD   r8, r8, #0x008         /* get 0xc08 into r8 */
 STR   r5, [r6, r8, LSL #2]
 
+/* initrd might span multiple megabytes so map in the
+   next 8MB of phys ram into kernel space */
+MOV   r9, #8
+
+MapInitrdMap:
+ADD   r8, #1
+ADD   r5, r5, #4
+STR   r5, [r6, r8, LSL #2]
+SUB   r9, r9, #1
+CMP   r9, #0
+BNE   MapInitrdMap
+
 /* map 1M of the system registers at 0x10000000 physical
    into the kernel's space at 0xc0000000 + 0x10000000 */
 MOV   r5, #0x100

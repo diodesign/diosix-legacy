@@ -39,7 +39,7 @@ multiboot_info_t *preboot(unsigned int magic, arm_machine_id machine_id, void *a
    /* sanity checks - bail out if magic is non-zero or if
       trying to boot on a non-supported board */
    if(magic || machine_id != versatilepb) return NULL;
-
+   
    /* process the atag list for the core kernel, which expects multiboot */
    mb = atag_process(KERNEL_PHYS2LOG(atag_list));
    BOOT_DEBUG("[arm] machine id: %i multiboot: 0x%p\n", machine_id, mb);
