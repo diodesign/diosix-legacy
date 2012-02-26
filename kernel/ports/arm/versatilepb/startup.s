@@ -293,13 +293,13 @@ KernelBootStrFIQ:
          1-0   = 2 for 1M section
 */
 KernelBootPgTableEntry:
-.word 0x00000402  /* point at 0x0 phys mem */
+.word 0x0000040a  /* point at 0x0 phys mem with caching enabled */
 
 KernelBootPgTablePgStack:
-.word 0x00100402  /* point at 0x00100000 phys mem */
+.word 0x0010040a  /* point at 0x00100000 phys mem with caching enabled */
 
 KernelBootPgTableInitrd:
-.word 0x00800402  /* point at 0x00800000 phys mem */
+.word 0x0080040a  /* point at 0x00800000 phys mem with caching enabled */
 
 /* craft a mapping for the system's chipset registers */
 KernelBootPgTableSysRegs:
