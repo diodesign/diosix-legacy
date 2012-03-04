@@ -793,10 +793,6 @@ kresult pg_add_4K_mapping(unsigned int **pgdir, unsigned int virtual, unsigned i
 kresult pg_add_1M_mapping(unsigned int **pgdir, unsigned int virtual, unsigned int physical, 
                           unsigned int flags)
 {
-   dprintf("pg_add_1M_mapping: not implemented\n");
-   return success;
-   
-#if 0
    PAGE_DEBUG("[page:%i] mapping 1M: %x -> %x (%x) dir index %x\n", 
            CPU_ID, virtual, physical, flags, virtual >> PG_1M_SHIFT);
    
@@ -820,7 +816,6 @@ kresult pg_add_1M_mapping(unsigned int **pgdir, unsigned int virtual, unsigned i
    
    /* fall through to failure */
    return e_failure;
-#endif
 }
 
 /* pg_remove_1M_mapping

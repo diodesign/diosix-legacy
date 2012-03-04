@@ -264,8 +264,8 @@ extern unsigned int *phys_pg_stack_high_ptr;
 
 /* set the type of page directory entry */
 #define PG_L1TYPE_MASK     (PG_L1TYPE_1M | PG_L1TYPE_4KTBL) 
-#define PG_L1TYPE_4KTBL    (1 << 0)  /* entry is to a lvl2 page table of 4K pages */ 
-#define PG_L1TYPE_1M       (1 << 1)  /* entry is to a 1M page in phys mem */
+#define PG_L1TYPE_4KTBL    (1 << 0)  /* entry points to a lvl2 page table of 4K pages */ 
+#define PG_L1TYPE_1M       (1 << 1)  /* entry points to a 1M section in phys mem */
 
 #define PG_L2TYPE_MASK     (PG_L2TYPE_4K | PG_L2TYPE_64K)
 #define PG_L2TYPE_64K      (1 << 0)  /* entry points to a 64K physical page frame */
