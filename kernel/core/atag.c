@@ -163,16 +163,6 @@ multiboot_info_t *atag_process(atag_item *item)
                        item->data.initrd2.physaddr,
                        KERNEL_PHYS2LOG(item->data.initrd2.physaddr),
                        item->data.initrd2.size);
-            
-            {
-               unsigned int *initrd_dword = KERNEL_PHYS2LOG(item->data.initrd2.physaddr);
-
-               unsigned char initrd_loop;
-               for(initrd_loop = 0; initrd_loop < 8; initrd_loop++)
-               {
-                  dprintf("initrd_dword[%i] = %x\n", initrd_loop, initrd_dword[initrd_loop]);
-               }
-            }
 
             /* store the details of the initrd in phys mem - the core kernel doesn't care for
                the header data we prepended to the modules but does expect the pointers to
