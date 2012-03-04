@@ -249,7 +249,7 @@ extern unsigned int *phys_pg_stack_high_ptr;
 #define PG_1M_ENTRIES      (4096) /* number of 32bit word entries in the page directory */
 #define PG_1M_SHIFT        (20)   /* physical addr in bits 20-31 for 1M page entries */
 #define PG_1M_AP_SHIFT     (10)   /* access bits start at bit 10 in 1M page entries */
-#define PG_1M_CB_SHIFT     (3)    /* cache and buffering bits start at bit 3 in 1M page entries */
+#define PG_1M_CB_SHIFT     (2)    /* cache and buffering bits start at bit 2 in 1M page entries */
 #define PG_1M_MASK         (~((1 * 1024 * 1024) - 1))
 
 #define PG_4K_MASK         (~((4 * 1024) - 1))

@@ -868,10 +868,6 @@ kresult pg_remove_1M_mapping(unsigned int **pgdir, unsigned int virtual)
 */
 void pg_map_phys_to_kernel_space(unsigned int *base, unsigned int *top)
 {
-   dprintf("pg_map_phys_to_kernel_space: not implemented\n");
-   return;
-   
-#if 0
    /* from kernel/ports/arm/include/memory.h */
    unsigned int **pg_dir = (unsigned int **)KernelPageDirectory;
 
@@ -888,7 +884,7 @@ void pg_map_phys_to_kernel_space(unsigned int *base, unsigned int *top)
       /* perform the page table scribbling */
       virtual_addr = (unsigned int)KERNEL_PHYS2LOG((unsigned int)addr);
       
-      PAGE_DEBUG("[page:%i] mapping to kernel 1M, page dir[%i] = %x (%x) (%x)\n",
+      PAGE_DEBUG("[page:%i] mapping to kernel 1M, page dir[%i] = phys %x (virt %x) (lvl1 %x)\n",
               CPU_ID, (virtual_addr >> PG_1M_SHIFT), addr, virtual_addr, pg_dir);
       
       /* create 1MB entry, cached and buffered, read+write for kernel-only */
@@ -902,7 +898,6 @@ void pg_map_phys_to_kernel_space(unsigned int *base, unsigned int *top)
          if((*base & PG_1M_MASK) != addr) break;
       }
    }
-#endif
 }
 
 /* pg_load_pgdir
