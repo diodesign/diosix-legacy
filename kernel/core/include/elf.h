@@ -23,10 +23,11 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 #define Elf32_Sword     int
 #define Elf32_Word      unsigned int
 
-#define EI_NIDENT 16
-#define ET_EXEC   (2)
-#define EM_PORT   (3)  /* for i386 */
-#define PT_LOAD   (1)
+#define EI_NIDENT       (16)
+#define ET_EXEC         (2)
+#define EM_PORT_X86     (0x03)  /* for i386 */
+#define EM_PORT_ARM     (0x28)  /* for ARM */
+#define PT_LOAD         (1)
 
 /* ELF File Header */
 typedef struct {

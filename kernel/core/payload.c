@@ -116,9 +116,13 @@ payload_type payload_parsemodule(mb_module_t *module, payload_descr *payload)
       return payload_bad;
    }
 
-   if(fheader->e_machine != EM_PORT)
+   /* check it's a supported architecture */
+   if(fheader->e_machine != EM_PORT_X86 &&
+      fheader->e_machine != EM_PORT_ARM)
    {
-      BOOT_DEBUG(" ... is incompatible with this machine (%x)\n", fheader->e_machine);
+      BOOT_DEBUG(" ... is incompatible with this machine (type: 0x%x allowed: 0x%x, 0x%x)\n",
+                 fheader->e_machine,
+                 EM_PORT_X86, EM_PORT_ARM);
       return payload_bad;
    }
 
