@@ -69,7 +69,7 @@ MAKEDEP		= $(MAKEFILE) $(PORTDIR)/include/portdefs.h $(COREDIR)/include/processe
 # basic debugging
 DEBUGFLAGS	= -DDEBUG -DPAGE_HALT_ON_SEGV_DEBUG
 
-CC		= $(CCbin) $(SVNDEF) $(FLAGS) -I$(INCDIR) -I$(COREDIR)/include -I$(LIBDIOSIXDIR) $(DEBUGFLAGS) $(VERSION)
+CC		= $(CCbin) $(SVNDEF) $(FLAGS) -I$(INCDIR) -I$(COREDIR)/include -I$(LIBDIOSIXDIR) -DUNIPROC $(DEBUGFLAGS) $(VERSION)
 LD		= $(CCbin) $(FLAGS) -Xlinker --script=$(LDSCRIPT) -Xlinker
 ASM		= $(ASbin) -g $(ARCH_FLAGS)
 
