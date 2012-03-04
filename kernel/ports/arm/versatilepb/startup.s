@@ -121,27 +121,35 @@ MOV   r8, #0xc00
 ADD   r8, r8, #0x001         /* get 0xc01 into r8 */
 STR   r5, [r6, r8, LSL #2]
 
-/* an initrd will be loaded at 0x800000 physical so
+/* an initrd will be loaded at 0x00800000 physical so
    make sure it's mapped into the kernel's virtual space 
    at 0xC0800000 */
 LDR   r5, =KernelBootPgTableInitrd
 SUB   r5, r5, r4
-LDR   r5, [r5]
+LDR   r5, [r5]               /* r5 = template pg table entry */
 MOV   r8, #0xc00
 ADD   r8, r8, #0x008         /* get 0xc08 into r8 */
-STR   r5, [r6, r8, LSL #2]
+MOV   r10, #0x00100000       /* for 1M increments */
 
-/* initrd might span multiple megabytes so map in the
-   next 8MB of phys ram into kernel space */
+/* initrd might span multiple megabytes so map in 
+   8MB of phys ram into kernel space */
 MOV   r9, #8
 
-MapInitrdMap:
-ADD   r8, #1
-ADD   r5, r5, #4
+MapInitrdLoop:
+/* write the page table entry, r6 = page table base */
 STR   r5, [r6, r8, LSL #2]
-SUB   r9, r9, #1
+
+/* all done? */
 CMP   r9, #0
-BNE   MapInitrdMap
+BEQ   MapInitrdMapDone
+
+/* prepare the next page table entry for the initrd */
+ADD   r8, r8, #1
+ADD   r5, r5, r10
+SUB   r9, r9, #1
+B     MapInitrdLoop
+
+MapInitrdMapDone:
 
 /* map 1M of the system registers at 0x10000000 physical
    into the kernel's space at 0xc0000000 + 0x10000000 */

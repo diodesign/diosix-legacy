@@ -33,9 +33,6 @@ unsigned int atag_fixup_initrd(unsigned int phys_addr)
    mb_module_t *module = (mb_module_t *)(virt_addr + sizeof(payload_blob_header));
 
    payload_blob_header *hdr = (payload_blob_header *)virt_addr;
-      
-   /* bail out if we've been given an empty blob */
-   if(hdr->present == 0) return 0;
 
    for(mod_loop = 0; mod_loop < hdr->present; mod_loop++)
    {      
@@ -137,7 +134,7 @@ multiboot_info_t *atag_process(atag_item *item)
          case atag_core:
             if(item->size > 2)
             {
-               BOOT_DEBUG("[atag] flags: 0x%x, %i bytes per page\n",
+               BOOT_DEBUG("[atag] processor flags: 0x%x, %i bytes per page\n",
                           item->data.core.flags, item->data.core.page_size);
                
                if(item->data.core.page_size != MEM_PGSIZE)
@@ -162,10 +159,21 @@ multiboot_info_t *atag_process(atag_item *item)
             break;
             
          case atag_initrd2:
-            BOOT_DEBUG("[atag] initrd: 0x%x size: %i bytes\n",
+            BOOT_DEBUG("[atag] initrd: phys 0x%x virt 0x%x size: %i bytes\n",
                        item->data.initrd2.physaddr,
+                       KERNEL_PHYS2LOG(item->data.initrd2.physaddr),
                        item->data.initrd2.size);
             
+            {
+               unsigned int *initrd_dword = KERNEL_PHYS2LOG(item->data.initrd2.physaddr);
+
+               unsigned char initrd_loop;
+               for(initrd_loop = 0; initrd_loop < 8; initrd_loop++)
+               {
+                  dprintf("initrd_dword[%i] = %x\n", initrd_loop, initrd_dword[initrd_loop]);
+               }
+            }
+
             /* store the details of the initrd in phys mem - the core kernel doesn't care for
                the header data we prepended to the modules but does expect the pointers to
                be valid, hence the fixup proc call */
