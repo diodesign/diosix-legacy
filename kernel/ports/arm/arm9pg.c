@@ -826,15 +826,9 @@ kresult pg_add_1M_mapping(unsigned int **pgdir, unsigned int virtual, unsigned i
 */
 kresult pg_remove_1M_mapping(unsigned int **pgdir, unsigned int virtual)
 {
-   dprintf("pg_remove_1M_mapping: not implemented\n");
-   return success;
-   
-#if 0
-   PAGE_DEBUG("[page:%i] unmapping 1M: %x dir index %x\n", 
-              CPU_ID, virtual, virtual >> PG_DIR_BASE);
+   PAGE_DEBUG("[page:%i] unmapping 1M: virt %x\n", CPU_ID, virtual);
    
    virtual = virtual & PG_1M_MASK;
-   physical = physical & PG_1M_MASK;
    
    /* remove a 1MB entry, ensure we don't overrun the 16K level 1 page directory */
    if((virtual >> PG_1M_SHIFT) < PG_1M_ENTRIES)
@@ -852,7 +846,6 @@ kresult pg_remove_1M_mapping(unsigned int **pgdir, unsigned int virtual)
    
    /* fall through to failure */
    return e_failure;
-#endif
 }
 
 /* pg_map_phys_to_kernel_space
