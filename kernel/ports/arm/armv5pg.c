@@ -1,5 +1,5 @@
-/* kernel/ports/arm/arm9page.c
- * manipulate page tables for ARM9-compatible processors
+/* kernel/ports/arm/armv5pg.c
+ * manipulate page tables for ARM v5-compatible processors
  * Author : Chris Williams
  * Date   : Sun,17 Apr 2011.02:06.00
 
@@ -519,17 +519,13 @@ unsigned int **pg_clone_pgdir(unsigned int **source)
 
 /* pg_new_process
    Called when a new process is being created so port-specific stuff
-   can take place. We'll base 
+   can take place. 
    => new = pointer to process structure
       current = pointer or NULL for initial system processes
    <= 0 for success or an error code
 */
 kresult pg_new_process(process *new, process *current)
 {
-   dprintf("pg_new_process: not implemented\n");
-   return success;
-   
-#if 0
    unsigned int **pgdir;
 
    lock_gate(&(new->lock), LOCK_WRITE);
@@ -544,10 +540,10 @@ kresult pg_new_process(process *new, process *current)
       pgdir = (unsigned int **)KernelPageDirectory;
    
    /* grab a copy of the parent page directory or
-    bail out if there's a failure. if there is no
-    parent, we're create new processes from scratch
-    and the kernel's page directory should be empty
-    for userspace... */
+      bail out if there's a failure. if there is no
+      parent, we're create new processes from scratch
+      and the kernel's page directory should be empty
+      for userspace... */
    new->pgdir = pg_clone_pgdir(pgdir);
    if(new->pgdir == NULL)
    {
@@ -575,7 +571,6 @@ kresult pg_new_process(process *new, process *current)
            CPU_ID, new->pgdir, new->pid);
 
    return success;
-#endif
 }
 
 /* pg_destroy_process

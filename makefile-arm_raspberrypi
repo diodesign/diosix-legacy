@@ -56,7 +56,7 @@ FLAGS		= -g -std=c99 -Wall -nostdlib -nostartfiles \
 
 OBJS		= $(OBJSDIR)/startup.o $(OBJSDIR)/preboot.o $(OBJSDIR)/debug.o $(OBJSDIR)/serial.o \
 		  $(OBJSDIR)/lowlevel.o $(OBJSDIR)/arm926ej-s.o $(OBJSDIR)/atag.o $(OBJSDIR)/boot.o \
-	       	  $(OBJSDIR)/payload.o $(OBJSDIR)/arm9pg.o $(OBJSDIR)/arm9int.o $(OBJSDIR)/irqs.o \
+	       	  $(OBJSDIR)/payload.o $(OBJSDIR)/armv5pg.o $(OBJSDIR)/armv5int.o $(OBJSDIR)/irqs.o \
 		  $(OBJSDIR)/vmm.o $(OBJSDIR)/msg.o $(OBJSDIR)/sched.o $(OBJSDIR)/proc.o $(OBJSDIR)/thread.o \
 		  $(OBJSDIR)/sys_debug.o $(OBJSDIR)/sys_driver.o $(OBJSDIR)/sys_info.o $(OBJSDIR)/sys_memory.o \
 		  $(OBJSDIR)/sys_msg.o $(OBJSDIR)/sys_privs.o $(OBJSDIR)/sys_proc.o $(OBJSDIR)/sys_thread.o
@@ -100,11 +100,11 @@ $(OBJSDIR)/arm926ej-s.o:	$(PORTDIR)/arm926ej-s.c	$(MAKEDEP)
 				$(WRITE) '==> COMPILE: $<'
 				$(COMPILE.c)
 
-$(OBJSDIR)/arm9pg.o:	$(PORTDIR)/arm9pg.c	$(MAKEDEP)
+$(OBJSDIR)/armv5pg.o:	$(PORTDIR)/armv5pg.c	$(MAKEDEP)
 			$(WRITE) '==> COMPILE: $<'
 			$(COMPILE.c)
 
-$(OBJSDIR)/arm9int.o:	$(PORTDIR)/arm9int.c	$(MAKEDEP)
+$(OBJSDIR)/armv5int.o:	$(PORTDIR)/armv5int.c	$(MAKEDEP)
 			$(WRITE) '==> COMPILE: $<'
 			$(COMPILE.c)
 

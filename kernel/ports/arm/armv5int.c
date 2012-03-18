@@ -1,5 +1,5 @@
-/* kernel/ports/arm/arm9int.c
- * i386-specific interrupt initialisation and control for ARM9 processors
+/* kernel/ports/arm/armv5int.c
+ * ARM v5-specific interrupt initialisation and control for ARM-compatible processors
  * Author : Chris Williams
  * Date   : Sun,17 Apr 2011.03:25:00
 
