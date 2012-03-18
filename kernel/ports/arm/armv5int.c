@@ -2,8 +2,6 @@
  * ARM v5-specific interrupt initialisation and control for ARM-compatible processors
  * Author : Chris Williams
  * Date   : Sun,17 Apr 2011.03:25:00
-
-Cribbed from... http://www.jamesmolloy.co.uk/tutorial_html/
  
 Copyright (c) Chris Williams and individual contributors
 
