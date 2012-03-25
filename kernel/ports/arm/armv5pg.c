@@ -447,14 +447,14 @@ kresult pg_preempt_fault(thread *test, unsigned int virtualaddr, unsigned int si
  */
 unsigned int **pg_clone_pgdir(unsigned int **source)
 {
-   dprintf("pg_clone_pgdir: not implemented\n");
-   return NULL;
-   
-#if 0
    unsigned int loop;
    unsigned int source_touched = 0;
    unsigned int **new = NULL;
 
+   dprintf("pg_clone_pgdir called with source = %p\n", source);
+   return NULL;
+   
+#if 0
    new = pg_create_pgdir(source);
    if(!new) return NULL; /* bail out if we can't get a phys page */
 
@@ -537,7 +537,7 @@ kresult pg_new_process(process *new, process *current)
       pgdir = current->pgdir;
    }
    else
-      pgdir = (unsigned int **)KernelPageDirectory;
+      pgdir = (unsigned int **)cpu_table[CPU_ID].pgdir;
    
    /* grab a copy of the parent page directory or
       bail out if there's a failure. if there is no
@@ -788,14 +788,13 @@ kresult pg_add_4K_mapping(unsigned int **pgdir, unsigned int virtual, unsigned i
 kresult pg_add_1M_mapping(unsigned int **pgdir, unsigned int virtual, unsigned int physical, 
                           unsigned int flags)
 {
-   PAGE_DEBUG("[page:%i] mapping 1M: %x -> %x (%x) dir index %x\n", 
+   PAGE_DEBUG("[page:%i] mapping 1M section: %x -> %x (%x) dir index %x\n", 
            CPU_ID, virtual, physical, flags, virtual >> PG_1M_SHIFT);
    
    virtual = virtual & PG_1M_MASK;
    physical = physical & PG_1M_MASK;
    
-   /* create 1MB entry, read+write for kernel-only
-      ensure we don't overrun the 16K level 1 page directory */
+   /* create 1MB entry, ensure we don't overrun the 16K level 1 page directory */
    if((virtual >> PG_1M_SHIFT) < PG_1M_ENTRIES)
    {
       unsigned int entry = (unsigned int)(pgdir[(virtual >> PG_1M_SHIFT)]);
@@ -908,7 +907,6 @@ void pg_init(void)
    unsigned int *high_ptr = phys_pg_stack_high_ptr;
    
    unsigned int *boot_pg_dir = (unsigned int *)KernelPageDirectory;
-   
    unsigned int loop;
       
    PAGE_DEBUG("[page:%i] initialising... zeroing %i entries\n", CPU_ID, KERNEL_SPACE_BASE >> PG_1M_SHIFT);
@@ -921,12 +919,53 @@ void pg_init(void)
    /* ensure all of physical RAM is mapped into the kernel */
    pg_map_phys_to_kernel_space(high_base, high_ptr);
    pg_map_phys_to_kernel_space(low_base, low_ptr);
+   
+   PAGE_DEBUG("[page:%i] mapped physical memory into kernel virtual space\n", CPU_ID);
+}
 
+/* pg_post_init
+   Initialise the paging system to support processes, called once the rest of the kernel's
+   memory, process and cpu startup has completed
+   => boot_pg_dir = virtual addresss of kernel's boot page directory
+*/
+void pg_post_init(unsigned int *boot_pg_dir)
+{
+   unsigned int loop;
+   pg_process *boot_pg_dir_descr;
+   kresult err;
+   
+   /* sanity check */
+   if(!boot_pg_dir)
+   {
+      KOOPS_DEBUG("[page:%i] OMGWTF pg_post_init() called with page directory %p\n",
+                  CPU_ID, boot_pg_dir);
+      return;
+   }
+   
+   /* we must construct a page directory descriptor for the boot cpu */
+   err = vmm_malloc((void **)&boot_pg_dir_descr, sizeof(pg_process));
+   if(err)
+   {
+      KOOPS_DEBUG("[page:%i] OMGWTF couldn't allocate %i bytes for boot page directory descriptor (%i)\n",
+                  CPU_ID, sizeof(pg_process), err);
+      return;
+   }
+   
+   /* clear the meta data for the boot process page dir descriptor */
+   boot_pg_dir_descr->frames_flags = 0;
+   
    /* now point the boot CPU's level one page directory at the kernel boot page dirctory.
       the 16K contig space for the table is in the kernel's critical section so it won't
       be reallocated. multiprocessor systems can clone theirs when needed */
-   cpu_table[CPU_ID].pgdir = boot_pg_dir;
+   for(loop = 0; loop < PG_LVL1_FRAMES; loop++)
+   {
+      /* calculate the physical addrsses of the page frames in the boot page directory */
+      boot_pg_dir_descr->phys_frames[loop] = KERNEL_LOG2PHYS((unsigned int)boot_pg_dir + (loop * MEM_PGSIZE));
+   }
    
-   BOOT_DEBUG("[page:%i] paging initialised\n", CPU_ID);
+   /* save the new descriptor */
+   cpu_table[CPU_ID].pgdir = boot_pg_dir_descr;
+   
+   BOOT_DEBUG("[page:%i] paging initialised, boot page directory: %p descriptor %p\n",
+              CPU_ID, boot_pg_dir, boot_pg_dir_descr);
 }
-

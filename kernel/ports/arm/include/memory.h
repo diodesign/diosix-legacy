@@ -52,6 +52,7 @@ extern unsigned int KernelBootStackBase;
 #define KernelPageDirectory  (KERNEL_PHYS2LOG(0xC000))
 
 #define MEM_PGSIZE           (4 * 1024)
+#define MEM_1M_PGSIZE        (1 * 1024 * 1024)
 #define MEM_4M_PGSIZE        (4 * 1024 * 1024)
 #define MEM_PGSHIFT          (12)
 #define MEM_PGMASK           ((1 << MEM_PGSHIFT) - 1)
@@ -300,6 +301,7 @@ typedef struct
 
 unsigned int pg_fault_addr(void);
 void pg_init(void);
+void pg_post_init(unsigned int *boot_pg_dir);
 void pg_dump_pagedir(unsigned int *pgdir);
 kresult pg_new_process(process *new, process *current);
 kresult pg_destroy_process(process *victim);

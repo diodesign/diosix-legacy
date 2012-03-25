@@ -209,7 +209,11 @@ void lowlevel_thread_switch(thread *now, thread *next, int_registers_block *regs
 
 void lowlevel_proc_preinit(void)
 {
-   KOOPS_DEBUG("lowlevel_proc_preinit: not yet implemented\n");
+   /* call the second-half initialisation of the paging system */
+   pg_post_init((unsigned int *)KernelPageDirectory);
+   
+   /* nothing to do except announce that the kernel is ready to roll */
+   BOOT_DEBUG(PORT_BANNER "\n[arm] ARMv5-compatible port initialised, boot processor is %i\n", CPU_ID);
 }
 
 void lowlevel_kickstart(void)
