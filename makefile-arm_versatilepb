@@ -56,8 +56,9 @@ FLAGS		= -g -std=c99 -Wall -nostdlib -nostartfiles \
 
 OBJS		= $(OBJSDIR)/startup.o $(OBJSDIR)/preboot.o $(OBJSDIR)/debug.o $(OBJSDIR)/serial.o \
 		  $(OBJSDIR)/lowlevel.o $(OBJSDIR)/arm926ej-s.o $(OBJSDIR)/atag.o $(OBJSDIR)/boot.o \
-	       	  $(OBJSDIR)/payload.o $(OBJSDIR)/armv5pg.o $(OBJSDIR)/armv5int.o $(OBJSDIR)/irqs.o \
+	       $(OBJSDIR)/payload.o $(OBJSDIR)/armv5pg.o $(OBJSDIR)/armv5int.o $(OBJSDIR)/irqs.o \
 		  $(OBJSDIR)/vmm.o $(OBJSDIR)/msg.o $(OBJSDIR)/sched.o $(OBJSDIR)/proc.o $(OBJSDIR)/thread.o \
+		  $(OBJSDIR)/locks.o \
 		  $(OBJSDIR)/sys_debug.o $(OBJSDIR)/sys_driver.o $(OBJSDIR)/sys_info.o $(OBJSDIR)/sys_memory.o \
 		  $(OBJSDIR)/sys_msg.o $(OBJSDIR)/sys_privs.o $(OBJSDIR)/sys_proc.o $(OBJSDIR)/sys_thread.o
 
@@ -155,6 +156,10 @@ $(OBJSDIR)/debug.o:	$(COREDIR)/debug.c	$(MAKEDEP)
 			$(COMPILE.c)
 
 $(OBJSDIR)/boot.o:	$(COREDIR)/boot.c	$(MAKEDEP)
+			$(WRITE) '==> COMPILE: $<'
+			$(COMPILE.c)
+
+$(OBJSDIR)/locks.o:	$(COREDIR)/locks.c	$(MAKEDEP)
 			$(WRITE) '==> COMPILE: $<'
 			$(COMPILE.c)
 

@@ -36,6 +36,7 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 /* the order of these should not be important */
 #include <atag.h>
 #include <boot.h>
+#include <mmu.h>
 #include <memory.h>
 #include <cpu.h>
 #include <lowlevel.h>

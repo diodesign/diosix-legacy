@@ -35,9 +35,28 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 /* locking primitives for processes and threads */
 typedef struct
 {
-   /* lock value, owning thread, and status flags */
+   /* lock value, owning thread, and status flags
+      This structure must be kept tight and a clean divisor of a 4K page */
    volatile unsigned int spinlock, owner, flags, refcount;
 } rw_gate;
+
+/* calculate the size of the pool bitmap in bytes */
+#define LOCK_POOL_BITMAP_LENGTH  ((MEM_PGSIZE / sizeof(rw_gate)) / 8)
+
+/* describe a page of rw_gate locks */
+typedef struct rw_gate_pool rw_gate_pool;
+struct rw_gate_pool
+{
+   /* describe location of pool page in memory and which blocks are free */
+   unsigned int physical_base, virtual_base;
+   unsigned char bitmap[LOCK_POOL_BITMAP_LENGTH];
+   
+   /* indicates which bit was last thought to be free */
+   unsigned char last_free;
+   
+   /* double-linked list pointers */
+   rw_gate_pool *prev, *next;
+};
 
 /* low-level locking mechanisms */
 void lock_spin(volatile unsigned int *spinlock);

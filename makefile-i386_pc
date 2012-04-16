@@ -72,7 +72,7 @@ OBJS	 = $(OBJSDIR)/locore.o \
 	   $(OBJSDIR)/sys_driver.o $(OBJSDIR)/sys_info.o $(OBJSDIR)/sys_memory.o $(OBJSDIR)/sys_msg.o $(OBJSDIR)/sys_privs.o \
 	   $(OBJSDIR)/sys_proc.o $(OBJSDIR)/sys_thread.o $(OBJSDIR)/sys_debug.o \
 	   $(OBJSDIR)/vmm.o $(OBJSDIR)/page.o $(OBJSDIR)/thread.o $(OBJSDIR)/proc.o $(OBJSDIR)/ioapic.o $(OBJSDIR)/pic.o \
-	   $(OBJSDIR)/lapic.o $(OBJSDIR)/buses.o \
+	   $(OBJSDIR)/lapic.o $(OBJSDIR)/buses.o $(OBJSDIR)/locks.o \
 	   $(OBJSDIR)/intcontrol.o $(OBJSDIR)/mp.o $(OBJSDIR)/boot.o $(OBJSDIR)/payload.o \
 	   $(OBJSDIR)/serial.o $(OBJSDIR)/debug.o
 
@@ -91,6 +91,10 @@ $(OBJSDIR)/boot.o:	$(COREDIR)/boot.c	$(MAKEDEP)
 			$(COMPILE.c)
 
 $(OBJSDIR)/payload.o:	$(COREDIR)/payload.c	$(MAKEDEP)
+			$(WRITE) '==> COMPILE: $<'
+			$(COMPILE.c)
+
+$(OBJSDIR)/locks.o:	$(COREDIR)/locks.c	$(MAKEDEP)
 			$(WRITE) '==> COMPILE: $<'
 			$(COMPILE.c)
 

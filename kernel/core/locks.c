@@ -1,7 +1,7 @@
-/* kernel/ports/arm/lowlevel.c
- * perform low-level operations with the ARM port
+/* kernel/core/locks.c
+ * diosix portable lock management code
  * Author : Chris Williams
- * Date   : Sat,12 Mar 2011.22:28:00
+ * Date   : Thu,12 Apr 2012.07:28:51
 
 Copyright (c) Chris Williams and individual contributors
 
@@ -17,22 +17,98 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 #include <portdefs.h>
 
-#ifdef LOCK_TIME_CHECK
-volatile unsigned int lock_time_check_lock = 0;
-#endif
+/* in order to provide a sane way of managing locks in volatile
+   memory areas - ie: non-cached, non-buffered - that are SMP-safe,
+   locks must be allocated from pools of whole pages. Each MMU page
+   will be configured by the arch-specific paging code to be volatile.
+   Each 4K page can hold 256 x 16-byte lock gates, which must be
+   allocated dynamically in an efficient way. And quickly too.
+   
+   Using the VMM's pool system could be possible, but it calls into
+   the locking system to secure itself. instead we'll chain pages
+   of physical memory with a bitmap array to mark when they're in use. */
 
-// --------------------- atomic locking support ---------------------------
+rw_gate *lock_lock;   
+   
+/* statically allocate the first pool structure */
+rw_gate_pool pool_head;
+ 
+/* lock_gate_alloc
+   Allocate a readers-writer gate structure from a pool of SMP-safe pages.
+   => ptr = pointer to word in which to store address of allocated gate
+   <= 0 for success, or an error code
+*/
+kresult lock_rw_gate_alloc(rw_gate **ptr)
+{
+   kresult err;
+   rw_gate_pool *search = &pool_head;
 
-/* lock_spin
-   Block until we've acquired the lock */
-void lock_spin(volatile unsigned int *spinlock)
-{      
+   /* sanity check */
+   if(!ptr) return e_bad_params;
+   
+   /* lock the locking code */
+   lock_gate(lock_lock, LOCK_READ);
+   
+   /* try to find an existing pool */
+   while(search)
+   {
+   }
+   
+   /* if search is still NULL then grab a new page for the pool */
+   if(!search)
+   {
+      void *new_page;
+      err = vmm_req_phys_pg(&new_page, 1);
+      if(err)
+      {
+         unlock_gate(lock_lock, LOCK_READ);
+         return err; /* bail out if we're out of pages! */
+      }
+      
+      /* allocate a new structure to describe this pool or give up */
+      err = vmm_malloc((void **)&search, sizeof(rw_gate_pool));
+      if(err)
+      {
+         unlock_gate(lock_lock, LOCK_READ);
+         return err; /* bail out if we're out of memory! */
+      }
+      
+      /* initialise the pool structure and add to the head of
+         the linked list so it can be found quickly */
+      vmm_memset(search, 0, sizeof(rw_gate_pool));
+      
+      lock_gate(lock_lock, LOCK_WRITE);
+      
+   }
 }
 
-/* unlock_spin
-   Release a lock */
-void unlock_spin(volatile unsigned int *spinlock)
+/* locks_initialise
+   Initialise the portable part of the locking system. This will
+   require setting up locks for the VMM before any of its management
+   functions can be called using the given physical page, which is assumed to
+   have been configured with the correct non-cached/unbuffered MMU flags
+   => initial_phys_pg = base address of first physical page to use
+   <= 0 for success, or an error code
+*/
+kresult locks_initialise(void *initial_phys_pg)
 {
+   /* sanity check */
+   if(!initial_phys_pg) return e_bad_params;
+   
+   /* zero out the initial pool structure - this VMM call is safe to use */
+   vmm_memset(&pool_head, 0, sizeof(rw_gate_pool));
+   
+   /* plug in the base address of this initial page */
+   pool_head.physical_base = initial_phys_pg;
+   pool_head.virtual_base = KERNEL_PHYS2LOG(initial_phys_pg);
+   
+   /* create the first lock by hand - the lock for the locking code */
+   lock_lock = (rw_gate *)pool_head.virtual_base;
+   pool_head.bitmap[0] = 1; /* too hardcoded? */
+   pool_head.last_free = 1;
+   vmm_memset(lock_lock, 0, sizeof(rw_gate));
+   
+   return success;
 }
 
 /* lock_gate
@@ -54,6 +130,10 @@ kresult lock_gate(rw_gate *gate, unsigned int flags)
 #ifndef UNIPROC
    kresult err = success;
    unsigned int caller;
+
+#ifdef LOCK_TIME_CHECK
+   unsigned long long ticks = x86_read_cyclecount();
+#endif
 
    /* sanity checks */
    if(!gate) return e_failure;
@@ -128,6 +208,31 @@ kresult lock_gate(rw_gate *gate, unsigned int flags)
       
       /* small window of opportunity for the other thread to
          release the gate :-/ */
+      /* hint to newer processors that this is a spin-wait loop or
+         NOP for older processors */
+      __asm__ __volatile__("pause");
+      
+#ifdef LOCK_TIME_CHECK
+      if((x86_read_cyclecount() - ticks) > LOCK_TIMEOUT)
+      {
+         /* prevent other cores from trashing the output debug while we dump this info */
+         lock_spin(&lock_time_check_lock);
+         
+         KOOPS_DEBUG("[lock:%i] OMGWTF waited too long for gate %p to become available (flags %x)\n"
+                     "         lock is owned by %p", CPU_ID, gate, flags, gate->owner);
+         if(gate->owner > KERNEL_SPACE_BASE)
+         {
+            thread *t = (thread *)(gate->owner);
+            KOOPS_DEBUG(" (thread %i process %i on cpu %i)", t->tid, t->proc->pid, t->cpu);
+         }
+         KOOPS_DEBUG("\n");
+         debug_stacktrace();
+         
+         unlock_spin(&lock_time_check_lock);
+         
+         debug_panic("deadlock in kernel: we can't go on together with suspicious minds");
+      }
+#endif
    }
 
 exit_lock_gate:
@@ -196,40 +301,4 @@ kresult unlock_gate(rw_gate *gate, unsigned int flags)
    
    return success;
 #endif
-}
-
-/* generic veneers */
-void lowlevel_thread_switch(thread *now, thread *next, int_registers_block *regs)
-{
-   KOOPS_DEBUG("lowlevel_thread_switch(%p, %p, %p): not yet implemented\n",
-               now, next, regs);
-}
-
-void lowlevel_proc_preinit(void)
-{
-   /* call the second-half initialisation of the paging system */
-   pg_post_init((unsigned int *)KernelPageDirectory);
-   
-   /* nothing to do except announce that the kernel is ready to roll */
-   BOOT_DEBUG(PORT_BANNER "\n[arm] ARMv5-compatible port initialised, boot processor is %i\n", CPU_ID);
-}
-
-void lowlevel_kickstart(void)
-{
-   KOOPS_DEBUG("lowlevel_kickstart: not yet implemented\n");
-}
-
-void lowlevel_stacktrace(void)
-{
-   KOOPS_DEBUG("lowlevel_stacktrace: not yet implemented\n");
-}
-
-void lowlevel_disable_interrupts(void)
-{
-   KOOPS_DEBUG("lowlevel_disable_interrupts: not yet implemented\n");
-}
-
-void lowlevel_enable_interrupts(void)
-{
-   KOOPS_DEBUG("lowlevel_enable_interrupts: not yet implemented\n");
 }

@@ -76,8 +76,8 @@ OBJS	 = $(OBJSDIR)/locore.o \
 	   $(OBJSDIR)/vmm.o $(OBJSDIR)/page.o $(OBJSDIR)/thread.o $(OBJSDIR)/proc.o $(OBJSDIR)/ioapic.o $(OBJSDIR)/pic.o \
 	   $(OBJSDIR)/lapic.o $(OBJSDIR)/buses.o \
 	   $(OBJSDIR)/intcontrol.o $(OBJSDIR)/mp.o $(OBJSDIR)/boot.o $(OBJSDIR)/payload.o \
-	   $(OBJSDIR)/serial.o $(OBJSDIR)/debug.o $(OBJSDIR)/atag.o
-
+	   $(OBJSDIR)/serial.o $(OBJSDIR)/debug.o $(OBJSDIR)/atag.o \
+	   $(OBJSDIR)/locks.o
 
 # targets
 all: kernel
@@ -89,6 +89,10 @@ COMPILE.c 	= $(CC) -c -o $@ $<
 # per-source rules
 # the portable source
 $(OBJSDIR)/boot.o:	$(COREDIR)/boot.c	$(MAKEDEP)
+			$(WRITE) '==> COMPILE: $<'
+			$(COMPILE.c)
+
+$(OBJSDIR)/locks.o:	$(COREDIR)/locks.c	$(MAKEDEP)
 			$(WRITE) '==> COMPILE: $<'
 			$(COMPILE.c)
 

@@ -35,6 +35,7 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #include <boot.h>
 #include <sched.h>
 #include <buses.h>
+#include <mmu.h>
 #include <memory.h>
 #include <interrupts.h>
 #include <chips.h>
