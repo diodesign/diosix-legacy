@@ -77,6 +77,9 @@ kresult lock_rw_gate_alloc(rw_gate **ptr)
          the linked list so it can be found quickly */
       vmm_memset(search, 0, sizeof(rw_gate_pool));
       
+      /* mark the page as non-cacheable, non-buffering */
+      pg_set_page_cache_type(new_page, 
+      
       lock_gate(lock_lock, LOCK_WRITE);
       
    }
