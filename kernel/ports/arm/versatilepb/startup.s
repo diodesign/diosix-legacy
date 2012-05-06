@@ -225,7 +225,8 @@ B .
 
 /* ------------------------------------------------------------ */
 
-/* boot exception vector table */
+/* boot exception vector table - offsets are 8bytes short due to
+   ARM quirk when loading pc with a new value */
 KernelBootExceptionTable:
 LDR   pc, [pc, #24]     /* reset */
 LDR   pc, [pc, #24]     /* undefined instruction */
