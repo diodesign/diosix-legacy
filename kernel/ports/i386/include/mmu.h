@@ -70,25 +70,25 @@ extern unsigned int KernelBootStackBase, APStack;
 
 /* paging */
 /* page fault codes */
-#define PG_FAULT_P    (1<<0)  /* 0 = not present,   1 = access violation */
-#define PG_FAULT_W    (1<<1)  /* 0 = tried to read, 1 = tried to write */
-#define PG_FAULT_U    (1<<2)  /* 0 = in svc mode,   1 = in usr mode */
-#define PG_FAULT_R    (1<<3)  /* 1 = reserved bits set in dir entry */
-#define PG_FAULT_I    (1<<4)  /* 0 = not instruction fetch, 1 = instr fetch */
+#define PG_FAULT_P    (1 << 0)  /* 0 = not present,   1 = access violation */
+#define PG_FAULT_W    (1 << 1)  /* 0 = tried to read, 1 = tried to write */
+#define PG_FAULT_U    (1 << 2)  /* 0 = in svc mode,   1 = in usr mode */
+#define PG_FAULT_R    (1 << 3)  /* 1 = reserved bits set in dir entry */
+#define PG_FAULT_I    (1 << 4)  /* 0 = not instruction fetch, 1 = instr fetch */
 
 /* intel-specific page flags (see 3-25 pg 87) */
-#define PG_PRESENT    (1<<0)  /* page present in memory */
-#define PG_RW         (1<<1)  /* set for read+write, clear for read only */
-#define PG_PRIVLVL    (1<<2)  /* set for usr, clear for knl */
-#define PG_WRITETHRU  (1<<3)  /* enable write-through caching when set */
-#define PG_CACHEDIS   (1<<4)  /* don't cache when set */
-#define PG_ACCESSED   (1<<5)  /* page has been read from or written to */
-#define PG_DIRTY      (1<<6)  /* page has been written to */
-#define PG_SIZE       (1<<7)  /* set for 4MB page dir entries, 4KB otherwise */
-#define PG_GLOBAL     (1<<8)  /* set to map in globally */
+#define PG_PRESENT    (1 << 0)  /* page present in memory */
+#define PG_RW         (1 << 1)  /* set for read+write, clear for read only */
+#define PG_PRIVLVL    (1 << 2)  /* set for usr, clear for knl */
+#define PG_WRITETHRU  (1 << 3)  /* enable write-through caching when set */
+#define PG_CACHEDIS   (1 << 4)  /* don't cache when set */
+#define PG_ACCESSED   (1 << 5)  /* page has been read from or written to */
+#define PG_DIRTY      (1 << 6)  /* page has been written to */
+#define PG_SIZE       (1 << 7)  /* set for 4MB page dir entries, 4KB otherwise */
+#define PG_GLOBAL     (1 << 8)  /* set to map in globally */
 
-#define PG_EXTERNAL   (1<<9)  /* set to bump the page manager on fault, unset to use the vma's setting */
-#define PG_PRIVATE    (1<<10) /* set to indicate this page is private to the process and can be released */
+#define PG_EXTERNAL   (1 << 9)  /* set to bump the page manager on fault, unset to use the vma's setting */
+#define PG_PRIVATE    (1 << 10) /* set to indicate this page is private to the process and can be released */
 
 #define PG_DIR_BASE   (22)    /* physical addr in bits 22-31 */
 #define PG_TBL_BASE   (12)    /* table index in bits 12-21 */

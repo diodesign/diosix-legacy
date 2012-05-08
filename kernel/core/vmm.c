@@ -1414,7 +1414,7 @@ kresult vmm_initialise(multiboot_info_t *mbd)
 /* vmm_nullbufferlen
    Return the length of a NULL-terminated buffer in a number of bytes
    => buffer = pointer to NULL-terminated buffer
-   <= returns size in bytes or possibly 0 if an error occured
+   <= returns size in bytes (excluding the NULL) or possibly 0 if an error occured
 */
 unsigned int vmm_nullbufferlen(char *buffer)
 {

@@ -73,11 +73,11 @@ extern unsigned int KernelBootStackBase;
 
 /* paging */
 /* ARM-specific page fault codes */
-#define PG_FAULT_P    (0)  /* 0 = not present,   1 = access violation */
-#define PG_FAULT_W    (0)  /* 0 = tried to read, 1 = tried to write */
-#define PG_FAULT_U    (0)  /* 0 = in svc mode,   1 = in usr mode */
-#define PG_FAULT_R    (0)  /* 1 = reserved bits set in dir entry */
-#define PG_FAULT_I    (0)  /* 0 = not instruction fetch, 1 = instr fetch */
+#define PG_FAULT_P         (0)  /* 0 = not present,   1 = access violation */
+#define PG_FAULT_W         (0)  /* 0 = tried to read, 1 = tried to write */
+#define PG_FAULT_U         (0)  /* 0 = in svc mode,   1 = in usr mode */
+#define PG_FAULT_R         (0)  /* 1 = reserved bits set in dir entry */
+#define PG_FAULT_I         (0)  /* 0 = not instruction fetch, 1 = instr fetch */
 
 /* ARM-specific page access flags */
 #define PG_ACCESS_KERNEL   (1) /* kernel r/w access */

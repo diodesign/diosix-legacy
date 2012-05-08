@@ -22,26 +22,35 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #define LOCK_TIMEOUT         (0xffffffff)
 
 /* lock settings */
-#define LOCK_READ           (0)
-#define LOCK_WRITE          (1 << 0)
-#define LOCK_SELFDESTRUCT   (1 << 1)
-#define LOCK_WRITEWAITING   (1 << 2)
+#define LOCK_READ            (0)
+#define LOCK_WRITE           (1 << 0)
+#define LOCK_SELFDESTRUCT    (1 << 1)
+#define LOCK_WRITEWAITING    (1 << 2)
 
 /* Determine the owner of a lock gate (a) or set the owner (b) of a gate (a).
    Only use once lock_gate() has been successful but before unlock_gate() is called. */
 #define LOCK_GET_OWNER(a)    (thread *)((rw_gate *)(a)->owner)
 #define LOCK_SET_OWNER(a, b) ((rw_gate *)(a))->owner = (unsigned int)(b)
 
+/* number of bytes including terminator of lock name */
+#define LOCK_DESCRIPT_LENGTH (8)
+
 /* locking primitives for processes and threads */
 typedef struct
 {
    /* lock value, owning thread, and status flags
-      This structure must be kept tight and a clean divisor of a 4K page */
+      This structure must be kept tight and a factor of 4096 (a 4K page) */
    volatile unsigned int spinlock, owner, flags, refcount;
+   
+#ifdef DEBUG_LOCK_RWGATE_PROFILE
+   unsigned int read_count, write_count;
+   unsigned char description[LOCK_DESCRIPT_LENGTH];
+#endif
 } rw_gate;
 
-/* calculate the size of the pool bitmap in bytes */
-#define LOCK_POOL_BITMAP_LENGTH  ((MEM_PGSIZE / sizeof(rw_gate)) / 8)
+/* calculate the size of the pool bitmap in bits and bytes */
+#define LOCK_POOL_BITMAP_LENGTH_BITS   (MEM_PGSIZE / sizeof(rw_gate))
+#define LOCK_POOL_BITMAP_LENGTH_BYTES  (LOCK_POOL_BITMAP_LENGTH_BITS / 8)
 
 /* describe a page of rw_gate locks */
 typedef struct rw_gate_pool rw_gate_pool;
@@ -49,10 +58,10 @@ struct rw_gate_pool
 {
    /* describe location of pool page in memory and which blocks are free */
    unsigned int physical_base, virtual_base;
-   unsigned char bitmap[LOCK_POOL_BITMAP_LENGTH];
+   unsigned char bitmap[LOCK_POOL_BITMAP_LENGTH_BYTES];
    
-   /* indicates which bit was last thought to be free */
-   unsigned char last_free;
+   /* indicates how many locks are available and which bit was last thought to be free */
+   unsigned char nr_free, last_free;
    
    /* double-linked list pointers */
    rw_gate_pool *prev, *next;

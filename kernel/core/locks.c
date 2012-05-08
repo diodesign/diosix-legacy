@@ -31,28 +31,88 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 rw_gate *lock_lock;   
    
 /* statically allocate the first pool structure */
-rw_gate_pool pool_head;
+rw_gate_pool gate_pool;
  
-/* lock_gate_alloc
-   Allocate a readers-writer gate structure from a pool of SMP-safe pages.
-   => ptr = pointer to word in which to store address of allocated gate
-   <= 0 for success, or an error code
+/* lock_bitmap_test
+   Test the value of a bit within a char-array bitmap.
+   Hint to the compiler that we would like this function inlined..
+   => array = pointer to base of unsigned char array to inspect
+      bit = bit number to inspect
+   <= return value of the bit requested
 */
-kresult lock_rw_gate_alloc(rw_gate **ptr)
+static __inline__ unsigned char lock_bitmap_test(unsigned char *array, unsigned char bit)
+{
+   /* assumes array pointer is sane */
+   
+   /* calculate how many bytes into the array we need to start from
+      and the offset into the Nth byte to find the bit */
+   unsigned int bytes = (bit >> 3);
+   unsigned char remainder = bit - (bytes << 3);
+   
+   return (array[bytes] >> remainder) & 1;
+}
+
+/* lock_bitmap_set
+   Set a bit within a char-array bitmap.
+   Hint to the compiler that we would like this function inlined..
+   => array = pointer to base of unsigned char array to access
+      bit = bit number to set
+*/
+static __inline__ void lock_bitmap_set(unsigned char *array, unsigned char bit)
+{
+   /* assumes array pointer is sane */
+   
+   /* calculate how many bytes into the array we need to start from
+    and the offset into the Nth byte to find the bit */
+   unsigned int bytes = (bit >> 3);
+   unsigned char remainder = bit - (bytes << 3);
+   
+   array[bytes] |= (1 << remainder);
+}
+
+/* lock_bitmap_clear
+   Clear a bit within a char-array bitmap.
+   Hint to the compiler that we would like this function inlined..
+   => array = pointer to base of unsigned char array to access
+      bit = bit number to set
+*/
+static __inline__ void lock_bitmap_clear(unsigned char *array, unsigned char bit)
+{
+   /* assumes array pointer is sane */
+   
+   /* calculate how many bytes into the array we need to start from
+    and the offset into the Nth byte to find the bit */
+   unsigned int bytes = (bit >> 3);
+   unsigned char remainder = bit - (bytes << 3);
+   
+   array[bytes] &= ~(1 << remainder);
+}
+
+/* lock_gate_alloc
+   Allocate a readers-writer gate structure
+   => ptr = pointer to word in which to store address of allocated gate
+      description = NULL-terminated human-readable label 
+   <= 0 for success, or an error code (and ptr will be set to NULL)
+*/
+kresult lock_rw_gate_alloc(rw_gate **ptr, char *description)
 {
    kresult err;
-   rw_gate_pool *search = &pool_head;
+   rw_gate_pool *search = &gate_pool;
+   unsigned char slot_search_start, slot_search;
+   unsigned char slot_found = 0;
+   rw_gate *new_gate;
 
    /* sanity check */
-   if(!ptr) return e_bad_params;
+   if(!ptr || !description) return e_bad_params;
+   if(vmm_nullbufferlen(description) >= LOCK_DESCRIPT_LENGTH)
+      return e_bad_params;
    
    /* lock the locking code */
-   lock_gate(lock_lock, LOCK_READ);
+   lock_gate(lock_lock, LOCK_WRITE);
    
-   /* try to find an existing pool */
-   while(search)
-   {
-   }
+   /* try to find an existing pool with free slots */
+   while(search && search->nr_free == 0)
+      search = search->next;
    
    /* if search is still NULL then grab a new page for the pool */
    if(!search)
@@ -61,7 +121,7 @@ kresult lock_rw_gate_alloc(rw_gate **ptr)
       err = vmm_req_phys_pg(&new_page, 1);
       if(err)
       {
-         unlock_gate(lock_lock, LOCK_READ);
+         unlock_gate(lock_lock, LOCK_WRITE);
          return err; /* bail out if we're out of pages! */
       }
       
@@ -69,27 +129,137 @@ kresult lock_rw_gate_alloc(rw_gate **ptr)
       err = vmm_malloc((void **)&search, sizeof(rw_gate_pool));
       if(err)
       {
-         unlock_gate(lock_lock, LOCK_READ);
+         unlock_gate(lock_lock, LOCK_WRITE);
          return err; /* bail out if we're out of memory! */
       }
       
       /* initialise the pool structure and add to the head of
          the linked list so it can be found quickly */
       vmm_memset(search, 0, sizeof(rw_gate_pool));
+      search->nr_free = LOCK_POOL_BITMAP_LENGTH_BITS;
+      search->physical_base = new_page;
+      search->virtual_base = KERNEL_PHYS2LOG(new_page);
       
-      /* mark the page as non-cacheable, non-buffering */
-      pg_set_page_cache_type(new_page, 
-      
-      lock_gate(lock_lock, LOCK_WRITE);
-      
+      vmm_memset(KERNEL_PHYS2LOG(new_page), 0, MEM_PGSIZE);
+            
+      /* add us to the start of the list */
+      if(gate_pool.next)
+      {
+         search->next = gate_pool.next;
+         search->next->prev = search;
+      }
+
+      gate_pool.next = search;
+      search->prev = gate_pool;
    }
+   
+   /* search is now valid or we wouldn't be here, so locate a free slot by
+      scanning through the bitmap, starting at the last known free slot */
+   slot_search = slot_search_start = search->last_free;
+   do
+   {
+      if(lock_bitmap_test(search->bitmap, slot_search) == 0)
+         slot_found = 1;
+      
+      slot_search++;
+      if(slot_search >= LOCK_POOL_BITMAP_LENGTH_BITS)
+         slot_search = 0;
+   }
+   while(slot_search_start != slot_search && !slot_found);
+   
+   /* set the bit and grab the address of the slot to use for the lock */
+   if(slot_found)
+   {
+      lock_bitmap_set(search->bitmap, slot_search);
+      
+      /* initialise the gate structure */
+      new_gate = (rw_gate *)(unsigned int)search->virtual_base + (sizeof(rw_gate) * slot_search);
+      vmm_memset(new_gate, 0, (sizeof(rw_gate)));
+      *ptr = new_gate;
+      
+#ifdef DEBUG_LOCK_RWGATE_PROFILE
+      vmm_memcpy(&(new_gate->description), description, vmm_nullbufferlen(description) + sizeof('\0'));
+#endif
+                 
+      /* update accounting, increment the next free slot but beware of
+         overflow */
+      search->nr_free--;
+      search->last_free++;
+      if(search->last_free >= LOCK_POOL_BITMAP_LENGTH_BITS)
+         slot_search = 0;
+      
+      unlock_gate(lock_lock, LOCK_WRITE);
+      return success;
+   }
+   
+   /* something weird has happened if we've fallen this far, so
+      fall through to failure */
+   unlock_gate(lock_lock, LOCK_WRITE);
+   *ptr = NULL;
+   return e_failure;
+}
+
+/* lock_gate_free
+   Free a readers-writer gate structure
+   => ptr = pointer to address of allocated gate
+   <= 0 for success, or an error code
+*/
+kresult lock_rw_gate_free(rw_gate *gate)
+{
+   void *page_to_find = MEM_PGALIGN(gate);
+   unsigned char slot = ((unsigned int)gate - (unsigned int)page_to_find) / sizeof(rw_gate);
+   
+   /* sanity check */
+   if(!gate) return e_failure;
+   
+   /* locate the gate */
+   rw_gate_pool *search = &gate_pool;
+
+   /* lock the locking code */
+   lock_gate(lock_lock, LOCK_WRITE);
+   
+   while(search)
+   {
+      if(search->virtual_base == page_to_find) break;
+      search = search->next;
+   }
+   
+   /* serious problems if a lock's page has gone missing
+      or the slot bit isn't set.. */
+   if(!search || !lock_bitmap_test(search->bitmap, slot))
+   {
+      unlock_gate(lock_lock, LOCK_WRITE);
+      return e_not_found;
+   }
+   
+   /* clear the slot and free the page if need be */
+   lock_bitmap_clear(search->bitmap, slot);
+   search->nr_free++;
+   search->last_free = slot;
+   
+   if(search->nr_free == LOCK_POOL_BITMAP_LENGTH_BITS)
+   {
+      /* free the page */
+      vmm_return_phys_pg(search->physical_base);
+      
+      /* delink from the list */
+      if(search->next)
+         search->next->previous = search->previous;
+      
+      if(search->previous)
+         search->previous->next = search->next;
+      
+      vmm_free(search);
+   }
+   
+   unlock_gate(lock_lock, LOCK_WRITE);
+   return success;
 }
 
 /* locks_initialise
    Initialise the portable part of the locking system. This will
    require setting up locks for the VMM before any of its management
-   functions can be called using the given physical page, which is assumed to
-   have been configured with the correct non-cached/unbuffered MMU flags
+   functions can be called using the given physical page
    => initial_phys_pg = base address of first physical page to use
    <= 0 for success, or an error code
 */
@@ -98,17 +268,20 @@ kresult locks_initialise(void *initial_phys_pg)
    /* sanity check */
    if(!initial_phys_pg) return e_bad_params;
    
-   /* zero out the initial pool structure - this VMM call is safe to use */
-   vmm_memset(&pool_head, 0, sizeof(rw_gate_pool));
+   /* zero out the initial pool structure - this VMM call is safe to use.
+      this also forces gate_pool.prev to be NULL, indicating it's
+      the first item and therefore shouldn't be free()d */
+   vmm_memset(&gate_pool, 0, sizeof(rw_gate_pool));
    
    /* plug in the base address of this initial page */
-   pool_head.physical_base = initial_phys_pg;
-   pool_head.virtual_base = KERNEL_PHYS2LOG(initial_phys_pg);
+   gate_pool.physical_base = initial_phys_pg;
+   gate_pool.virtual_base = KERNEL_PHYS2LOG(initial_phys_pg);
    
    /* create the first lock by hand - the lock for the locking code */
-   lock_lock = (rw_gate *)pool_head.virtual_base;
-   pool_head.bitmap[0] = 1; /* too hardcoded? */
-   pool_head.last_free = 1;
+   lock_lock = (rw_gate *)gate_pool.virtual_base;
+   gate_pool.bitmap[0] = 1; /* too hardcoded? */
+   gate_pool.last_free = 1;
+   gate_pool.nr_free = LOCK_POOL_BITMAP_LENGTH_BITS - 1;
    vmm_memset(lock_lock, 0, sizeof(rw_gate));
    
    return success;

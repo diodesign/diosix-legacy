@@ -85,6 +85,13 @@ typedef enum
    badaccess      /* the fault can't be handled */
 } vmm_decision;
 
+/* system-independent page types */
+typedef enum
+{
+   cached,
+   notcached
+} vmm_page_type;
+
 /* link a vma to processes through one or more of these mappings */
 typedef struct
 {
