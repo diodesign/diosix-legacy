@@ -49,7 +49,8 @@ typedef struct
 } rw_gate;
 
 /* calculate the size of the pool bitmap in bits and bytes */
-#define LOCK_POOL_BITMAP_LENGTH_BITS   (MEM_PGSIZE / sizeof(rw_gate))
+#define LOCK_PAGE_SIZE                 (4096) /* XXX any objections? */
+#define LOCK_POOL_BITMAP_LENGTH_BITS   (LOCK_PAGE_SIZE / sizeof(rw_gate))
 #define LOCK_POOL_BITMAP_LENGTH_BYTES  (LOCK_POOL_BITMAP_LENGTH_BITS / 8)
 
 /* describe a page of rw_gate locks */
@@ -57,14 +58,14 @@ typedef struct rw_gate_pool rw_gate_pool;
 struct rw_gate_pool
 {
    /* describe location of pool page in memory and which blocks are free */
-   unsigned int physical_base, virtual_base;
+   void *physical_base, *virtual_base;
    unsigned char bitmap[LOCK_POOL_BITMAP_LENGTH_BYTES];
    
    /* indicates how many locks are available and which bit was last thought to be free */
    unsigned char nr_free, last_free;
    
    /* double-linked list pointers */
-   rw_gate_pool *prev, *next;
+   rw_gate_pool *previous, *next;
 };
 
 /* low-level locking mechanisms */

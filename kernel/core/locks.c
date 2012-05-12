@@ -28,11 +28,16 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
    the locking system to secure itself. instead we'll chain pages
    of physical memory with a bitmap array to mark when they're in use. */
 
-rw_gate *lock_lock;   
-   
+rw_gate *lock_lock;
+
 /* statically allocate the first pool structure */
 rw_gate_pool gate_pool;
- 
+
+#ifdef LOCK_TIME_CHECK
+/* locking system's optional timeout counter */
+volatile unsigned int lock_time_check_lock = 0;
+#endif
+
 /* lock_bitmap_test
    Test the value of a bit within a char-array bitmap.
    Hint to the compiler that we would like this function inlined..
@@ -136,7 +141,7 @@ kresult lock_rw_gate_alloc(rw_gate **ptr, char *description)
       /* initialise the pool structure and add to the head of
          the linked list so it can be found quickly */
       vmm_memset(search, 0, sizeof(rw_gate_pool));
-      search->nr_free = LOCK_POOL_BITMAP_LENGTH_BITS;
+      search->nr_free = (unsigned char)LOCK_POOL_BITMAP_LENGTH_BITS;
       search->physical_base = new_page;
       search->virtual_base = KERNEL_PHYS2LOG(new_page);
       
@@ -146,11 +151,11 @@ kresult lock_rw_gate_alloc(rw_gate **ptr, char *description)
       if(gate_pool.next)
       {
          search->next = gate_pool.next;
-         search->next->prev = search;
+         search->next->previous = search;
       }
 
       gate_pool.next = search;
-      search->prev = gate_pool;
+      search->previous = &gate_pool;
    }
    
    /* search is now valid or we wouldn't be here, so locate a free slot by

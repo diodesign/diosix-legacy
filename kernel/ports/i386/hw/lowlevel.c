@@ -19,10 +19,6 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 #include <portdefs.h>
 
-#ifdef LOCK_TIME_CHECK
-volatile unsigned int lock_time_check_lock = 0;
-#endif
-
 // --------------------- atomic locking support ---------------------------
 
 /* lock_spin

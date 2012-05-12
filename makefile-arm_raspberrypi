@@ -62,7 +62,7 @@ OBJS		= $(OBJSDIR)/startup.o $(OBJSDIR)/preboot.o $(OBJSDIR)/debug.o $(OBJSDIR)/
 		  $(OBJSDIR)/sys_debug.o $(OBJSDIR)/sys_driver.o $(OBJSDIR)/sys_info.o $(OBJSDIR)/sys_memory.o \
 		  $(OBJSDIR)/sys_msg.o $(OBJSDIR)/sys_privs.o $(OBJSDIR)/sys_proc.o $(OBJSDIR)/sys_thread.o
 
-MAKEDEP		= $(MAKEFILE) $(PORTDIR)/include/portdefs.h $(COREDIR)/include/processes.h $(COREDIR)/include/boot.h $(PORTDIR)/include/cpu.h $(COREDIR)/include/debug.h $(COREDIR)/include/elf.h $(PORTDIR)/include/interrupts.h $(COREDIR)/include/ipc.h $(COREDIR)/include/locks.h $(PORTDIR)/include/lowlevel.h $(PORTDIR)/include/memory.h $(COREDIR)/include/multiboot.h $(COREDIR)/include/sched.h $(COREDIR)/include/sglib.h $(PORTDIR)/include/registers.h $(LIBDIOSIXDIR)/diosix.h $(LIBDIOSIXDIR)/async.h $(PORTDIR)/include/syscalls.h
+MAKEDEP		= $(MAKEFILE) $(PORTDIR)/include/portdefs.h $(COREDIR)/include/processes.h $(COREDIR)/include/boot.h $(PORTDIR)/include/cpu.h $(COREDIR)/include/debug.h $(COREDIR)/include/elf.h $(PORTDIR)/include/interrupts.h $(COREDIR)/include/ipc.h $(COREDIR)/include/locks.h $(PORTDIR)/include/lowlevel.h $(PORTDIR)/include/mmu.h $(COREDIR)/include/memory.h $(COREDIR)/include/multiboot.h $(COREDIR)/include/sched.h $(COREDIR)/include/sglib.h $(PORTDIR)/include/registers.h $(LIBDIOSIXDIR)/diosix.h $(LIBDIOSIXDIR)/async.h $(PORTDIR)/include/syscalls.h
 
 # all debugging flags possible
 # DEBUGFLAGS	= -DDEBUG -DMSG_DEBUG -DBUS_DEBUG -DPROC_DEBUG -DSCHED_DEBUG -DTHREAD_DEBUG -DVMM_DEBUG -DXPT_DEBUG -DINT_DEBUG -DIRQ_DEBUG -DMP_DEBUG -DPAGE_DEBUG -DKSYM_DEBUG -DIOAPIC_DEBUG -DLAPIC_DEBUG -DLOCK_DEBUG -DLOLVL_DEBUG -DPIC_DEBUG -DSYSCALL_DEBUG -DPERFORMANCE_DEBUG -DLOCK_TIME_CHECK

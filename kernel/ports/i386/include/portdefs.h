@@ -26,16 +26,16 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 /* declare stuff exclusive to the microkernel */
 #include <debug.h>
 #include <multiboot.h>
-#include <locks.h>
 #include <registers.h>
+#include <locks.h>
 #include <processes.h>
+#include <mmu.h>
 
 /* the order of these should not be important */
 #include <atag.h>
 #include <boot.h>
 #include <sched.h>
 #include <buses.h>
-#include <mmu.h>
 #include <memory.h>
 #include <interrupts.h>
 #include <chips.h>

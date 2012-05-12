@@ -26,9 +26,10 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 /* declare stuff exclusive to the microkernel */
 #include <debug.h>
 #include <multiboot.h>
-#include <locks.h>
 #include <registers.h>
+#include <locks.h>
 #include <processes.h>
+#include <mmu.h>
 #include <sched.h>
 #include <ipc.h>
 #include <elf.h>
@@ -36,7 +37,6 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 /* the order of these should not be important */
 #include <atag.h>
 #include <boot.h>
-#include <mmu.h>
 #include <memory.h>
 #include <cpu.h>
 #include <lowlevel.h>
