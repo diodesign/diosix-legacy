@@ -86,7 +86,7 @@ kresult vmm_malloc(void **addr, unsigned int size)
       
    lock_gate(&(vmm_lock), LOCK_WRITE);
    
-   /* round up size to a fixed multple, including our block header. we round up to a set size
+   /* round up size to a fixed multiple, including our block header. we round up to a set size
       (default 64 bytes) to reduce fragmentation and aid quick realloc'ing */
    required_capacity = KHEAP_ROUND_UP(size);
 
