@@ -42,13 +42,16 @@ extern unsigned int KernelBootStackBase;
 /* not used in the ARM build - yet - but park it at the 16M mark */
 #define INITRD_LOAD_ADDR     (0x01000000)
 
-/* the kernel is loaded at the 64K mark and the 16K boot page directory is placed at
-   the 48K mark - all must be included in the critical section */
-#define KERNEL_CRITICAL_BASE (KERNEL_PHYSICAL_BASE - (16 * 1024))
+/* the kernel is loaded at the 64K mark, the 16K boot page directory is placed at
+   the 48K mark and a page of lock variables is below that - all must be included
+   in the critical section */
+#define KERNEL_CRITICAL_BASE (KERNEL_PHYSICAL_BASE - (16 * 1024) - MEM_PGSIZE)
 #define KERNEL_CRITICAL_END  KERNEL_PHYSICAL_END_ALIGNED
 
 /* the boot page directory is stored at the 48K mark in phys mem */
 #define KernelPageDirectory  (KERNEL_PHYS2LOG(0xC000))
+/* the initial page of locking variables is stored one page below the boot page dir */
+#define KernelPhysLockPage   (0xC000 - MEM_PGSIZE)
 
 #define MEM_PGSIZE           (4 * 1024)
 #define MEM_1M_PGSIZE        (1 * 1024 * 1024)

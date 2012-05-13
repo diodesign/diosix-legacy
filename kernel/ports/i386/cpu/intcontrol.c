@@ -98,10 +98,10 @@ void int_initialise_common(void)
 /* int_initialise
    Set up interrupt handling and device management */
 kresult int_initialise(void)
-{
+{   
    /* initialise the basic PIC chipset */
    pic_initialise();
-
+   
    /* on a uniproc machine? */
    if(!mp_is_smp)
    {      
@@ -110,7 +110,7 @@ kresult int_initialise(void)
       x86_timer_init(SCHED_FREQUENCY);
       irq_register_driver(PIC_8254_IRQ, IRQ_DRIVER_FUNCTION | IRQ_DRIVER_LAST, 0, &int_common_timer);
    }
-
+   
    /* initialise the smp system's IOAPIC */
    if(mp_ioapics) ioapic_initialise(0);
 

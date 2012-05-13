@@ -52,6 +52,9 @@ unsigned int *phys_pg_stack_high_base  = KERNEL_PHYS2LOG(MEM_PHYS_STACK_BASE -
 unsigned int *phys_pg_stack_high_ptr;
 unsigned int *phys_pg_stack_high_limit;
 
+/* accounting totals for each stack in terms of pages */
+unsigned int phys_pg_low_total = 0, phys_pg_high_total = 0;
+
 unsigned int phys_pg_count = 0; /* nr of physical pages at our disposable */
 unsigned int phys_pg_reqed = 0; /* nr of physical pages requested */
 
@@ -129,6 +132,7 @@ kresult vmm_malloc(void **addr, unsigned int size)
    {
       /* try using high memory first */
       int pg_count, type = MEM_HIGH_PG;
+            
       kresult result = vmm_ensure_pgs(required_capacity, type);
       if(result)
       {
@@ -1136,7 +1140,11 @@ kresult vmm_ensure_pgs(unsigned int size, int type)
 {
    unsigned int pgs_required, pg_run_count;
    unsigned int *pg_ptr, *pg_base, *pg_ptr_saved, *pg_run_start;
-
+   
+   /* if there are no 'high memory' (aka non-DMAable) pages then
+      ensure we always pick from the lower memory area */
+   if(!phys_pg_high_total) type = MEM_LOW_PG;
+   
    lock_gate(&(vmm_lock), LOCK_READ);
 
    /* are we checking DMA-able physical memory? */
@@ -1322,8 +1330,6 @@ kresult vmm_initialise(multiboot_info_t *mbd)
    while((unsigned int)region < mbd->mmap_addr + mbd->mmap_length)
    {
       unsigned int pg_loop;
-      unsigned int pg_count_lo = 0;
-      unsigned int pg_count_hi = 0;
       unsigned int pg_skip = 0;
       unsigned int max_addr = region->base_addr_low + region->length_low;
 
@@ -1367,20 +1373,20 @@ kresult vmm_initialise(multiboot_info_t *mbd)
             {
                *phys_pg_stack_low_ptr = pg_loop;
                phys_pg_stack_low_ptr--;
-               pg_count_lo++;
+               phys_pg_low_total++;
             }
             else
             {
                *phys_pg_stack_high_ptr = pg_loop;
                phys_pg_stack_high_ptr--;
-               pg_count_hi++;
+               phys_pg_high_total++;
             }
             
             if(phys_pg_stack_low_ptr < phys_pg_stack_high_base)
             {
                KOOPS_DEBUG("*** lomem page stack crashed into himem stack!\n"
                            "    ptr %p after %i pages (%x) - halting.\n",
-                           phys_pg_stack_low_ptr, pg_count_lo, pg_loop);
+                           phys_pg_stack_low_ptr, phys_pg_low_total, pg_loop);
                while(1);
             }
             
@@ -1388,7 +1394,7 @@ kresult vmm_initialise(multiboot_info_t *mbd)
          }
 
          VMM_DEBUG("[vmm:%i] added phys pages: %i low, %i high (%i reserved)\n",
-                 CPU_ID, pg_count_lo, pg_count_hi, pg_skip);
+                   CPU_ID, phys_pg_low_total, phys_pg_high_total, pg_skip);
 
       }
          

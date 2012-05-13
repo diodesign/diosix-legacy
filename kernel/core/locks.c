@@ -193,6 +193,9 @@ kresult lock_rw_gate_alloc(rw_gate **ptr, char *description)
       if(search->last_free >= LOCK_POOL_BITMAP_LENGTH_BITS)
          slot_search = 0;
       
+      LOCK_DEBUG("[lock:%i] created new readers-writer lock '%s' %p (spinlock %p)\n",
+                 description, new_gate, new_gate->spinlock);
+      
       unlock_gate(lock_lock, LOCK_WRITE);
       return success;
    }
@@ -220,6 +223,8 @@ kresult lock_rw_gate_free(rw_gate *gate)
    /* locate the gate */
    rw_gate_pool *search = &gate_pool;
 
+   LOCK_DEBUG("[lock:%i] freeing readers-writer gate %p\n", CPU_ID, gate); 
+   
    /* lock the locking code */
    lock_gate(lock_lock, LOCK_WRITE);
    
@@ -288,6 +293,9 @@ kresult locks_initialise(void *initial_phys_pg)
    gate_pool.last_free = 1;
    gate_pool.nr_free = LOCK_POOL_BITMAP_LENGTH_BITS - 1;
    vmm_memset(lock_lock, 0, sizeof(rw_gate));
+   
+   LOCK_DEBUG("[lock:%i] locks initialised: first gate pool at %p, first lock at %p\n",
+              CPU_ID, &gate_pool, gate_pool.virtual_base);
    
    return success;
 }
@@ -439,6 +447,10 @@ kresult unlock_gate(rw_gate *gate, unsigned int flags)
 #ifndef UNIPROC
    unsigned int caller;
    
+   /* sanity checks */
+   if(!gate) return e_failure;
+   if(!cpu_table) return success; /* only one processor running */   
+   
 #ifdef LOCK_DEBUG
    if(cpu_table)
    {
@@ -449,10 +461,6 @@ kresult unlock_gate(rw_gate *gate, unsigned int flags)
       LOCK_DEBUG("[lock:%i] unlock_gate(%p, %x)\n", CPU_ID, gate, flags);
    }
 #endif
-
-   /* sanity checks */
-   if(!gate) return e_failure;
-   if(!cpu_table) return success; /* only one processor running */   
    
    if(cpu_table[CPU_ID].current)
       caller = (unsigned int)cpu_table[CPU_ID].current;

@@ -46,9 +46,12 @@ extern unsigned int KernelBootStackBase, APStack;
 #define INITRD_LOAD_ADDR      (0x00100000)
 
 /* the kernel is loaded at the 4M mark and the physical page stack
-   descends from the 12M mark. these are critical kernel areas */
-#define KERNEL_CRITICAL_BASE KERNEL_PHYSICAL_BASE
+   descends from the 12M mark; there is also a page of lock variables
+   below the KERNEL_PHYSICAL_BASE. these are critical kernel areas */
+#define KERNEL_CRITICAL_BASE (KERNEL_PHYSICAL_BASE - MEM_PGSIZE)
 #define KERNEL_CRITICAL_END  MEM_PHYS_STACK_BASE
+
+#define KernelPhysLockPage   KERNEL_CRITICAL_BASE
 
 #define MEM_PGSIZE           (4 * 1024)
 #define MEM_4M_PGSIZE        (4 * 1024 * 1024)
