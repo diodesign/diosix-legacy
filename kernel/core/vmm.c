@@ -93,7 +93,7 @@ kresult vmm_malloc(void **addr, unsigned int size)
    VMM_DEBUG("[vmm:%i] request to allocate %i bytes (rounded up to %i)\n", CPU_ID,
              size, required_capacity);
 
-/* define VMM_MALLOC_OVERSIZE_DEBUG to report larger-than-page-size allocation equests */
+/* define VMM_MALLOC_OVERSIZE_DEBUG to report larger-than-page-size allocation requests */
 #ifdef VMM_MALLOC_OVERSIZE_DEBUG
    if(required_capacity > MEM_PGSIZE)
    {
