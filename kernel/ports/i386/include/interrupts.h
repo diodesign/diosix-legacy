@@ -114,6 +114,7 @@ void pic_reset(unsigned char pic);
 void pic_mask_disable(unsigned char irq);
 void pic_mask_enable(unsigned char irq);
 
+unsigned char lapic_is_present(void);
 void lapic_write(volatile unsigned int *addr, unsigned int value);
 void lapic_end_interrupt(void);
 void lapic_ipi_send(unsigned char destination, unsigned char vector);

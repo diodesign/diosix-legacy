@@ -67,9 +67,13 @@ void serial_initialise(void);
 /* CR0 flags */
 #define X86_CR0_TS            (1 << 3)
 
-/* probe the CPU for features, return data in eax,ebx,ecx,edx */
+/* probe the CPU for features, return data in eax,ebx,ecx,edx for given function */
 #define x86_cpuid(func,ax,bx,cx,dx) \
    __asm__ __volatile__ ("cpuid" : "=a" (ax), "=b" (bx), "=c" (cx), "=d" (dx) : "a" (func));
+
+/* CPUID functions */
+#define X86_CPUID_FEATURES    (1)
+#define X86_CPUID_EDX_LAPIC   (9)
 
 unsigned x86_inportb(unsigned short port);
 void x86_outportb(unsigned port, unsigned val);

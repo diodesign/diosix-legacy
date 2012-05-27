@@ -98,12 +98,16 @@ void int_initialise_common(void)
 /* int_initialise
    Set up interrupt handling and device management */
 kresult int_initialise(void)
-{   
+{
+   unsigned int has_lapic = lapic_is_present();
+
+   dprintf("has_lapic = %i\n", has_lapic);
+   
    /* initialise the basic PIC chipset */
    pic_initialise();
    
    /* on a uniproc machine? */
-   if(!mp_is_smp)
+   if(!has_lapic)
    {      
       /* set up a 100Hz ticker for the scheduler  */
       INT_DEBUG("[int:%i] uniproc: set up timer (%iHz)...\n", CPU_ID, SCHED_FREQUENCY);
@@ -113,9 +117,9 @@ kresult int_initialise(void)
    
    /* initialise the smp system's IOAPIC */
    if(mp_ioapics) ioapic_initialise(0);
-
-   /* initialise the boot cpu's local APIC if we're on a multiprocessor machine */
-   if(mp_is_smp) lapic_initialise(INT_IAMBSP);
    
+   /* initialise the boot cpu's local APIC if we're on a multiprocessor machine */
+   if(has_lapic) lapic_initialise(INT_IAMBSP);
+
    return success;
 }

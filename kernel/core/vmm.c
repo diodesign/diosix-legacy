@@ -823,10 +823,10 @@ kresult vmm_create_free_blocks_in_pool(kpool *pool, unsigned int start, unsigned
       
       addr += total_block_size;
    }
-   
+
    VMM_DEBUG("[vmm:%i] initialised free blocks %i to %i in pool %p\n",
              CPU_ID, start, end - 1, pool);
-   
+      
    return success;
 }
 

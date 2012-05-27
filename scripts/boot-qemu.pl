@@ -26,7 +26,7 @@
 # then perform a standalone boot of the system using the given configuration within the target
 
 # define how many seconds each run is allowed to execute for
-$qemu_timeout = 2;
+$qemu_timeout = 10;
 
 if($ARGV[0] eq "")
 {
