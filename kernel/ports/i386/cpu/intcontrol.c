@@ -100,26 +100,25 @@ void int_initialise_common(void)
 kresult int_initialise(void)
 {
    unsigned int has_lapic = lapic_is_present();
-
-   dprintf("has_lapic = %i\n", has_lapic);
    
    /* initialise the basic PIC chipset */
    pic_initialise();
    
-   /* on a uniproc machine? */
    if(!has_lapic)
-   {      
-      /* set up a 100Hz ticker for the scheduler  */
-      INT_DEBUG("[int:%i] uniproc: set up timer (%iHz)...\n", CPU_ID, SCHED_FREQUENCY);
+   {
+      /* set up a 100Hz ticker for the scheduler on a non-apic machine */
+      INT_DEBUG("[int:%i] uniproc: set up timer (%iHz)\n", CPU_ID, SCHED_FREQUENCY);
       x86_timer_init(SCHED_FREQUENCY);
       irq_register_driver(PIC_8254_IRQ, IRQ_DRIVER_FUNCTION | IRQ_DRIVER_LAST, 0, &int_common_timer);
+   }
+   else
+   {
+      /* initialise the boot cpu's local APIC if present */
+      lapic_initialise(INT_IAMBSP);
    }
    
    /* initialise the smp system's IOAPIC */
    if(mp_ioapics) ioapic_initialise(0);
    
-   /* initialise the boot cpu's local APIC if we're on a multiprocessor machine */
-   if(has_lapic) lapic_initialise(INT_IAMBSP);
-
    return success;
 }

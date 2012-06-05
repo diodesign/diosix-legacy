@@ -23,10 +23,27 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 #define LAPIC_ID_REG         ((volatile unsigned int *)(LAPIC_BASE + 0x020))
 #define LAPIC_VER_REG        ((volatile unsigned int *)(LAPIC_BASE + 0x030))
 #define LAPIC_TASKPRI        ((volatile unsigned int *)(LAPIC_BASE + 0x080))
+#define LAPIC_PROCPRI        ((volatile unsigned int *)(LAPIC_BASE + 0x0a0))
 #define LAPIC_EOI            ((volatile unsigned int *)(LAPIC_BASE + 0x0b0))
 #define LAPIC_DESTID         ((volatile unsigned int *)(LAPIC_BASE + 0x0d0))
 #define LAPIC_DESTFMT        ((volatile unsigned int *)(LAPIC_BASE + 0x0e0))
 #define LAPIC_SPURIOUS_REG   ((volatile unsigned int *)(LAPIC_BASE + 0x0f0))
+#define LAPIC_INSERVC0_REG   ((volatile unsigned int *)(LAPIC_BASE + 0x100))
+#define LAPIC_INSERVC1_REG   ((volatile unsigned int *)(LAPIC_BASE + 0x110))
+#define LAPIC_INSERVC2_REG   ((volatile unsigned int *)(LAPIC_BASE + 0x120))
+#define LAPIC_INSERVC3_REG   ((volatile unsigned int *)(LAPIC_BASE + 0x130))
+#define LAPIC_INSERVC4_REG   ((volatile unsigned int *)(LAPIC_BASE + 0x140))
+#define LAPIC_INSERVC5_REG   ((volatile unsigned int *)(LAPIC_BASE + 0x150))
+#define LAPIC_INSERVC6_REG   ((volatile unsigned int *)(LAPIC_BASE + 0x160))
+#define LAPIC_INSERVC7_REG   ((volatile unsigned int *)(LAPIC_BASE + 0x170))
+#define LAPIC_INTREQ0_REG    ((volatile unsigned int *)(LAPIC_BASE + 0x200))
+#define LAPIC_INTREQ1_REG    ((volatile unsigned int *)(LAPIC_BASE + 0x210))
+#define LAPIC_INTREQ2_REG    ((volatile unsigned int *)(LAPIC_BASE + 0x220))
+#define LAPIC_INTREQ3_REG    ((volatile unsigned int *)(LAPIC_BASE + 0x230))
+#define LAPIC_INTREQ4_REG    ((volatile unsigned int *)(LAPIC_BASE + 0x240))
+#define LAPIC_INTREQ5_REG    ((volatile unsigned int *)(LAPIC_BASE + 0x250))
+#define LAPIC_INTREQ6_REG    ((volatile unsigned int *)(LAPIC_BASE + 0x260))
+#define LAPIC_INTREQ7_REG    ((volatile unsigned int *)(LAPIC_BASE + 0x270))
 #define LAPIC_ERRSTATUS_REG  ((volatile unsigned int *)(LAPIC_BASE + 0x280))
 #define LAPIC_ICR_LO         ((volatile unsigned int *)(LAPIC_BASE + 0x300))
 #define LAPIC_ICR_HI         ((volatile unsigned int *)(LAPIC_BASE + 0x310))
@@ -157,13 +174,15 @@ kresult irq_deregister_driver(unsigned int irq_num, unsigned int type, process *
 #define IRQ_APIC_ERROR     (APIC_VECTOR_BASE + 5)
 #define IRQ_APIC_SPURIOUS  (63) /* bits 0-3 must be set */
 
-#define IOAPIC_VECTOR_BASE (64)
-
-#define INT_IAMBSP         (1)
-#define INT_IAMAP          (0)
-
-/* the 8254 PIT timer kernel IRQ wired via a PIC chip on a uniproc machine */
+/* the 8254 PIT's PMT scheduler IRQ is wired via a PIC chip on a uniproc machine */
 #define PIC_8254_IRQ_FIXED (0)
 #define PIC_8254_IRQ       (PIC_MASTER_VECTOR_BASE + PIC_8254_IRQ_FIXED)
+
+#define IOAPIC_VECTOR_BASE (64)
+#define IOAPIC_8254_IRQ    (IOAPIC_VECTOR_BASE + 2) /* the PIT is tied to INTIN2 */
+
+/* flag whether we're the boot processor or not */
+#define INT_IAMBSP         (1)
+#define INT_IAMAP          (0)
 
 #endif

@@ -120,12 +120,12 @@ void ioapic_initialise(unsigned char id)
    IOAPIC_DEBUG("[ioapic:%i] initialising chip %i\n", id);
    
    /* ensure any IOAPICs present are enabled and in SMP mode. From the Intel manaual:
-    The IMCR is supported by two read/writable or write-only I/O ports, 22h and
-    23h, which receive address and data respectively. To access the IMCR, write a
-    value of 70h to I/O port 22h, which selects the IMCR. Then write the data to
-    I/O port 23h. The power-on default value is zero, which connects the NMI and
-    8259 INTR lines directly to the BSP. Write a value of 1 to route 8259/PIT
-    interrupts via the IOAPIC */
+      The IMCR is supported by two read/writable or write-only I/O ports, 22h and
+      23h, which receive address and data respectively. To access the IMCR, write a
+      value of 70h to I/O port 22h, which selects the IMCR. Then write the data to
+      I/O port 23h. The power-on default value is zero, which connects the NMI and
+      8259 INTR lines directly to the BSP. Write a value of 1 to route 8259/PIT
+      interrupts via the IOAPIC */
    x86_outportb(0x22, 0x70); /* begin IMCR access */
    x86_outportb(0x23, 1);    /* set bit 1 for SMP mode */
    

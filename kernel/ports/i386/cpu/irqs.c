@@ -38,7 +38,6 @@ void irq_handler(int_registers_block regs)
    irq_driver_entry *driver;
    
    IRQ_DEBUG("[irq:%i] processing IRQ %i (registers at %p)\n", CPU_ID, regs.intnum, &regs);
-   dprintf("[irq:%i] processing IRQ %i (registers at %p)\n", CPU_ID, regs.intnum, &regs);
    
    /* make sure we only consider the low byte, which contains the irq number */
    regs.intnum = regs.intnum % IRQ_MAX_LINES;

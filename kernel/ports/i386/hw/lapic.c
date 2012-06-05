@@ -43,6 +43,9 @@ kresult lapic_irq_default(unsigned char intnum, int_registers_block *regs)
    lAPIC timer for the scheduler */
 kresult lapic_preflight_timer(unsigned char intnum, int_registers_block *regs)
 {
+   LAPIC_DEBUG("[lapic:%i] lapic preflight timer interrupt: count %i\n",
+               CPU_ID, lapic_preflight_timer_pass);
+
    /* sample the lAPIC's current timer value and store it while the index variable 
       is valid for the array */
    if(lapic_preflight_timer_pass < APIC_TIMER_PASSES)
@@ -69,7 +72,7 @@ void lapic_end_interrupt(void)
 
 /* lapic_write
    Write to an APIC register. Due to a silly Pentium bug, it's best to
-   read from the register before wriitng to it..
+   read from the register before writing to it..
    => addr  = address to write to
       value = 32bit value to write
 */
@@ -83,6 +86,17 @@ void lapic_write(volatile unsigned int volatile *addr, volatile unsigned int val
    
    /* simple, eh? */
    *addr = value;
+}
+
+/* lapic_read
+   Read from an APIC register
+   => addr  = address to read from
+      value = 32bit value to read
+*/
+unsigned int lapic_read(volatile unsigned int volatile *addr)
+{
+   /* simple, eh? */
+   return (unsigned int)*addr;
 }
 
 /* int_apic_icr_ready
@@ -186,24 +200,22 @@ void lapic_initialise(unsigned char flags)
       
       /* catch IPI messages */
       int_set_gate(INT_IPI_RESCHED, (unsigned int)isr142, 0x18, 0x8E, 0);
-      int_set_gate(INT_IPI_FLUSHTLB, (unsigned int)isr143, 0x18, 0x8E, 1); /* reload idt */
+      int_set_gate(INT_IPI_FLUSHTLB, (unsigned int)isr143, 0x18, 0x8E, 1); /* 1 = reload idt */
    }
       
    /* program the APIC's registers so that interrupts point towards
-    the correct entries in the table of handlers  - start with the 
-    destination and task priority registers before enabling the APIC */
+      the correct entries in the table of handlers  - start with the 
+      destination and task priority registers before enabling the APIC */
    lapic_write(LAPIC_DESTID,  0xff000000);
    lapic_write(LAPIC_DESTFMT, 0xffffffff); /* force into flat SMP mode */
    lapic_write(LAPIC_TASKPRI, 0); /* clear the task priority reg so all ints are handled */  
    
+   /* program the initial interrupt vectors for the APIC */
    lapic_write(LAPIC_SPURIOUS_REG, IRQ_APIC_SPURIOUS | LAPIC_ENABLE);
    lapic_write(LAPIC_LVT_TIMER,    IRQ_APIC_TIMER);
-   lapic_write(LAPIC_LVT_LINT0,    IRQ_APIC_LINT0);
-   lapic_write(LAPIC_LVT_LINT1,    IRQ_APIC_LINT1 | LAPIC_LVT_NMI);
-   lapic_write(LAPIC_LVT_PCOUNTER, IRQ_APIC_PCINT | LAPIC_LVT_MASK);
    lapic_write(LAPIC_LVT_THERMAL,  IRQ_APIC_THERMAL);
    lapic_write(LAPIC_LVT_ERROR,    IRQ_APIC_ERROR);
-      
+
    /* allow the boot processor to perform one-time system init and pre-flight checks */
    if(flags & INT_IAMBSP)
    {
@@ -213,11 +225,10 @@ void lapic_initialise(unsigned char flags)
       LAPIC_DEBUG("[lapic:%i] measuring APIC timer in pre-flight checks...\n", CPU_ID);
       
       /* attach the preflight timer handler to IRQ line. */
-      irq_register_driver(IRQ_APIC_LINT0, IRQ_DRIVER_FUNCTION, 0, &lapic_preflight_timer);
-      irq_register_driver(IOAPIC_VECTOR_BASE, IRQ_DRIVER_FUNCTION, 0, &lapic_preflight_timer);
+      irq_register_driver(PIC_8254_IRQ, IRQ_DRIVER_FUNCTION, 0, &lapic_preflight_timer);
       
-      /* set the old-world timer to fire every at the rate expcted by the scheduler
-       and see how far the CPU's APIC counts down in those periods */
+      /* set the old-world PIT timer to fire at the rate expcted by the scheduler
+         and see how far the CPU's APIC counts down in those periods */
       lapic_write(LAPIC_TIMERDIV, LAPIC_DIV_128); /* divide down the bus clock by 128 */
       lapic_write(LAPIC_TIMERINIT, 0xffffffff);
       x86_timer_init(SCHED_FREQUENCY);
@@ -229,9 +240,8 @@ void lapic_initialise(unsigned char flags)
       /* tear down this preflight check and ensure the timer is disabled */
       x86_disable_interrupts();
       x86_timer_init(0);
-      irq_deregister_driver(IRQ_APIC_LINT0, IRQ_DRIVER_FUNCTION, 0, &lapic_preflight_timer);
-      irq_deregister_driver(IOAPIC_VECTOR_BASE, IRQ_DRIVER_FUNCTION, 0, &lapic_preflight_timer);
-      
+      irq_deregister_driver(PIC_8254_IRQ, IRQ_DRIVER_FUNCTION, 0, &lapic_preflight_timer);
+
       /* calculate the average init value for the apic timer - each value has
          already been divided by APIC_TIMER_PASSES */
        for(addition_loop = 0; addition_loop < APIC_TIMER_PASSES; addition_loop++)
@@ -253,6 +263,11 @@ void lapic_initialise(unsigned char flags)
    lapic_write(LAPIC_LVT_TIMER, IRQ_APIC_TIMER | LAPIC_TIMER_TP);
    lapic_write(LAPIC_TIMERDIV,  LAPIC_DIV_128); /* divide down the bus clock by 128 */
    lapic_write(LAPIC_TIMERINIT, lapic_preflight_timer_init);
+   
+   /* program the rest of the interrupt vectors */
+   lapic_write(LAPIC_LVT_LINT0,    IRQ_APIC_LINT0);
+   lapic_write(LAPIC_LVT_LINT1,    IRQ_APIC_LINT1 | LAPIC_LVT_NMI);
+   lapic_write(LAPIC_LVT_PCOUNTER, IRQ_APIC_PCINT | LAPIC_LVT_MASK);
 }
 
 /* lapic_is_present
