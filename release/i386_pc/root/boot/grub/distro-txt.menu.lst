@@ -1,0 +1,25 @@
+# diosix-hyatt pre-Release1.0 i386 boot agenda
+# with text console rather than VGA graphics
+
+timeout 1
+
+title diosix-hyatt
+root (cd)
+kernel /boot/kernel
+
+# kernel symbol table
+module /boot/kernel.sym
+
+# system services
+module /sbin/init
+module /sbin/vfs
+module /sbin/lwip
+
+# base device drivers
+module /sbin/drivers/i386/pcimngr
+module /sbin/drivers/i386/rtl8139
+module /sbin/drivers/i386/ata
+module /sbin/drivers/i386/textconsole
+
+# serial is a test driver
+# module /sbin/drivers/i386/serial

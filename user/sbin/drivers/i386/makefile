@@ -9,4 +9,4 @@ all:	makefile
 	make -C rtl8139
 	make -C serial
 	make -C ata
-
+	make -C textconsole
