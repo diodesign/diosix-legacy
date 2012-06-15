@@ -82,7 +82,14 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 # define XPT_DEBUG      dprintf
 #else
 # define XPT_DEBUG if(0) dprintf
-#endif 
+#endif
+
+#ifdef XPT_CRASH_DEBUG
+# undef XPT_CRASH_DEBUG
+# define XPT_CRASH_DEBUG dprintf
+#else
+# define XPT_CRASH_DEBUG if(0) dprintf
+#endif
 
 #ifdef INT_DEBUG
 # undef INT_DEBUG

@@ -27,4 +27,20 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 #define COLOUR_UNCHANGED (-1)
 
+/* colours suitable for foreground and backgrounds */
+#define COLOUR_BLACK     (0)
+#define COLOUR_BLUE      (1)
+#define COLOUR_GREEN     (2)
+#define COLOUR_CYAN      (3)
+#define COLOUR_RED       (4)
+#define COLOUR_MAGENTA   (5)
+#define COLOUR_BROWN     (6)
+#define COLOUR_GRAY      (7)
+
+/* set this bit to force a fg colour into a lighter tint */
+#define COLOUR_LIGHTER   (1 << 7)
+
+#define COLOUR_DEFAULTBG (COLOUR_MAGENTA)
+#define COLOUR_DEFAULTFG (COLOUR_GRAY | COLOUR_LIGHTER)
+
 #endif

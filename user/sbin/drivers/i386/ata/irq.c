@@ -73,7 +73,7 @@ void wait_for_irq(void)
    msg.role = msg.pid = DIOSIX_MSG_ANY_PROCESS;
    msg.tid = DIOSIX_MSG_ANY_THREAD;
    msg.flags = DIOSIX_MSG_SIGNAL | DIOSIX_MSG_KERNELONLY;
-   
+
    for(;;)
    {
       /* block until a signal comes in from the hardware */

@@ -300,6 +300,8 @@ kresult locks_initialise(void *initial_phys_pg)
    return success;
 }
 
+extern rw_gate vmm_lock;
+
 /* lock_gate
    Allow multiple threads to read during a critical section, but only
    allow one writer. To avoid deadlocks, it keeps track of the exclusive
@@ -346,7 +348,7 @@ kresult lock_gate(rw_gate *gate, unsigned int flags)
       caller = (unsigned int)cpu_table[CPU_ID].current;
    else
       caller = (CPU_ID) + 1; /* zero means no owner, CPU_IDs start at zero... */
-
+   
    while(1)
    {
       lock_spin(&(gate->spinlock));

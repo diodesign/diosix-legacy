@@ -223,6 +223,13 @@ BL    _main
 parked:
 B .
 
+/* put this CPU to sleep and do not return */
+arm_cpu_sleep:
+MRS   r1, CPSR
+BIC   r1, r1, #0x80
+MSR   CPSR_c, r1  /* enable interrupts */
+B .               /* stop doing anything */
+
 /* ------------------------------------------------------------ */
 
 /* boot exception vector table - offsets are 8bytes short due to

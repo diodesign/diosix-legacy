@@ -427,65 +427,56 @@ void x86_proc_preinit(void)
 
 /* x86_thread_switch
    Freeze a thread and select another to run
-   => now = running thread to stop
+   => now = running thread to stop, or NULL to simply start the next thread
       next = thread to reload, or NULL to just preserve the now thread
       regs = pointer to kernel stack
 */
 void x86_thread_switch(thread *now, thread *next, int_registers_block *regs)
 {
    tss_descr *new_tss;
-
-   /* bail out if invalid pointers */
-   if(!now || !regs)
-   {
-      KOOPS_DEBUG("OMGWTF! x86_thread_switch() called with invalid pointer: now = %p, next = %p, regs = %p\n",
-                  now, next, regs);
-      debug_panic("x86_thread_switch() cannot continue with a wild pointer");
-      /* shouldn't return */
-   }
-      
-#ifdef LOLVL_DEBUG
-   if(next)
-   {
-      new_tss = next->tss;
-         
-      LOLVL_DEBUG("[x86:%i] switching thread %p for %p (regs %p state %i) (ds/ss %x cs %x ss0 %x esp0 %x)\n",
-              CPU_ID, now, next, regs, next->state, new_tss->ss, new_tss->cs, new_tss->ss0, new_tss->esp0);
-      LOLVL_DEBUG("[x86:%i] PRE-SWAP: ds %x edi %x esi %x ebp %x esp %x ebx %x edx %x ecx %x eax %x\n"
-              "      intnum %x errcode %x eip %x cs %x eflags %x useresp %x ss %x\n",
-              CPU_ID, regs->ds, regs->edi, regs->esi, regs->ebp, regs->esp, regs->ebx, regs->edx, regs->ecx, regs->eax,
-              regs->intnum, regs->errcode, regs->eip, regs->cs, regs->eflags, regs->useresp, regs->ss);
-   }
-#endif
    
-   /* check to see if we have to preserve the FP context */
-   if(KernelFPPresent == X86_FPU_PRESENT)
-   {      
-      /* check to see if the thread running used FP.
-         if TS is cleared then FP was used */
-      if(!(x86_read_cr0() & X86_CR0_TS))
-         fpu_save_state(now); /* XXX can this fail here? the memory is already allocated */
-         
-      /* ensure TS is set in cr0 for the next thread. if it uses FP,
-         an exception will occur and we'll demand load its FP state */
-      x86_load_cr0(x86_read_cr0() | X86_CR0_TS);
-   }
-   
-   /* preserve state of the thread */
-   vmm_memcpy(&(now->regs), regs, sizeof(int_registers_block));
-
-   if(next)
+   if(now)
    {
-      /* load state for new thread */
-      vmm_memcpy(regs, &(next->regs), sizeof(int_registers_block));
-
-      LOLVL_DEBUG("[x86:%i] POST-SWAP: ds %x edi %x esi %x ebp %x esp %x ebx %x edx %x ecx %x eax %x\n"
+      LOLVL_DEBUG("[x86:%i] x86_thread_switch: current thread: ds %x edi %x esi %x ebp %x esp %x ebx %x edx %x ecx %x eax %x\n"
                   "      intnum %x errcode %x eip %x cs %x eflags %x useresp %x ss %x\n",
                   CPU_ID, regs->ds, regs->edi, regs->esi, regs->ebp, regs->esp, regs->ebx, regs->edx, regs->ecx, regs->eax,
                   regs->intnum, regs->errcode, regs->eip, regs->cs, regs->eflags, regs->useresp, regs->ss);
       
+      /* check to see if we have to preserve the FP context */
+      if(KernelFPPresent == X86_FPU_PRESENT)
+      {      
+         /* check to see if the thread running used FP.
+            if TS is cleared then FP was used */
+         if(!(x86_read_cr0() & X86_CR0_TS))
+            fpu_save_state(now); /* XXX can this fail here? the memory is already allocated */
+            
+         /* ensure TS is set in cr0 for the next thread. if it uses FP,
+            an exception will occur and we'll demand load its FP state */
+         x86_load_cr0(x86_read_cr0() | X86_CR0_TS);
+      }
+      
+      /* preserve state of the thread */
+      vmm_memcpy(&(now->regs), regs, sizeof(int_registers_block));
+   }
+
+   if(next)
+   {
+      unsigned int **pgdir = NULL;
+      
+      /* load state for new thread */
+      vmm_memcpy(regs, &(next->regs), sizeof(int_registers_block));
+
+      LOLVL_DEBUG("[x86:%i] x86_thread_switch: next thread: ds %x edi %x esi %x ebp %x esp %x ebx %x edx %x ecx %x eax %x\n"
+                  "      intnum %x errcode %x eip %x cs %x eflags %x useresp %x ss %x\n",
+                  CPU_ID, regs->ds, regs->edi, regs->esi, regs->ebp, regs->esp, regs->ebx, regs->edx, regs->ecx, regs->eax,
+                  regs->intnum, regs->errcode, regs->eip, regs->cs, regs->eflags, regs->useresp, regs->ss);
+      
+      /* get the current thread's page directory, if there is one.
+         the pgdir will never have a virtual address of NULL */
+      if(now) pgdir = now->proc->pgdir;
+      
       /* reload page directory if we're switching to a new address space */
-      if(now->proc->pgdir != next->proc->pgdir)
+      if(pgdir != next->proc->pgdir)
          x86_load_cr3(KERNEL_LOG2PHYS(next->proc->pgdir));
       
       /* inform the CPU that things have changed */
@@ -747,18 +738,17 @@ void x86_disable_interrupts(void)
    __asm__ __volatile__("cli");
 }
 
-
-/* generic veneers */
-void lowlevel_thread_switch(thread *now, thread *next, int_registers_block *regs)
-{
+/* debug the locks on entry to the thread switch code */
 #ifdef LOCK_SANITY_CHECK
+void lowlevel_thread_switch_lock_debug(thread *now, thread *next, int_registers_block *regs)
+{
    /* thread+owner process locks should be released prior to switching tasks to avoid deadlocks */
    lock_spin(&(now->lock.spinlock));
    if(now->lock.owner && now->state != dead)
    {
       thread *o = (thread *)(now->lock.owner);
       KOOPS_DEBUG("[x86:%i] switching from thread %p (tid %i pid %i) with lock %p still engaged!\n",
-              CPU_ID, now, now->tid, now->proc->pid, &(now->lock));
+                  CPU_ID, now, now->tid, now->proc->pid, &(now->lock));
       KOOPS_DEBUG("        lock owner is %p (tid %i pid %i)\n", o, o->tid, o->proc->pid);
       KOOPS_DEBUG(" *** halting.\n");
       while(1);
@@ -770,7 +760,7 @@ void lowlevel_thread_switch(thread *now, thread *next, int_registers_block *regs
    {
       thread *o = (thread *)(now->proc->lock.owner);
       KOOPS_DEBUG("[x86:%i] switching from process %p (pid %i) with lock %p still engaged!\n",
-              CPU_ID, now->proc, now->proc->pid, &(now->proc->lock));
+                  CPU_ID, now->proc, now->proc->pid, &(now->proc->lock));
       KOOPS_DEBUG("        lock owner is %p (tid %i pid %i)\n", o, o->tid, o->proc->pid);
       KOOPS_DEBUG(" *** halting.\n");
       while(1);
@@ -785,25 +775,47 @@ void lowlevel_thread_switch(thread *now, thread *next, int_registers_block *regs
                   CPU_ID, now->tid, now->proc->pid, now, next);
    }
    unlock_spin(&(irq_lock.spinlock));
+}
+#endif
+
+/* generic veneers */
+/* lowlevel_thread_switch
+   Preserve the given thread by saving the register block to its structure and switch in the next thread
+   => now = thread to preserve, or NULL to just start the next thread
+      next = next thread to switch in, or NULL to simply preserve the now thread's state
+      regs = the register state of the now thread
+   <= only returns if next is NULL
+*/
+void lowlevel_thread_switch(thread *now, thread *next, int_registers_block *regs)
+{
+#ifdef LOCK_SANITY_CHECK
+   if(now) lowlevel_thread_switch_lock_debug(now, next, regs);
 #endif
    
-   /* if the thread is already in usermode then switch to it */
-   if(next->flags & THREAD_FLAG_INUSERMODE)
+   /* preserve just the running thread if there's no next thread */
+   if(now && !next) x86_thread_switch(now, NULL, regs);
+   
+   /* prepare to start or restart the next thread */
+   if(next)
    {
-      LOLVL_DEBUG("[x86:%i] switching to warm thread %i process %i (%p) from thread %i process %i (%p)\n",
-                   CPU_ID, next->tid, next->proc->pid, next, now->tid, now->proc->pid, now);
-      x86_thread_switch(now, next, regs);
-   }
-   else
-   {
-      LOLVL_DEBUG("[x86:%i] switching to cold thread %i process %i (%p) from thread %i process %i (%p)\n",
-                  CPU_ID, next->tid, next->proc->pid, next, now->tid, now->proc->pid, now);
-      
-      /* suspend the currently running thread */
-      x86_thread_switch(now, NULL, regs);
-      
-      /* and kickstart the next one into userspace */
-      x86_kickstart(next);
+      /* if the thread is already in usermode then switch to it */
+      if(next->flags & THREAD_FLAG_INUSERMODE)
+      {
+         LOLVL_DEBUG("[x86:%i] switching to warm thread %i process %i (%p))\n",
+                     CPU_ID, next->tid, next->proc->pid, next);
+         x86_thread_switch(now, next, regs);
+      }
+      else
+      {
+         LOLVL_DEBUG("[x86:%i] switching to cold thread %i process %i (%p)\n",
+                     CPU_ID, next->tid, next->proc->pid, next);
+         
+         /* suspend the currently running thread */
+         x86_thread_switch(now, NULL, regs);
+         
+         /* and kickstart the next one into userspace */
+         x86_kickstart(next);
+      }
    }
 }
 

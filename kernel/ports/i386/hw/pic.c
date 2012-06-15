@@ -30,8 +30,8 @@ kresult pic_irq_default(unsigned char intnum, int_registers_block *regs)
 {
    /* clear the int from the chip */
    if(intnum >= PIC_SLAVE_VECTOR_BASE)
-      pic_reset(2); /* reset the slave if necessary */
-   pic_reset(1); /* as well as the master */
+      pic_reset(PIC_SLAVE); /* reset the slave if necessary */
+   pic_reset(PIC_MASTER); /* as well as the master */
    
    PIC_DEBUG("[pic:%i] default irq handler called: int %i\n", CPU_ID, intnum);
    return success;
@@ -71,16 +71,53 @@ void pic_remap(unsigned int offset1, unsigned int offset2)
 
 /* pic_reset
    Send an end-of-interrupt/reset signal to a PIC
-   => pic = 1 for master
-            2 for slave
+   => pic = PIC_MASTER for master
+            PIC_SLAVE for slave
 */
 void pic_reset(unsigned char pic)
 {
-   if(pic == 1)
+   if(pic == PIC_MASTER)
       x86_outportb(PIC1_COMMAND, 0x20);
-   else
+   
+   if(pic == PIC_SLAVE)
       x86_outportb(PIC2_COMMAND, 0x20);
 }
+
+/* pic_read_irq
+   Read the given register from both PICs
+   => reg = ICW3_READ_IRR = read their interrupt request registers
+            ICW3_READ_ISR = read their interrupt in-service registers
+   <= master PIC's data in the low byte, slave's in the high byte
+*/
+unsigned short pic_read_irq(unsigned char reg)
+{
+   x86_outportb(PIC1_COMMAND, reg);
+   x86_outportb(PIC2_COMMAND, reg);
+   return x86_inportb(PIC1_COMMAND) | (x86_inportb(PIC2_COMMAND) << 8);
+}
+
+/* pic_discover_irq
+   Return the highest priority interrupt in-service in the PICs,
+   ie: call this to find out which source is caused the PICs to fire an IRQ
+   <= pending interrupt source requiring source (0-15) or -1 for no IRQ
+*/
+signed char pic_discover_irq(void)
+{
+   unsigned char loop;
+   unsigned short isr = pic_read_irq(ICW3_READ_ISR);
+      
+   /* scan through the ISR register looking for set bits to indicate
+      an IRQ has been delivered to the CPU */
+   for(loop = 0; loop < PIC_MAX_IRQS; loop++)
+   {
+      if(isr & 1) return loop;
+      isr = isr >> 1;
+   }
+   
+   /* fall through to return no IRQ source found */
+   return -1;
+}
+
 
 /* pic_mask_disable
    Mask out the given IRQ line to disable the PIC from processing it

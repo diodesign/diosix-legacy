@@ -59,6 +59,9 @@ void exception_handler(int_registers_block regs)
          XPT_DEBUG("[xpt:%i] DOUBLE FAULT: code %i (%x)\n",
                    CPU_ID, regs.errcode, regs.errcode & ((1 << 16) - 1));
 
+         XPT_CRASH_DEBUG("[crash:%i] process %i thread %i doubled faulted [eip %x]\n",
+                         CPU_ID, cpu_table[CPU_ID].current->proc->pid,
+                         cpu_table[CPU_ID].current->tid, regs.eip);
          syscall_do_exit(&regs);
          break;
          
@@ -98,6 +101,9 @@ void exception_handler(int_registers_block regs)
          }
          else
             /* this process is broken, so default action is shoot to kill */
+            XPT_CRASH_DEBUG("[crash:%i] process %i thread %i hit an undefined instruction [eip %x]\n",
+                            CPU_ID, cpu_table[CPU_ID].current->proc->pid,
+                            cpu_table[CPU_ID].current->tid, regs.eip);
             syscall_do_exit(&regs);
          break;
          
@@ -118,20 +124,29 @@ void exception_handler(int_registers_block regs)
          {
             /* if this process was already trying to handle a GPF then kill it.
                the kernel's signal code in msg.c will clear this bit */
-             if(cpu_table[CPU_ID].current->proc->unix_signals_inprogress & (1 << SIGBUS))
+            if(cpu_table[CPU_ID].current->proc->unix_signals_inprogress & (1 << SIGBUS))
+            {
+               XPT_CRASH_DEBUG("[crash:%i] process %i thread %i hit a GP fault during fix-up [eip %x]\n",
+                               CPU_ID, cpu_table[CPU_ID].current->proc->pid,
+                               cpu_table[CPU_ID].current->tid, regs.eip);
                syscall_do_exit(&regs);
+            }
             else
             {
                /* mark this process as attempting to handle the fault */
                cpu_table[CPU_ID].current->proc->unix_signals_inprogress |= (1 << SIGBUS);
                
                if(msg_send_signal(cpu_table[CPU_ID].current->proc, NULL, SIGBUS, 0))
+               {
                   /* something went wrong, so default action is shoot to kill */
+                  XPT_CRASH_DEBUG("[crash:%i] process %i thread %i hit GP fault, signal delivery failed [eip %x]\n",
+                                  CPU_ID, cpu_table[CPU_ID].current->proc->pid,
+                                  cpu_table[CPU_ID].current->tid, regs.eip);
                   syscall_do_exit(&regs);
+               }
                else
                   /* sleep this thread until it's woken up by the signal handler */
                   sched_remove(cpu_table[CPU_ID].current, waitingaftersig);
-
             }
          }
          break;
@@ -142,9 +157,14 @@ void exception_handler(int_registers_block regs)
             the process - pg_fault() doesn't return if the kernel hits an unhandled
             kernel page fault */
          {
-            /* kill the process if it in the middle of trying to fix-up a page fault */
+            /* kill the process if it's in the middle of trying to fix-up a page fault */
             if(cpu_table[CPU_ID].current->proc->unix_signals_inprogress & (1 << SIGSEGV))
+            {
+               XPT_CRASH_DEBUG("[crash:%i] process %i thread %i faulted during fault fix-up [eip %x]\n",
+                               CPU_ID, cpu_table[CPU_ID].current->proc->pid,
+                               cpu_table[CPU_ID].current->tid, regs.eip);
                syscall_do_exit(&regs);
+            }
             else
             {
                /* mark this process as attempting to handle the fault */
@@ -154,8 +174,9 @@ void exception_handler(int_registers_block regs)
                {
                   /* something went wrong, so shoot to kill */
                   regs.eax = POSIX_GENERIC_FAILURE;
-                  dprintf("*** going to kill process %i (in thread %i)\n",
-                          cpu_table[CPU_ID].current->proc->pid, cpu_table[CPU_ID].current->tid);
+                  XPT_CRASH_DEBUG("[crash:%i] process %i thread %i faulted, signal delivery failed [eip %x]\n",
+                                  CPU_ID, cpu_table[CPU_ID].current->proc->pid,
+                                  cpu_table[CPU_ID].current->tid, regs.eip);
                   syscall_do_exit(&regs);
                }
                else

@@ -199,11 +199,25 @@ void write_string(char *str, char fg_colour, char bg_colour)
    line_break();
 }
 
+/* clear_screen
+   Wipe the screen clear using the given background colour */
+void clear_screen(char bg_colour)
+{
+   plot_rectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, bg_colour);
+}
 
 /* introduce us to the console user */
 void boot_screen(void)
 {
-   write_string("Hello, world! Now running diosix-hyatt", 7, 0);
+   clear_screen(COLOUR_DEFAULTBG);
+
+   write_string("Hello, world! Now running diosix-hyatt", COLOUR_DEFAULTFG, COLOUR_DEFAULTBG);
+
+   while(1)
+   {
+      write_string("tick", COLOUR_DEFAULTFG, COLOUR_DEFAULTBG);
+      diosix_thread_sleep(100);
+   }
 }
 
 /* ----------------------------------------------------------------------

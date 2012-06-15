@@ -130,6 +130,7 @@ void pic_remap(unsigned int offset1, unsigned int offset2);
 void pic_reset(unsigned char pic);
 void pic_mask_disable(unsigned char irq);
 void pic_mask_enable(unsigned char irq);
+signed char pic_discover_irq(void);
 
 unsigned char lapic_is_present(void);
 void lapic_write(volatile unsigned int *addr, unsigned int value);
@@ -161,8 +162,12 @@ kresult irq_deregister_driver(unsigned int irq_num, unsigned int type, process *
 /* syscall interface */
 #define INT_KERNEL_SWI     (144)
 
+#define PIC_MASTER         (1)
+#define PIC_SLAVE          (2)
+
 #define PIC_MASTER_VECTOR_BASE   (32)
 #define PIC_SLAVE_VECTOR_BASE    (PIC_MASTER_VECTOR_BASE + 8)
+#define PIC_MAX_IRQS             (16)
 
 #define APIC_TIMER_PASSES  (4)
 #define APIC_VECTOR_BASE   (48)

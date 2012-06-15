@@ -33,7 +33,54 @@ extern void irq43(); extern void irq44(); extern void irq45(); extern void irq46
 /* default handler for IOAPIC IRQs - just EOI the interrupt */
 kresult ioapic_irq_default(unsigned char intnum, int_registers_block *regs)
 {
-   /* the local APIC generated this interrupt, so satisfy it */
+   /* determine if a PIC handler needs to be called - the PICs are
+      routed through the IOAPIC, which passes its IRQs onto the 
+      local APIC */
+   switch(intnum)
+   {
+      /* IOPIC IRQ0 tied to master PIC IRQ output,
+         so try to discover the IRQ source */
+      case IOAPIC_VECTOR_BASE + 0:
+      {
+         signed char isr = pic_discover_irq();
+         if(isr != -1)
+            pic_irq_default(PIC_MASTER_VECTOR_BASE + isr, regs);
+         else
+         {
+            KOOPS_DEBUG("[ioapic:%i] OOPS? Spurious interrupt %i, no source found..\n",
+                        CPU_ID, intnum);
+         }
+      }
+         break;
+         
+      /* IOPIC IRQ2 tied to master PIC IRQ0 */
+      case IOAPIC_VECTOR_BASE + 2:
+         pic_irq_default(PIC_MASTER_VECTOR_BASE + 0, regs);
+         break;
+         
+      /* IOAPIC IRQ 1,3-7 tied to master PIC IRQ 1,3-7 respectively */
+      case IOAPIC_VECTOR_BASE + 1:
+      case IOAPIC_VECTOR_BASE + 3:
+      case IOAPIC_VECTOR_BASE + 4:
+      case IOAPIC_VECTOR_BASE + 5:
+      case IOAPIC_VECTOR_BASE + 6:
+      case IOAPIC_VECTOR_BASE + 7:
+         pic_irq_default(PIC_MASTER_VECTOR_BASE + (intnum - IOAPIC_VECTOR_BASE), regs);
+         break;
+         
+      /* IOAPIC IRQ 8-15 tied to slave PIC IRQ 0-7 respectively */
+      case IOAPIC_VECTOR_BASE + 8:
+      case IOAPIC_VECTOR_BASE + 9:
+      case IOAPIC_VECTOR_BASE + 10:
+      case IOAPIC_VECTOR_BASE + 11:
+      case IOAPIC_VECTOR_BASE + 12:
+      case IOAPIC_VECTOR_BASE + 13:
+      case IOAPIC_VECTOR_BASE + 14:
+      case IOAPIC_VECTOR_BASE + 15:
+         pic_irq_default(PIC_SLAVE_VECTOR_BASE + (intnum - IOAPIC_VECTOR_BASE), regs);
+   }
+   
+   /* acknowledge to the local APIC that we've satisfied the interrupt */
    lapic_end_interrupt();
    return success;
 }

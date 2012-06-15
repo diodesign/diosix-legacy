@@ -37,5 +37,7 @@ void lowlevel_disable_interrupts(void);
 void lowlevel_proc_preinit(void);
 void lowlevel_stacktrace(void);
 void lowlevel_kickstart(void);
+#define lowlevel_cpu_sleep arm_cpu_sleep 
+void arm_cpu_sleep(int_registers_block *regs);
 
 #endif

@@ -19,7 +19,7 @@ Contact: chris@diodesign.co.uk / http://www.diodesign.co.uk/
 
 /* maintain a rough msec counter since scheduler start up */ 
 volatile unsigned int sched_msec_counter = 0;
-unsigned int tick = SCHED_CARETAKER;
+unsigned int sched_caretaker_tick = SCHED_CARETAKER;
 kpool *sched_bedroom; /* queued pool of sleeping threads waiting for an alarm timeout */
 
 /* provide spinlocking around critical sections */
@@ -127,7 +127,7 @@ void sched_priority_calc(thread *tocalc, sched_priority_request request)
          tocalc->priority = SCHED_PRIORITY_INTERRUPTS + 1;
       else
          tocalc->priority = SCHED_PRIORITY_INTERRUPTS;
-      
+
       unlock_gate(&(tocalc->lock), LOCK_WRITE);
       return;
    }
@@ -415,6 +415,47 @@ kresult sched_unlock_proc(process *proc)
    return success;
 }
 
+/* sched_check_snoozers
+   Check to see if there are snoozing threads that need waking up.
+   Call once per scheduling tick */
+void sched_check_snoozers(void)
+{
+   /* start the search from the top of the queued pool */
+   snoozing_thread *snoozer = vmm_next_in_pool(NULL, sched_bedroom);
+
+   while(snoozer)
+   {
+      /* step through the sleeping threads and decrease their timer values */
+      snoozer->timer--;
+      if(snoozer->timer == 0)
+      {
+         switch(snoozer->action)
+         {
+            case wake:
+               /* wake up the thread */
+               sched_add(snoozer->sleeper->cpu, snoozer->sleeper);
+               
+               SCHED_DEBUG("[sched:%i] woke up snoozing thread %p (tid %i pid %i)\n",
+                           CPU_ID, snoozer->sleeper, snoozer->sleeper->tid, snoozer->sleeper->proc->pid);
+               break;
+
+            case signal:
+               /* poke the owning process as a SIGALARM signal from the kernel */
+               msg_send_signal(snoozer->sleeper->proc, NULL, SIGALRM, 0);
+               
+               SCHED_DEBUG("[sched:%i] sent SIGALRM to process %p pid %i\n",
+                           CPU_ID, snoozer->sleeper, snoozer->sleeper->proc->pid);
+         }
+         
+         /* and bin the pool block */
+         vmm_free_pool(snoozer, sched_bedroom);
+         snoozer = NULL; /* pointer no longer valid, so start from the front */
+      }
+      
+      snoozer = vmm_next_in_pool(snoozer, sched_bedroom);
+   }
+}
+
 /* sched_caretaker
    Run maintenance over the queues to ensure even load across
    cpus by adjusting the cpu id for waiting threads. if a
@@ -446,69 +487,26 @@ void sched_tick(int_registers_block *regs)
       sched_msec_counter += DIOSIX_MSEC_PER_TICK;
       
       /* check to run the caretaker */
-      if(tick)
-         tick--;
+      if(sched_caretaker_tick)
+         sched_caretaker_tick--;
       else
       {
          sched_caretaker();
-         tick = SCHED_CARETAKER;
+         sched_caretaker_tick = SCHED_CARETAKER;
       }
       
       /* are there any sleeping threads? */
-      if(vmm_count_pool_inuse(sched_bedroom))
-      {
-         snoozing_thread *snoozer = NULL;
-         
-         for(;;)
-         {
-            /* step through the sleeping threads and decrease their timer values */
-            snoozer = vmm_next_in_pool(snoozer, sched_bedroom);
-            if(snoozer)
-            {
-               snoozer->timer--;
-               if(snoozer->timer == 0)
-               {
-                  switch(snoozer->action)
-                  {
-                     case wake:
-                     {
-                        /* wake up the thread */
-                        sched_add(snoozer->sleeper->cpu, snoozer->sleeper);
-                        
-                        SCHED_DEBUG("[sched:%i] woke up snoozing thread %p (tid %i pid %i)\n",
-                                    CPU_ID, snoozer->sleeper, snoozer->sleeper->tid, snoozer->sleeper->proc->pid);
-                     }
-
-                     case signal:
-                     {
-                        /* poke the owning process as a SIGALARM signal from the kernel */
-                        msg_send_signal(snoozer->sleeper->proc, NULL, SIGALRM, 0);
-                        
-                        SCHED_DEBUG("[sched:%i] sent SIGALRM to process %p pid %i\n",
-                                    CPU_ID, snoozer->sleeper, snoozer->sleeper->proc->pid);
-                     }
-                  }
-               
-                  /* and bin the pool block */
-                  vmm_free_pool(snoozer, sched_bedroom);
-                  snoozer = NULL; /* pointer no longer valid */
-                  break;
-               }
-            } else break; /* escape the loop if no more sleepers */
-         }
-      }
+      if(vmm_count_pool_inuse(sched_bedroom)) sched_check_snoozers();
    }
-   
-   lock_gate(&(cpu->lock), LOCK_READ);
-   
-   /* bail out if we're not running anything */
+      
+   /* find a thread if we're not running anything */
    if(!(cpu->current))
    {
-      SCHED_DEBUG("[sched:%i] nothing running on this core\n", CPU_ID);
-      unlock_gate(&(cpu->lock), LOCK_READ);
+      sched_pick(regs);
+
+      /* if we're still here then resume what was running */
       return;
    }
-   unlock_gate(&(cpu->lock), LOCK_READ);
    
    SCHED_DEBUG("[sched:%i] tick for thread %i of process %i (state %i)\n",
                CPU_ID, cpu->current->tid, cpu->current->proc->pid, cpu->current->state);
@@ -634,69 +632,73 @@ void sched_rescan_queues(unsigned char cpuid)
 */
 void sched_pick(int_registers_block *regs)
 {
-   thread *now, *next = NULL;
+   thread *now, *next;
 
    mp_core *cpu = &cpu_table[CPU_ID];
    
    SCHED_DEBUG_QUEUES;
    
-   /* this is the state of play */
-   lock_gate(&(cpu->lock), LOCK_READ);
+   /* this is the currently running thread or NULL for none */
    now = cpu->current;
-   unlock_gate(&(cpu->lock), LOCK_READ);
-   
+
    /* see if there's another thread to run */
-   while(!next)
+   next = sched_get_next_to_run(CPU_ID);
+   if(!next)
    {
+      /* avoid running out of any work to do
+         so check all queues for lingering threads */
+      sched_rescan_queues(CPU_ID);
       next = sched_get_next_to_run(CPU_ID);
+   }
       
+   /* how the next part plays out depends on whether or not
+      there's a thread waiting to run */
+   if(!next)
+   {
       /* if there's nothing to run and the current thread is
          marked as running then continue with the current 
          thread */
-      if(!next && now)
-         if(now->state == running) return;
-      
-      /* avoid running out of any work to do */
-      lock_gate(&(cpu->lock), LOCK_WRITE);
-      sched_rescan_queues(CPU_ID);
-      unlock_gate(&(cpu->lock), LOCK_WRITE);
+      if(now && now->state == running) return;
    }
-   
-   /* keep with the currently running thread if it's
-      the highest priority thread allowed to run */
-   if(next == now)
+   else
    {
-      /* ensure the thread's state variable reflects its condition */
-      lock_gate(&(next->lock), LOCK_WRITE);
-      next->state = running;
-      unlock_gate(&(next->lock), LOCK_WRITE);
+      /* keep with the currently running thread if it's
+         the highest priority thread allowed to run */
+      if(next == now)
+      {
+         /* ensure the thread's state variable reflects its condition */
+         next->state = running;
       
-      return; /* easy quick switch back to where we were */
+         return; /* easy quick switch back to where we were */
+      }
+   
+      if(now && now->state == running)
+      {
+         /* don't let a low priority thread trump the current one
+            (don't forget that higher the value, the lower the priority */
+         if(next->priority > now->priority) return;
+      
+         /* update thread state if it's about to be switched out */
+         now->state = inrunqueue;
+      }
+      
+      /* put the next thread in the driving seat */   
+      next->cpu = CPU_ID;
+      next->state = running;
    }
    
-   if((next->priority > now->priority) &&
-      (now->state == running)) return;
+   /* at this point, next may be NULL, indicating we should sleep
+      because there's nothing to actually run */
    
-   /* update thread states */
-   lock_gate(&(now->lock), LOCK_WRITE);
-   lock_gate(&(next->lock), LOCK_WRITE);
-   
-   if(now->state == running) now->state = inrunqueue;
-   next->cpu = CPU_ID;
-   next->state = running;
-   
-   unlock_gate(&(next->lock), LOCK_WRITE);
-   unlock_gate(&(now->lock), LOCK_WRITE);
-
-   /* this is the only place in core that we change cpu->current. the (un)lock_gate
-      code relies on cpu->current not changing between lock-unlock pairs for a
-      given kernel thread. so we have to use a basic low-level spin lock on the
-      cpu's gate while we update this */   
-   lock_spin(&(cpu->lock.spinlock));
+   /* the (un)lock_gate code relies on cpu->current not changing between
+      lock-unlock pairs for a given kernel thread. so we have to use a
+      basic low-level spin lock on the cpu's gate while we update this */   
    cpu->current = next;
-   unlock_spin(&(cpu->lock.spinlock));
-
+   
    lowlevel_thread_switch(now, next, regs);
+   
+   /* sleep until the timer wakes us up and restarts the scheduling process */
+   if(!next) lowlevel_cpu_sleep(regs); /* doesn't return */
    
    SCHED_DEBUG("[sched:%i] switched thread %i of process %i (%p) for thread %i of process %i (%p)\n",
            CPU_ID, now->tid, now->proc->pid, now, next->tid, next->proc->pid, next);

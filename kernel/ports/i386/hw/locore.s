@@ -663,8 +663,8 @@ x86_load_tss:
 ; ---------------- assembler to reload the gdt --------------------------------
 [global x86_load_gdtr]
 x86_load_gdtr:
-   mov  eax, [esp+4]   ; get the pointer to the gdtptr from the stack
-   lgdt [eax]        ; fixed address of gdt table
+   mov  eax, [esp+4]  ; get the pointer to the gdtptr from the stack
+   lgdt [eax]         ; fixed address of gdt table
    ret
 
 ; ---------------- assembler to atomically test and set -----------------------
@@ -675,6 +675,25 @@ x86_test_and_set:
     lock              ; lock the memory bus for the next instruction
     xchg [edx], eax   ; swap eax with what is stored in [edx]
     ret               ; return the old value that's in eax 
+
+; ---------------- assembler to put this CPU to sleep -------------------------
+; going from ring3->ring0 stacks an error code, eip, cs, eflags, esp and ss
+; plus ds, edi, esi, ebp, esp, ebx, edx, ecx, eax and an interrupt/exception code
+; but this code is running in ring0 and ring0-ring0 stacks ds, edi, esi, ebp,
+; esp, ebx, edx, ecx, eax, an error code, eip, cs, eflags - ie: r0->r0 doesn't
+; stack the usermode esp and ss. so flatten the stack but leave 2 x 4 bytes
+[global x86_cpu_sleep]
+x86_cpu_sleep:
+   mov eax, [esp+4]   ; get the stack ptr immediately after last interrupt
+   add eax, 14 * 4    ; skip over the 9 registers and irq/exception number stacked
+                      ; by the interrupt/exception handler and the error code, eip,
+                      ; cs and eflags stacked by the processor
+   mov esp, eax       ; update the stack
+   mov ecx, eax
+   sti                ; enable interrupts
+x86_cpu_halt:
+   hlt                ; sleep
+   jmp x86_cpu_halt   ; do not return
 
 ; ---------------- filthy dump of hex to COM1 -----------------
 x86_dump_hex_and_halt:
