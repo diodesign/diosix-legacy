@@ -108,9 +108,9 @@ kresult fpu_restore_state(thread *target)
    return success;
 }
 
-/* fpu_restore_state
-   Load the processor's FP registers with the state stored for a thread
-   => target = thread with FP state to restore
+/* fpu_save_state
+   Save the processor's FP registers to memory for a thread
+   => target = thread with FP state to save
    <= 0 for success, or an error code
 */
 kresult fpu_save_state(thread *target)
@@ -130,7 +130,7 @@ kresult fpu_save_state(thread *target)
    
    aligned_block = (unsigned char *)fpu_align_state((unsigned int)target->fp);
 
-   /* execute the right restore instruction for the supported FPU */
+   /* execute the right save instruction for the supported FPU */
    switch((fpu_type)KernelSIMDPresent)
    {
       case fpu_type_basic:
